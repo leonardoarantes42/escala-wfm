@@ -188,7 +188,7 @@ def criar_grafico_timeline(df_dim, data_referencia_str="2025-01-01", colorir_por
     return fig
 
 # ================= MAIN APP =================
-
+st.title("🚙 Sistema de Escalas Turbi")
 df_global, _ = carregar_dados_aba('Mensal')
 
 # --- SIDEBAR ---
