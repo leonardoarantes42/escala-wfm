@@ -211,7 +211,7 @@ def converter_df_para_csv(df):
 
 # ================= MAIN APP =================
 
-st.title("🚀 Sistema de EscalaS Turbi")
+st.title("🚙 Sistema de EscalaS Turbi")
 
 df_global, _ = carregar_dados_aba('Mensal')
 
