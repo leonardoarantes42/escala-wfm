@@ -10,10 +10,11 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- FUNÇÕES ---
 def carregar_dados():
-    # O read() lê a primeira aba por defeito. 
-    # usecols ajuda a garantir que lemos tudo, ou pode ajustar conforme necessário.
-    # header=1 mantém-se se a estrutura for a mesma (linha 2 é o cabeçalho)
-    df = conn.read(header=1) 
+    # Estamos forçando o link aqui para garantir que ele ache a planilha
+    url_planilha = "https://docs.google.com/spreadsheets/d/1sZ8fpjLMfJb25TfJL9Rj8Yhkdw91sZ0yNWGZIgKPO8Q"
+    
+    # TTL=0 garante que ele não use cache antigo e tente ler de novo agora
+    df = conn.read(spreadsheet=url_planilha, header=1, ttl=0)
     df = df.dropna(subset=['NOME'])
     return df
 
