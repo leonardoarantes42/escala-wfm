@@ -8,9 +8,9 @@ import io
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
-    page_title="Sistema de Escalas Turbi", 
+    page_title="Sistema WFM Pro", 
     layout="wide", 
-    page_icon="🚙",
+    page_icon="logo_turbi.png", 
     initial_sidebar_state="expanded"
 )
 
@@ -211,13 +211,18 @@ def converter_df_para_csv(df):
 
 # ================= MAIN APP =================
 
-st.title("🚙 Sistema de EscalaS Turbi")
+st.title("🚙 Sistema de Escalas Turbi")
 
 df_global, _ = carregar_dados_aba('Mensal')
 
 # --- SIDEBAR ---
 with st.sidebar:
+    st.image("logo_turbi.png", width=150) 
+    st.divider() # Uma linha elegante para separar
+    
     st.header("⚙️ Painel")
+    
+    modo_edicao = st.checkbox("Modo Edição (Líderes)")
     
     modo_edicao = st.checkbox("Modo Edição (Líderes)")
     pode_editar = False
