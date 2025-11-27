@@ -221,9 +221,7 @@ with st.sidebar:
     st.divider() # Uma linha elegante para separar
     
     st.header("⚙️ Painel")
-    
-    modo_edicao = st.checkbox("Modo Edição (Líderes)")
-    
+        
     modo_edicao = st.checkbox("Modo Edição (Líderes)")
     pode_editar = False
     if modo_edicao:
