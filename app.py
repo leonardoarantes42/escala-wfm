@@ -1,22 +1,60 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
+import gspread
+from google.oauth2.service_account import Credentials
 
 st.set_page_config(page_title="Escala WFM", layout="wide")
 
-# --- CONEXÃO SEGURA ---
-# Isto conecta-se usando os segredos que configurou no painel
-conn = st.connection("gsheets", type=GSheetsConnection)
+# --- CONEXÃO ROBUSTA (GSPREAD) ---
+def conectar_google_sheets():
+    # Define o escopo (o que o robô pode fazer)
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    
+    # Carrega as credenciais direto dos Segredos do Streamlit
+    credentials = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"],
+        scopes=scopes
+    )
+    
+    # Autentica
+    client = gspread.authorize(credentials)
+    return client
 
 # --- FUNÇÕES ---
+@st.cache_data(ttl=60)
 def carregar_dados():
-    # Estamos forçando o link aqui para garantir que ele ache a planilha
-    url_planilha = "https://docs.google.com/spreadsheets/d/1sZ8fpjLMfJb25TfJL9Rj8Yhkdw91sZ0yNWGZIgKPO8Q"
+    client = conectar_google_sheets()
     
-    # TTL=0 garante que ele não use cache antigo e tente ler de novo agora
-    df = conn.read(spreadsheet=url_planilha, header=1, ttl=0)
-    df = df.dropna(subset=['NOME'])
-    return df
+    # URL da sua planilha
+    url = "https://docs.google.com/spreadsheets/d/1sZ8fpjLMfJb25TfJL9Rj8Yhkdw91sZ0yNWGZIgKPO8Q"
+    
+    try:
+        # Tenta abrir a planilha
+        sh = client.open_by_url(url)
+        # Pega a primeira aba (índice 0)
+        worksheet = sh.get_worksheet(0)
+        
+        # Pega todos os dados
+        dados = worksheet.get_all_values()
+        
+        # Transforma em DataFrame (assumindo linha 2 como cabeçalho, índice 1)
+        # Se a linha 1 for cabeçalho, mude para headers = dados.pop(0)
+        cabecalho = dados[1] # Linha 2 do Excel
+        linhas = dados[2:]   # Da linha 3 para baixo
+        
+        df = pd.DataFrame(linhas, columns=cabecalho)
+        df = df.dropna(subset=['NOME']) # Filtra vazios
+        return df
+
+    except gspread.exceptions.SpreadsheetNotFound:
+        st.error("ERRO CRÍTICO: O Robô autenticou, mas não encontrou a planilha. Verifique se o e-mail do robô está na lista de compartilhamento.")
+        st.stop()
+    except Exception as e:
+        st.error(f"Erro detalhado: {e}")
+        st.stop()
 
 def colorir_escala(val):
     color = ''
@@ -28,40 +66,45 @@ def colorir_escala(val):
     return color
 
 # --- INTERFACE ---
-st.title("🔒 Escala WFM (Modo Seguro)")
+st.title("🔒 Escala WFM (GSpread)")
+
+if st.button("🔄 Recarregar"):
+    st.cache_data.clear()
 
 try:
-    # Botão para atualizar dados manualmente (útil quando alguém edita na planilha)
-    if st.button("🔄 Atualizar Dados"):
-        st.cache_data.clear()
-        
     df = carregar_dados()
 
     # Filtros
     st.sidebar.header("Filtros")
-    lideres = df['LIDER'].unique().tolist()
-    sel_lider = st.sidebar.multiselect("Líder", lideres, default=lideres)
     
-    ilhas = df['ILHA'].unique().tolist()
-    sel_ilha = st.sidebar.multiselect("Ilha", ilhas, default=ilhas)
+    # Garante que as colunas existem antes de criar filtro
+    if 'LIDER' in df.columns:
+        lideres = df['LIDER'].unique().tolist()
+        sel_lider = st.sidebar.multiselect("Líder", lideres, default=lideres)
+    
+    if 'ILHA' in df.columns:
+        ilhas = df['ILHA'].unique().tolist()
+        sel_ilha = st.sidebar.multiselect("Ilha", ilhas, default=ilhas)
     
     busca = st.sidebar.text_input("Buscar Nome")
 
-    # Lógica de Filtro
     df_filtrado = df.copy()
-    if sel_lider: df_filtrado = df_filtrado[df_filtrado['LIDER'].isin(sel_lider)]
-    if sel_ilha: df_filtrado = df_filtrado[df_filtrado['ILHA'].isin(sel_ilha)]
-    if busca: df_filtrado = df_filtrado[df_filtrado['NOME'].str.contains(busca, case=False)]
-
-    st.write(f"Visualizando **{len(df_filtrado)}** registos.")
     
-    # Exibição
+    if 'LIDER' in df.columns and sel_lider: 
+        df_filtrado = df_filtrado[df_filtrado['LIDER'].isin(sel_lider)]
+    if 'ILHA' in df.columns and sel_ilha: 
+        df_filtrado = df_filtrado[df_filtrado['ILHA'].isin(sel_ilha)]
+    if 'NOME' in df.columns and busca: 
+        df_filtrado = df_filtrado[df_filtrado['NOME'].str.contains(busca, case=False)]
+
+    st.write(f"Visualizando **{len(df_filtrado)}** analistas.")
+    
     colunas_fixas = ['NOME', 'EMAIL', 'ADMISSÃO', 'ILHA', 'ENTRADA', 'SAIDA', 'LIDER']
     st.dataframe(
-        df_filtrado.style.map(colorir_escala, subset=df_filtrado.columns.difference(colunas_fixas)),
+        df_filtrado.style.map(colorir_escala, subset=df_filtrado.columns.difference(colunas_fixas, sort=False)),
         height=600,
         use_container_width=True
     )
 
 except Exception as e:
-    st.error(f"Erro na conexão: {e}")
+    st.error(f"Erro geral: {e}")
