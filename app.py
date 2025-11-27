@@ -31,24 +31,51 @@ def listar_abas_dim():
     return abas_dim
 
 def carregar_dados_aba(nome_aba):
-    """Carrega dados de uma aba específica"""
+    """Carrega dados de uma aba específica com detecção inteligente de cabeçalho"""
     client = conectar_google_sheets()
     try:
         sh = client.open_by_url(URL_PLANILHA)
-        # Tenta pegar a aba pelo nome, se for 'Mensal' pega a primeira (índice 0)
         if nome_aba == 'Mensal':
              worksheet = sh.get_worksheet(0)
         else:
              worksheet = sh.worksheet(nome_aba)
 
         dados = worksheet.get_all_values()
-        cabecalho = dados[1] # Linha 2 é o cabeçalho
-        linhas = dados[2:]   # Dados da linha 3 para baixo
-        df = pd.DataFrame(linhas, columns=cabecalho)
-        # Remove linhas completamente vazias ou sem nome
+        
+        # --- DETECÇÃO INTELIGENTE DE CABEÇALHO ---
+        # Procura nas primeiras 5 linhas onde está a coluna "NOME" ou "NOMES"
+        indice_cabecalho = -1
+        cabecalho_encontrado = []
+        
+        for i, linha in enumerate(dados[:5]):
+            # Converte tudo para maiúsculo e remove espaços para verificar
+            linha_upper = [str(col).upper().strip() for col in linha]
+            if "NOME" in linha_upper or "NOMES" in linha_upper:
+                indice_cabecalho = i
+                # Normaliza: Se achar "NOMES", troca para "NOME" para não quebrar o código
+                cabecalho_encontrado = ['NOME' if str(col).upper().strip() == 'NOMES' else str(col).upper().strip() for col in linha]
+                break
+        
+        if indice_cabecalho == -1:
+            st.error(f"Erro: Não encontrei a coluna 'NOME' ou 'NOMES' nas primeiras 5 linhas da aba '{nome_aba}'.")
+            return None, None
+
+        # Carrega os dados a partir da linha seguinte ao cabeçalho encontrado
+        linhas = dados[indice_cabecalho + 1:]   
+        
+        df = pd.DataFrame(linhas, columns=cabecalho_encontrado)
+        
+        # Limpeza e Segurança
+        # Garante que não tenhamos colunas com nomes vazios (comum no pandas dar erro)
+        df = df.loc[:, ~df.columns.duplicated()]
+        
+        # Filtra linhas vazias
         df = df.dropna(how='all')
-        df = df[df['NOME'] != '']
+        if 'NOME' in df.columns:
+            df = df[df['NOME'] != '']
+            
         return df, worksheet
+
     except Exception as e:
         st.error(f"Erro ao carregar aba '{nome_aba}': {e}")
         return None, None
