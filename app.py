@@ -10,7 +10,7 @@ import io
 st.set_page_config(
     page_title="Sistema de Escalas Turbi", 
     layout="wide", 
-    page_icon="🚀",
+    page_icon="🚙",
     initial_sidebar_state="expanded"
 )
 
