@@ -4,11 +4,10 @@ import gspread
 from google.oauth2.service_account import Credentials
 import plotly.express as px
 from datetime import datetime, timedelta
-import io
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
-    page_title="Sistema WFM Pro", 
+    page_title="Sistema de Escalas Turbi", 
     layout="wide", 
     page_icon="logo_turbi.png", 
     initial_sidebar_state="expanded"
@@ -75,52 +74,34 @@ def carregar_dados_aba(nome_aba):
         st.error(f"Erro ao carregar aba '{nome_aba}': {e}")
         return None, None
 
-# --- NOVAS FUNÇÕES DE KPI (INTELIGÊNCIA) ---
-
+# --- NOVAS FUNÇÕES DE KPI ---
 def calcular_kpis_data_especifica(df_mensal, data_escolhida):
-    """Conta status baseada na data que o usuário escolheu"""
     metrics = {"Trabalhando": 0, "Folga": 0, "Afastado": 0}
-    
     if data_escolhida in df_mensal.columns:
         contagem = df_mensal[data_escolhida].value_counts()
         metrics["Trabalhando"] = contagem.get("T", 0)
         metrics["Folga"] = contagem.get("F", 0)
         metrics["Afastado"] = contagem.get("FR", 0) + contagem.get("AF", 0) + contagem.get("ATESTADO", 0)
-    
     return metrics
 
 def analisar_gargalos_dim(df_dim):
-    """Analisa hora a hora para achar picos e vales"""
     cols_horarios = [c for c in df_dim.columns if ':' in c]
-    
-    if not cols_horarios:
-        return None
+    if not cols_horarios: return None
 
     menor_chat_valor = 9999
     menor_chat_hora = "-"
-    
     maior_pausa_valor = -1
     maior_pausa_hora = "-"
 
-    # Varre cada coluna de hora (06:00, 07:00...)
     for hora in cols_horarios:
-        # Pega a coluna e converte para maiusculo
         coluna_limpa = df_dim[hora].astype(str).str.upper().str.strip()
-        
-        # Conta quantos CHAT tem nessa hora
         qtd_chat = coluna_limpa.eq('CHAT').sum()
-        
-        # Conta quantas PAUSAS (P ou PAUSA) tem nessa hora
         qtd_pausa = coluna_limpa.isin(['P', 'PAUSA']).sum()
 
-        # Verifica se é o novo recorde (Mínimo Chat)
-        # Ignoramos horários onde o chat é 0 se for muito cedo/tarde (opcional), 
-        # mas aqui vamos mostrar a verdade nua e crua.
         if qtd_chat < menor_chat_valor:
             menor_chat_valor = qtd_chat
             menor_chat_hora = hora
             
-        # Verifica se é o novo recorde (Máximo Pausa)
         if qtd_pausa > maior_pausa_valor:
             maior_pausa_valor = qtd_pausa
             maior_pausa_hora = hora
@@ -206,22 +187,17 @@ def criar_grafico_timeline(df_dim, data_referencia_str="2025-01-01", colorir_por
     )
     return fig
 
-def converter_df_para_csv(df):
-    return df.to_csv(index=False).encode('utf-8')
-
 # ================= MAIN APP =================
-
-st.title("🚙 Sistema de Escalas Turbi")
 
 df_global, _ = carregar_dados_aba('Mensal')
 
 # --- SIDEBAR ---
 with st.sidebar:
     st.image("logo_turbi.png", width=150) 
-    st.divider() # Uma linha elegante para separar
+    st.divider()
     
     st.header("⚙️ Painel")
-        
+    
     modo_edicao = st.checkbox("Modo Edição (Líderes)")
     pode_editar = False
     if modo_edicao:
@@ -235,9 +211,6 @@ with st.sidebar:
         filtro_lider_placeholder = st.empty()
         filtro_ilha_placeholder = st.empty()
         busca_nome = st.text_input("Buscar Nome")
-        
-    st.divider()
-    csv_download_placeholder = st.empty()
 
 # --- TABS ---
 aba_mensal, aba_diaria = st.tabs(["📅 Visão Mensal (Macro)", "⏱️ Visão Diária (Operação)"])
@@ -249,16 +222,13 @@ with aba_mensal:
     df_mensal = df_global
     if df_mensal is not None:
         
-        # --- SELETOR DE DATA PARA KPI (Novo!) ---
-        # Procura colunas que pareçam data (ex: XX/XX)
+        # --- SELETOR DE DATA PARA KPI ---
         colunas_datas = [c for c in df_mensal.columns if '/' in c]
         
-        # Cria 2 colunas: Uma para o texto, outra para o selectbox
         kpi_col1, kpi_col2 = st.columns([1, 3])
         with kpi_col1:
             st.markdown("### 📊 Status do Dia:")
         with kpi_col2:
-            # Tenta pegar a data de hoje como padrão, se não pega a primeira
             hoje_str = datetime.now().strftime("%d/%m")
             index_padrao = colunas_datas.index(hoje_str) if hoje_str in colunas_datas else 0
             
@@ -269,7 +239,6 @@ with aba_mensal:
                 label_visibility="collapsed"
             )
 
-        # Calcula KPI da data escolhida
         kpis = calcular_kpis_data_especifica(df_mensal, data_kpi_selecionada)
         
         c1, c2, c3 = st.columns(3)
@@ -288,9 +257,6 @@ with aba_mensal:
         if sel_lider and 'LIDER' in df_f: df_f = df_f[df_f['LIDER'].isin(sel_lider)]
         if sel_ilha and 'ILHA' in df_f: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
         if busca_nome and 'NOME' in df_f: df_f = df_f[df_f['NOME'].str.contains(busca_nome, case=False)]
-
-        csv = converter_df_para_csv(df_f)
-        csv_download_placeholder.download_button("📥 Baixar Mensal", csv, "mensal.csv", "text/csv")
 
         cols_visuais = [c for c in df_f.columns if c not in ['EMAIL', 'ADMISSÃO']]
         
@@ -314,40 +280,34 @@ with aba_diaria:
         df_dim, ws_dim = carregar_dados_aba(aba_sel)
         
         if df_dim is not None:
-            # --- ANÁLISE DE GARGALOS (Novo!) ---
+            # --- ANÁLISE DE GARGALOS ---
             analise = analisar_gargalos_dim(df_dim)
             
             if analise:
                 st.markdown(f"### 🌡️ Termômetro da Operação: {aba_sel}")
                 k1, k2 = st.columns(2)
                 
-                # Card de Alerta (Menos Chat)
                 k1.metric(
                     label="⚠️ Horário com MENOS Chat", 
                     value=f"{analise['min_chat_hora']}",
                     delta=f"{analise['min_chat_valor']} pessoas",
-                    delta_color="inverse" # Fica vermelho se for baixo
+                    delta_color="inverse"
                 )
                 
-                # Card de Atenção (Pico de Pausa)
                 k2.metric(
                     label="☕ Horário com MAIS Pausas", 
                     value=f"{analise['max_pausa_hora']}",
                     delta=f"{analise['max_pausa_valor']} pessoas em pausa",
-                    delta_color="off" # Cinza/Neutro
+                    delta_color="off"
                 )
                 st.divider()
 
-            # --- FILTROS VISUAIS ---
+            # --- FILTROS ---
             df_dim_f = df_dim.copy()
             if sel_lider and 'LIDER' in df_dim_f: df_dim_f = df_dim_f[df_dim_f['LIDER'].isin(sel_lider)]
             if sel_ilha and 'ILHA' in df_dim_f: df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
             if busca_nome and 'NOME' in df_dim_f: df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
             
-            # Download
-            csv_d = converter_df_para_csv(df_dim_f)
-            csv_download_placeholder.download_button(f"📥 Baixar {aba_sel}", csv_d, f"{aba_sel}.csv", "text/csv")
-
             tipo = st.radio("Modo:", ["📊 Timeline", "▦ Grade"], index=1 if pode_editar else 0, horizontal=True)
 
             if pode_editar or tipo == "▦ Grade":
