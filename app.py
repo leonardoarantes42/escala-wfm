@@ -150,7 +150,7 @@ def criar_grafico_timeline(df_dim, data_referencia_str="2025-01-01"):
     return fig
 
 # --- INTERFACE ---
-st.title("🚀 Sistema de Gestão de Escala WFM")
+st.title("🚀 Sistema de Escalas Turbi")
 
 with st.sidebar:
     st.header("⚙️ Controle")
