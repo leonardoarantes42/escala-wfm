@@ -3,7 +3,7 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 
-st.set_page_config(page_title="Escala WFM", layout="wide")
+st.set_page_config(page_title="Escala CX Turbi", layout="wide")
 
 # --- CONEXÃO ROBUSTA (GSPREAD) ---
 def conectar_google_sheets():
@@ -52,7 +52,7 @@ def colorir_escala(val):
     return color
 
 # --- INTERFACE ---
-st.title("🔒 Escala WFM (Com Edição)")
+st.title("🔒 Escala CX Turbi")
 
 # Carrega os dados (usamos session_state para não recarregar toda hora)
 if 'df_dados' not in st.session_state:
