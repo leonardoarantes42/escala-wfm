@@ -59,6 +59,20 @@ st.markdown("""
         .stDataFrame {
             font-size: 13px;
         }
+        
+        /* Centralização Forçada da Tabela */
+        [data-testid="stDataFrame"] div[role="gridcell"] > div {
+            display: flex;
+            justify-content: center; 
+            align-items: center;     
+            text-align: center;
+        }
+        /* Coluna NOME à esquerda */
+        [data-testid="stDataFrame"] div[role="gridcell"][aria-colindex="1"] > div {
+            justify-content: flex-start !important;
+            text-align: left !important;
+            font-weight: bold;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -68,8 +82,7 @@ COLUNAS_FIXAS_BACKEND = ['NOME', 'EMAIL', 'ADMISSÃO', 'ILHA', 'ENTRADA', 'SAIDA
 SENHA_LIDER = "turbi123"
 OPCOES_ATIVIDADE = ["Chat", "E-mail", "P", "1:1", "F", "Treino", "Almoço", "Feedback", "Financeiro", "Reembolsos", "BackOffice"]
 
-# --- SUA ORDEM PERSONALIZADA AQUI ---
-# Atenção: Escreva EXATAMENTE como está na planilha (Maiúsculas, acentos, etc)
+# --- ORDEM RÍGIDA DAS ILHAS ---
 ORDEM_DAS_ILHAS = [
     "Suporte", 
     "Emergência", 
@@ -195,7 +208,8 @@ def analisar_gargalos_dim(df_dim):
         "max_pausa_valor": maior_pausa_valor
     }
 
-# --- ESTILOS E CORES ---
+# --- VISUALIZAÇÃO E ESTILOS ---
+
 def colorir_mensal(val):
     val = str(val).upper().strip() if isinstance(val, str) else str(val)
     if val == 'T': return 'background-color: #c9daf8; color: black' 
@@ -212,17 +226,34 @@ def colorir_diario(val):
     elif 'E-MAIL' in val or 'EMAIL' in val: return 'background-color: #bfe1f6; color: black'
     elif 'REEMBOLSOS' in val: return 'background-color: #d4edbc; color: black'
     elif 'BACKOFFICE' in val: return 'background-color: #5a3286; color: white'
+    elif 'T' == val: return 'background-color: #c9daf8; color: black' # Caso tenha T no diário
     return ''
 
 def estilo_separacao_ilhas(df):
-    """Borda grossa para separar as ilhas visualmente"""
+    """
+    Função avançada que desenha uma borda grossa no topo sempre que a ilha muda.
+    """
+    # Cria uma cópia vazia do dataframe para guardar os estilos CSS
     estilos = pd.DataFrame('', index=df.index, columns=df.columns)
+    
     if 'ILHA' in df.columns:
-        # Detecta onde a Ilha muda em relação à linha anterior
-        mudanca_ilha = df['ILHA'] != df['ILHA'].shift(1)
-        for col in df.columns:
-            # Aplica borda no topo da linha onde muda a ilha
-            estilos.loc[mudanca_ilha, col] = 'border-top: 2px solid #333 !important;' 
+        # Detecta onde a Ilha muda (comparando linha atual com a anterior)
+        # O .astype(str) garante que não dê erro de tipos diferentes
+        ilhas = df['ILHA'].astype(str)
+        mudanca_ilha = ilhas != ilhas.shift(1)
+        
+        # Define o estilo da borda: Azul escuro, grosso (3px) e sólido
+        # border-top é o segredo da separação
+        css_borda = 'border-top: 3px solid #1e3a8a !important;'
+        
+        # Aplica em todas as colunas das linhas onde a ilha mudou
+        # Ignoramos a primeira linha (iloc[0]) para não riscar o cabeçalho
+        linhas_para_pintar = mudanca_ilha[mudanca_ilha].index
+        
+        for idx in linhas_para_pintar:
+            if idx in estilos.index: # Segurança
+                estilos.loc[idx, :] = css_borda
+                
     return estilos
 
 def criar_grafico_timeline(df_dim, data_referencia_str="2025-01-01", colorir_por="Atividade"):
@@ -335,27 +366,33 @@ with aba_mensal:
         if sel_ilha and 'ILHA' in df_f: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
         if busca_nome and 'NOME' in df_f: df_f = df_f[df_f['NOME'].str.contains(busca_nome, case=False)]
 
-        # --- ORDENAÇÃO PERSONALIZADA (Aqui está a mágica!) ---
+        # --- ORDENAÇÃO RÍGIDA E LIMPEZA (AQUI ESTÁ A MÁGICA) ---
         if 'ILHA' in df_f.columns:
-            # Cria uma coluna temporária para ordenar
-            df_f['ILHA_TEMP'] = df_f['ILHA'].astype("category")
-            # Define a ordem exata que você pediu
-            df_f['ILHA_TEMP'] = df_f['ILHA_TEMP'].cat.set_categories(ORDEM_DAS_ILHAS, ordered=True)
-            # Ordena e depois joga fora a coluna temporária
-            df_f = df_f.sort_values(by=['ILHA_TEMP', 'NOME'])
-            df_f = df_f.drop(columns=['ILHA_TEMP'])
+            # 1. Limpa espaços em branco para garantir o match
+            df_f['ILHA'] = df_f['ILHA'].astype(str).str.strip()
             
-            # (Segurança) Coloca quem não estiver na lista no final
-            # O sort acima já faz isso (NaN fica por último), mas garantimos que a lógica funciona
+            # 2. Cria Categoria com a ORDEM EXATA
+            df_f['ILHA_CAT'] = pd.Categorical(
+                df_f['ILHA'], 
+                categories=ORDEM_DAS_ILHAS, 
+                ordered=True
+            )
+            
+            # 3. Ordena pela Categoria, colocando não encontrados (NaN) no final
+            df_f = df_f.sort_values(by=['ILHA_CAT', 'NOME'], na_position='last')
+            
+            # 4. Remove a coluna auxiliar
+            df_f = df_f.drop(columns=['ILHA_CAT'])
 
         cols_para_remover = ['EMAIL', 'E-MAIL', 'ADMISSÃO', 'ILHA']
         cols_visuais = [c for c in df_f.columns if c.upper().strip() not in cols_para_remover]
         
         styler = (df_f[cols_visuais].style
                   .map(colorir_mensal)
-                  .apply(estilo_separacao_ilhas, axis=None) # Aplica a linha divisória
-                  .set_properties(**{'font-size': '12px', 'text-align': 'center'})
-                  .set_properties(subset=['NOME'], **{'text-align': 'left'}))
+                  .apply(estilo_separacao_ilhas, axis=None) # APLICA A BORDA AZUL GROSSA
+                  .set_properties(**{'font-size': '12px'})
+                  # Nota: Alinhamento central forçado via CSS Global no início do código
+        )
 
         if pode_editar:
             st.data_editor(df_f, use_container_width=True, hide_index=True, key="ed_m")
@@ -393,12 +430,12 @@ with aba_diaria:
             if sel_ilha and 'ILHA' in df_dim_f: df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
             if busca_nome and 'NOME' in df_dim_f: df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
             
-            # APLICA A MESMA ORDENAÇÃO NO DIÁRIO SE TIVER COLUNA ILHA
+            # --- ORDENAÇÃO RÍGIDA NO DIÁRIO TAMBÉM ---
             if 'ILHA' in df_dim_f.columns:
-                df_dim_f['ILHA_TEMP'] = df_dim_f['ILHA'].astype("category")
-                df_dim_f['ILHA_TEMP'] = df_dim_f['ILHA_TEMP'].cat.set_categories(ORDEM_DAS_ILHAS, ordered=True)
-                df_dim_f = df_dim_f.sort_values(by=['ILHA_TEMP', 'NOME'])
-                df_dim_f = df_dim_f.drop(columns=['ILHA_TEMP'])
+                df_dim_f['ILHA'] = df_dim_f['ILHA'].astype(str).str.strip()
+                df_dim_f['ILHA_CAT'] = pd.Categorical(df_dim_f['ILHA'], categories=ORDEM_DAS_ILHAS, ordered=True)
+                df_dim_f = df_dim_f.sort_values(by=['ILHA_CAT', 'NOME'], na_position='last')
+                df_dim_f = df_dim_f.drop(columns=['ILHA_CAT'])
 
             tipo = st.radio("Modo:", ["📊 Timeline", "▦ Grade"], index=1 if pode_editar else 0, horizontal=True, label_visibility="collapsed")
 
@@ -414,9 +451,8 @@ with aba_diaria:
                 else:
                     styler_dim = (df_dim_f[cols_v].style
                                   .map(colorir_diario)
-                                  .apply(estilo_separacao_ilhas, axis=None) # Aplica borda no diário também
-                                  .set_properties(**{'font-size': '12px', 'text-align': 'center'})
-                                  .set_properties(subset=['NOME'], **{'text-align': 'left'}))
+                                  .apply(estilo_separacao_ilhas, axis=None) # Aplica a borda aqui também
+                                  .set_properties(**{'font-size': '12px'}))
                     
                     st.dataframe(styler_dim, use_container_width=True, height=600, hide_index=True)
             else:
