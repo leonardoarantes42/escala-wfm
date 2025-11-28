@@ -67,11 +67,11 @@ COLUNAS_FIXAS_BACKEND = ['NOME', 'EMAIL', 'ADMISSÃO', 'ILHA', 'ENTRADA', 'SAIDA
 SENHA_LIDER = "turbi123"
 OPCOES_ATIVIDADE = ["Chat", "E-mail", "P", "1:1", "F", "Treino", "Almoço", "Feedback", "Financeiro", "Reembolsos", "BackOffice"]
 
-# ORDEM DAS ILHAS PARA AGRUPAMENTO
+# ORDEM DAS ILHAS
 ORDEM_DAS_ILHAS = [
-    "Suporte", "Emergência", # Grupo 1
-    "Financeiro",            # Grupo 2 (Terá destaque)
-    "E-mail", "Pleno", "RA", "Staff" # Outros
+    "Suporte", "Emergência", 
+    "Financeiro",            
+    "E-mail", "Pleno", "RA", "Staff" 
 ]
 
 # --- CONEXÃO ---
@@ -115,18 +115,19 @@ def carregar_dados_aba(nome_aba):
         linhas = dados[indice_cabecalho + 1:]   
         df = pd.DataFrame(linhas, columns=cabecalho_encontrado)
         df = df.loc[:, ~df.columns.duplicated()]
-        df = df.dropna(how='all')
-        if 'NOME' in df.columns: df = df[df['NOME'] != '']
-        if 'ILHA' in df.columns: df = df[df['ILHA'].str.strip() != '']
-
+        
+        # REMOVIDO: df.dropna(how='all') e filtros de NOME
+        # MOTIVO: Para permitir que linhas de separação (que podem ter só o Nome ou só a Ilha) apareçam.
+        # Mantemos apenas a limpeza básica de linhas totalmente vazias se necessário depois.
+        df = df.dropna(how='all') 
+        
         return df, worksheet
 
     except Exception as e:
         st.error(f"Erro ao carregar aba '{nome_aba}': {e}")
         return None, None
 
-# --- NOVAS REGRAS DE KPI E FILTRO ---
-
+# --- KPIS ---
 def calcular_kpis_mensal_detalhado(df_mensal, data_escolhida):
     metrics = {"Trabalhando": 0, "Folga": 0, "Suporte": 0, "Emergencia": 0}
     if data_escolhida in df_mensal.columns:
@@ -140,9 +141,6 @@ def calcular_kpis_mensal_detalhado(df_mensal, data_escolhida):
     return metrics
 
 def calcular_resumo_dia_dim(df_dim):
-    """
-    Conta Escalados (Apenas quem tem CHAT) e Folgas totais.
-    """
     cols_horarios = [c for c in df_dim.columns if ':' in c]
     if not cols_horarios: return {"Trabalhando": 0, "Folga": 0}
 
@@ -151,11 +149,10 @@ def calcular_resumo_dia_dim(df_dim):
 
     resumo = df_dim[cols_horarios].apply(juntar_linha, axis=1)
     
-    # REQUISITO: Escalados conta APENAS quem tem CHAT
+    # Escalados: Apenas quem tem CHAT
     escalados_chat = resumo.str.contains('CHAT').sum()
     
-    # REQUISITO: Folga conta quem tem 'F' e NÃO tem atividade de trabalho
-    # Se tiver 'F' mas tiver 'CHAT' (ex: folga parcial/extra), não conta como folga total
+    # Folga: Quem tem F e NÃO tem trabalho
     tem_trabalho = resumo.str.contains('CHAT|EMAIL|E-MAIL|P|TREINO|1:1|1X1|FINANCEIRO|REEMBOLSOS|BACKOFFICE')
     tem_folga = resumo.str.contains('F')
     folga_total = ((tem_folga) & (~tem_trabalho)).sum()
@@ -203,18 +200,15 @@ def filtrar_e_ordenar_dim(df, modo):
         df_filtrado['SORT_TEMP'] = pd.NaT
 
     if modo == "💬 Apenas Chat":
-        # Mostra apenas quem tem pelo menos 1 'CHAT'
         mask = df_filtrado[cols_horarios].apply(lambda row: row.astype(str).str.upper().str.contains('CHAT').any(), axis=1)
         df_filtrado = df_filtrado[mask]
         
     elif modo == "🚫 Apenas Folgas":
-        # REQUISITO: Mostrar SÓ quem tem 'F' e NÃO tem outras coisas
         def is_pure_folga(row):
             s = "".join([str(val).upper() for val in row])
             has_f = 'F' in s
             has_work = any(x in s for x in ['CHAT', 'EMAIL', 'E-MAIL', 'P', '1:1', 'TREINO', 'FINANCEIRO'])
             return has_f and not has_work
-            
         mask = df_filtrado[cols_horarios].apply(is_pure_folga, axis=1)
         df_filtrado = df_filtrado[mask]
 
@@ -224,7 +218,6 @@ def filtrar_e_ordenar_dim(df, modo):
     return df_filtrado
 
 # --- ESTILOS VISUAIS ---
-
 def colorir_mensal(val):
     val = str(val).upper().strip() if isinstance(val, str) else str(val)
     if val == 'T': return 'background-color: #c9daf8; color: black' 
@@ -242,28 +235,6 @@ def colorir_diario(val):
     elif 'REEMBOLSOS' in val: return 'background-color: #d4edbc; color: black'
     elif 'BACKOFFICE' in val: return 'background-color: #5a3286; color: white'
     return ''
-
-def estilo_separacao_financeiro(df):
-    """
-    Desenha uma borda grossa especificamente acima da ilha FINANCEIRO
-    para criar a separação visual solicitada.
-    """
-    estilos = pd.DataFrame('', index=df.index, columns=df.columns)
-    if 'ILHA' in df.columns:
-        ilhas = df['ILHA'].astype(str).str.strip()
-        # Identifica onde começa o Financeiro (Linha atual é Financeiro E anterior não era)
-        is_fin = ilhas == "Financeiro"
-        was_not_fin = ilhas.shift(1) != "Financeiro"
-        inicio_financeiro = is_fin & was_not_fin
-        
-        # Aplica a borda
-        idx_fin = inicio_financeiro[inicio_financeiro].index
-        for idx in idx_fin:
-            if idx in estilos.index:
-                # Borda Roxa (cor do Nubank/Financeiro moderno) para destacar
-                estilos.loc[idx, :] = 'border-top: 3px solid #5a3286 !important;'
-                
-    return estilos
 
 def criar_grafico_timeline(df_dim, data_referencia_str="2025-01-01", colorir_por="Atividade"):
     lista_timeline = []
@@ -348,19 +319,17 @@ with aba_mensal:
         if sel_ilha and 'ILHA' in df_f: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
         if busca_nome and 'NOME' in df_f: df_f = df_f[df_f['NOME'].str.contains(busca_nome, case=False)]
 
-        # Ordenação
+        # Ordenação por Categoria
         if 'ILHA' in df_f.columns:
             df_f['ILHA'] = df_f['ILHA'].astype(str).str.strip()
             df_f['ILHA_CAT'] = pd.Categorical(df_f['ILHA'], categories=ORDEM_DAS_ILHAS, ordered=True)
             df_f = df_f.sort_values(by=['ILHA_CAT', 'NOME'], na_position='last').drop(columns=['ILHA_CAT'])
 
-        cols_para_remover = ['EMAIL', 'E-MAIL', 'ADMISSÃO', 'ILHA', 'Z'] # Remove Z se existir
+        cols_para_remover = ['EMAIL', 'E-MAIL', 'ADMISSÃO', 'ILHA', 'Z']
         cols_visuais = [c for c in df_f.columns if c.upper().strip() not in cols_para_remover]
         
-        # Aplica a separação visual para o Financeiro
-        styler = (df_f[cols_visuais].style
-                  .map(colorir_mensal)
-                  .apply(estilo_separacao_financeiro, axis=None)) # <--- Separador Financeiro
+        # Apenas cores básicas, sem bordas roxas (já que foi feito na planilha)
+        styler = df_f[cols_visuais].style.map(colorir_mensal)
 
         if pode_editar: st.data_editor(df_f, use_container_width=True, hide_index=True, key="ed_m")
         else: st.dataframe(styler, use_container_width=True, height=600, hide_index=True)
@@ -393,7 +362,7 @@ with aba_diaria:
             if sel_ilha and 'ILHA' in df_dim_f: df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
             if busca_nome and 'NOME' in df_dim_f: df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
             
-            # Ordenação Diária
+            # Ordenação
             if 'ILHA' in df_dim_f.columns:
                 df_dim_f['ILHA'] = df_dim_f['ILHA'].astype(str).str.strip()
                 df_dim_f['ILHA_CAT'] = pd.Categorical(df_dim_f['ILHA'], categories=ORDEM_DAS_ILHAS, ordered=True)
@@ -414,10 +383,10 @@ with aba_diaria:
                     else: st.warning("Erro ao gerar gráfico.")
             
             else:
-                # Filtrar e Ordenar
                 df_exibicao = filtrar_e_ordenar_dim(df_dim_f, tipo)
                 
-                # Ignora Coluna Z aqui também
+                # --- REMOÇÃO FORÇADA DE COLUNA Z ---
+                # Garante que Z não apareça, não importa como esteja escrito
                 cols_para_remover_dim = ['EMAIL', 'E-MAIL', 'ILHA', 'Z']
                 cols_v = [c for c in df_exibicao.columns if c.upper().strip() not in cols_para_remover_dim]
                 
