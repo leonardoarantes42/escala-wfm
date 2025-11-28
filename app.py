@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS: ALINHAMENTO E DESIGN ---
+# --- CSS: DESIGN E ALINHAMENTO ---
 st.markdown("""
     <style>
         .block-container {
@@ -22,6 +22,7 @@ st.markdown("""
             padding-left: 2rem;
             padding-right: 2rem;
         }
+        /* KPIs à Esquerda */
         [data-testid="metric-container"] {
             width: 100%;
             display: flex;
@@ -47,6 +48,7 @@ st.markdown("""
             font-weight: bold;
             color: #1e3a8a;
         }
+        /* Modo Escuro */
         @media (prefers-color-scheme: dark) {
             [data-testid="metric-container"] {
                 background-color: #262730;
@@ -56,22 +58,9 @@ st.markdown("""
                 color: #4dabf7;
             }
         }
+        /* Fonte da Tabela */
         .stDataFrame {
             font-size: 13px;
-        }
-        
-        /* Centralização Forçada da Tabela */
-        [data-testid="stDataFrame"] div[role="gridcell"] > div {
-            display: flex;
-            justify-content: center; 
-            align-items: center;     
-            text-align: center;
-        }
-        /* Coluna NOME à esquerda */
-        [data-testid="stDataFrame"] div[role="gridcell"][aria-colindex="1"] > div {
-            justify-content: flex-start !important;
-            text-align: left !important;
-            font-weight: bold;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -81,17 +70,6 @@ URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1sZ8fpjLMfJb25TfJL9Rj8Yhk
 COLUNAS_FIXAS_BACKEND = ['NOME', 'EMAIL', 'ADMISSÃO', 'ILHA', 'ENTRADA', 'SAIDA', 'LIDER']
 SENHA_LIDER = "turbi123"
 OPCOES_ATIVIDADE = ["Chat", "E-mail", "P", "1:1", "F", "Treino", "Almoço", "Feedback", "Financeiro", "Reembolsos", "BackOffice"]
-
-# --- ORDEM RÍGIDA DAS ILHAS ---
-ORDEM_DAS_ILHAS = [
-    "Suporte", 
-    "Emergência", 
-    "Financeiro", 
-    "E-mail", 
-    "Pleno", 
-    "RA", 
-    "Staff"
-]
 
 # --- CONEXÃO ---
 @st.cache_resource
@@ -167,8 +145,10 @@ def calcular_resumo_dia_dim(df_dim):
         return "".join([str(val).upper() for val in row])
 
     resumo = df_dim[cols_horarios].apply(juntar_linha, axis=1)
+    # Lista atualizada de atividades que contam como trabalho
     trabalhando = resumo.str.contains('CHAT|EMAIL|E-MAIL|P|TREINO|1:1|1X1|FINANCEIRO|REEMBOLSOS|BACKOFFICE').sum()
     folga = len(df_dim) - trabalhando
+    
     return {"Trabalhando": trabalhando, "Folga": folga}
 
 def analisar_gargalos_dim(df_dim):
@@ -208,57 +188,45 @@ def analisar_gargalos_dim(df_dim):
         "max_pausa_valor": maior_pausa_valor
     }
 
-# --- VISUALIZAÇÃO E ESTILOS ---
+# --- VISUALIZAÇÃO E CORES (Atualizado) ---
 
 def colorir_mensal(val):
+    """Cores para a Aba Mensal"""
     val = str(val).upper().strip() if isinstance(val, str) else str(val)
-    if val == 'T': return 'background-color: #c9daf8; color: black' 
-    elif val == 'F': return 'background-color: #93c47d; color: black'
-    elif val == 'AF': return 'background-color: #f4cccc; color: black'
+    
+    if val == 'T': 
+        return 'background-color: #c9daf8; color: black' # Azul claro
+    elif val == 'F': 
+        return 'background-color: #93c47d; color: black' # Verde folha
+    elif val == 'AF': 
+        return 'background-color: #f4cccc; color: black' # Vermelho claro
     return ''
 
 def colorir_diario(val):
+    """Cores para a Aba Diária (DIM)"""
     val = str(val).upper().strip() if isinstance(val, str) else str(val)
-    if val == 'F': return 'background-color: #002060; color: white'
-    elif 'CHAT' in val: return 'background-color: #d9ead3; color: black'
-    elif val == 'P' or 'PAUSA' in val: return 'background-color: #fce5cd; color: black'
-    elif 'FINANCEIRO' in val: return 'background-color: #11734b; color: white'
-    elif 'E-MAIL' in val or 'EMAIL' in val: return 'background-color: #bfe1f6; color: black'
-    elif 'REEMBOLSOS' in val: return 'background-color: #d4edbc; color: black'
-    elif 'BACKOFFICE' in val: return 'background-color: #5a3286; color: white'
-    elif 'T' == val: return 'background-color: #c9daf8; color: black' # Caso tenha T no diário
-    return ''
-
-def estilo_separacao_ilhas(df):
-    """
-    Função avançada que desenha uma borda grossa no topo sempre que a ilha muda.
-    """
-    # Cria uma cópia vazia do dataframe para guardar os estilos CSS
-    estilos = pd.DataFrame('', index=df.index, columns=df.columns)
     
-    if 'ILHA' in df.columns:
-        # Detecta onde a Ilha muda (comparando linha atual com a anterior)
-        # O .astype(str) garante que não dê erro de tipos diferentes
-        ilhas = df['ILHA'].astype(str)
-        mudanca_ilha = ilhas != ilhas.shift(1)
-        
-        # Define o estilo da borda: Azul escuro, grosso (3px) e sólido
-        # border-top é o segredo da separação
-        css_borda = 'border-top: 3px solid #1e3a8a !important;'
-        
-        # Aplica em todas as colunas das linhas onde a ilha mudou
-        # Ignoramos a primeira linha (iloc[0]) para não riscar o cabeçalho
-        linhas_para_pintar = mudanca_ilha[mudanca_ilha].index
-        
-        for idx in linhas_para_pintar:
-            if idx in estilos.index: # Segurança
-                estilos.loc[idx, :] = css_borda
-                
-    return estilos
+    if val == 'F': 
+        return 'background-color: #002060; color: white' # Azul escuro (texto branco)
+    elif 'CHAT' in val: 
+        return 'background-color: #d9ead3; color: black' # Verde claro
+    elif val == 'P' or 'PAUSA' in val: 
+        return 'background-color: #fce5cd; color: black' # Laranja claro
+    elif 'FINANCEIRO' in val: 
+        return 'background-color: #11734b; color: white' # Verde escuro (texto branco)
+    elif 'E-MAIL' in val or 'EMAIL' in val: 
+        return 'background-color: #bfe1f6; color: black' # Azul bebê
+    elif 'REEMBOLSOS' in val: 
+        return 'background-color: #d4edbc; color: black' # Verde limão suave
+    elif 'BACKOFFICE' in val: 
+        return 'background-color: #5a3286; color: white' # Roxo (texto branco)
+    
+    return ''
 
 def criar_grafico_timeline(df_dim, data_referencia_str="2025-01-01", colorir_por="Atividade"):
     lista_timeline = []
     colunas_horas = [col for col in df_dim.columns if ':' in col and col not in COLUNAS_FIXAS_BACKEND]
+    
     if not colunas_horas: return None
 
     for _, row in df_dim.iterrows():
@@ -285,11 +253,17 @@ def criar_grafico_timeline(df_dim, data_referencia_str="2025-01-01", colorir_por
     df_timeline = pd.DataFrame(lista_timeline)
     if df_timeline.empty: return None
 
+    # Mapa de cores para o Gráfico (Plotly) combinando com a grade
     cores_atividade_map = {
-        'CHAT': '#d9ead3', 'E-MAIL': '#bfe1f6', 'EMAIL': '#bfe1f6',
-        'P': '#fce5cd', 'PAUSA': '#fce5cd', 'F': '#002060', 
-        'FINANCEIRO': '#11734b', 'REEMBOLSOS': '#d4edbc', 'BACKOFFICE': '#5a3286',
-        'T': '#c9daf8', 'TREINO': '#e8f0fe', '1:1': '#f3e5f5'
+        'CHAT': '#d9ead3', 
+        'E-MAIL': '#bfe1f6', 'EMAIL': '#bfe1f6',
+        'P': '#fce5cd', 'PAUSA': '#fce5cd', 
+        'F': '#002060', 
+        'FINANCEIRO': '#11734b',
+        'REEMBOLSOS': '#d4edbc',
+        'BACKOFFICE': '#5a3286',
+        'T': '#c9daf8', 'TREINO': '#e8f0fe',
+        '1:1': '#f3e5f5'
     }
 
     coluna_cor = "Ilha" if colorir_por == "Ilha" else "Atividade"
@@ -366,33 +340,19 @@ with aba_mensal:
         if sel_ilha and 'ILHA' in df_f: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
         if busca_nome and 'NOME' in df_f: df_f = df_f[df_f['NOME'].str.contains(busca_nome, case=False)]
 
-        # --- ORDENAÇÃO RÍGIDA E LIMPEZA (AQUI ESTÁ A MÁGICA) ---
-        if 'ILHA' in df_f.columns:
-            # 1. Limpa espaços em branco para garantir o match
-            df_f['ILHA'] = df_f['ILHA'].astype(str).str.strip()
-            
-            # 2. Cria Categoria com a ORDEM EXATA
-            df_f['ILHA_CAT'] = pd.Categorical(
-                df_f['ILHA'], 
-                categories=ORDEM_DAS_ILHAS, 
-                ordered=True
-            )
-            
-            # 3. Ordena pela Categoria, colocando não encontrados (NaN) no final
-            df_f = df_f.sort_values(by=['ILHA_CAT', 'NOME'], na_position='last')
-            
-            # 4. Remove a coluna auxiliar
-            df_f = df_f.drop(columns=['ILHA_CAT'])
-
         cols_para_remover = ['EMAIL', 'E-MAIL', 'ADMISSÃO', 'ILHA']
         cols_visuais = [c for c in df_f.columns if c.upper().strip() not in cols_para_remover]
         
+        # --- APLICAÇÃO DE ESTILO E ALINHAMENTO ---
+        # 1. Aplica cores (Mensal)
+        # 2. Define tamanho da fonte
+        # 3. Alinha tudo ao centro
+        # 4. Força alinhamento à esquerda para NOME
+        
         styler = (df_f[cols_visuais].style
                   .map(colorir_mensal)
-                  .apply(estilo_separacao_ilhas, axis=None) # APLICA A BORDA AZUL GROSSA
-                  .set_properties(**{'font-size': '12px'})
-                  # Nota: Alinhamento central forçado via CSS Global no início do código
-        )
+                  .set_properties(**{'font-size': '12px', 'text-align': 'center'})
+                  .set_properties(subset=['NOME'], **{'text-align': 'left'}))
 
         if pode_editar:
             st.data_editor(df_f, use_container_width=True, hide_index=True, key="ed_m")
@@ -430,13 +390,6 @@ with aba_diaria:
             if sel_ilha and 'ILHA' in df_dim_f: df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
             if busca_nome and 'NOME' in df_dim_f: df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
             
-            # --- ORDENAÇÃO RÍGIDA NO DIÁRIO TAMBÉM ---
-            if 'ILHA' in df_dim_f.columns:
-                df_dim_f['ILHA'] = df_dim_f['ILHA'].astype(str).str.strip()
-                df_dim_f['ILHA_CAT'] = pd.Categorical(df_dim_f['ILHA'], categories=ORDEM_DAS_ILHAS, ordered=True)
-                df_dim_f = df_dim_f.sort_values(by=['ILHA_CAT', 'NOME'], na_position='last')
-                df_dim_f = df_dim_f.drop(columns=['ILHA_CAT'])
-
             tipo = st.radio("Modo:", ["📊 Timeline", "▦ Grade"], index=1 if pode_editar else 0, horizontal=True, label_visibility="collapsed")
 
             if pode_editar or tipo == "▦ Grade":
@@ -449,10 +402,11 @@ with aba_diaria:
                     st.info("✏️ Modo Edição")
                     st.data_editor(df_dim_f[cols_v], use_container_width=True, hide_index=True, key="ed_d", column_config=column_config)
                 else:
+                    # --- APLICAÇÃO DE ESTILO E ALINHAMENTO (Diário) ---
                     styler_dim = (df_dim_f[cols_v].style
                                   .map(colorir_diario)
-                                  .apply(estilo_separacao_ilhas, axis=None) # Aplica a borda aqui também
-                                  .set_properties(**{'font-size': '12px'}))
+                                  .set_properties(**{'font-size': '12px', 'text-align': 'center'})
+                                  .set_properties(subset=['NOME'], **{'text-align': 'left'}))
                     
                     st.dataframe(styler_dim, use_container_width=True, height=600, hide_index=True)
             else:
