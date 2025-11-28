@@ -16,51 +16,40 @@ st.set_page_config(
 # --- CSS: ALINHAMENTO À ESQUERDA E DESIGN ---
 st.markdown("""
     <style>
-        /* Ajuste do topo */
         .block-container {
             padding-top: 1.5rem;
             padding-bottom: 1rem;
             padding-left: 2rem;
             padding-right: 2rem;
         }
-        
-        /* KPI Container: Alinha tudo à esquerda */
         [data-testid="metric-container"] {
             width: 100%;
             display: flex;
             flex-direction: column;
-            align-items: flex-start !important; /* Esquerda */
+            align-items: flex-start !important;
             justify-content: center !important;
-            text-align: left !important; /* Esquerda */
+            text-align: left !important;
             background-color: #f8f9fa;
             border: 1px solid #e0e0e0;
             border-radius: 8px;
-            padding: 10px 15px; /* Mais espaço na esquerda */
+            padding: 10px 15px;
         }
-        
-        /* Título do KPI */
         [data-testid="stMetricLabel"] {
             width: 100%;
-            justify-content: flex-start !important; /* Esquerda */
+            justify-content: flex-start !important;
             font-size: 14px !important;
             color: #555;
         }
-
-        /* Valor do KPI */
         [data-testid="stMetricValue"] {
             width: 100%;
-            text-align: left !important; /* Esquerda */
+            text-align: left !important;
             font-size: 26px !important;
             font-weight: bold;
             color: #1e3a8a;
         }
-
-        /* Delta (a setinha pequena, se tiver) */
         [data-testid="stMetricDelta"] {
             justify-content: flex-start !important;
         }
-
-        /* Dark Mode */
         @media (prefers-color-scheme: dark) {
             [data-testid="metric-container"] {
                 background-color: #262730;
@@ -70,8 +59,6 @@ st.markdown("""
                 color: #4dabf7;
             }
         }
-        
-        /* Tabela: Fonte menor para caber melhor */
         .stDataFrame {
             font-size: 13px;
         }
@@ -139,24 +126,15 @@ def carregar_dados_aba(nome_aba):
 
 # --- KPIS ---
 def calcular_kpis_mensal_detalhado(df_mensal, data_escolhida):
-    """Retorna contagem de Trabalhando, Folga, Suporte e Emergência"""
     metrics = {"Trabalhando": 0, "Folga": 0, "Suporte": 0, "Emergencia": 0}
-    
     if data_escolhida in df_mensal.columns:
-        # Geral
         contagem = df_mensal[data_escolhida].value_counts()
         metrics["Trabalhando"] = contagem.get("T", 0)
         metrics["Folga"] = contagem.get("F", 0)
-        
-        # Por Ilha (Considerando quem está 'T')
         if 'ILHA' in df_mensal.columns:
-            # Filtra quem está trabalhando (T) E pertence à ilha específica
-            # Note: Ajuste os nomes "Suporte" e "Emergência" conforme está exato na sua planilha (Maiúsculas/Acentos)
             df_dia = df_mensal[df_mensal[data_escolhida] == 'T']
-            
             metrics["Suporte"] = df_dia[df_dia['ILHA'].str.contains("Suporte", case=False, na=False)].shape[0]
             metrics["Emergencia"] = df_dia[df_dia['ILHA'].str.contains("Emergência|Emergencia", case=False, na=False)].shape[0]
-            
     return metrics
 
 def calcular_resumo_dia_dim(df_dim):
@@ -167,20 +145,17 @@ def calcular_resumo_dia_dim(df_dim):
         return "".join([str(val).upper() for val in row])
 
     resumo = df_dim[cols_horarios].apply(juntar_linha, axis=1)
-    
     trabalhando = resumo.str.contains('CHAT|EMAIL|E-MAIL|P|TREINO|1:1|1X1').sum()
     folga = len(df_dim) - trabalhando
-    
     return {"Trabalhando": trabalhando, "Folga": folga}
 
 def analisar_gargalos_dim(df_dim):
-    # Filtra colunas entre 09:00 e 22:00
     cols_horarios = []
     for c in df_dim.columns:
         if ':' in c:
             try:
                 hora = int(c.split(':')[0])
-                if 9 <= hora <= 22: # Alterado para 09h as 22h
+                if 9 <= hora <= 22: 
                     cols_horarios.append(c)
             except: pass
     
@@ -312,8 +287,6 @@ with aba_mensal:
         hoje_str = datetime.now().strftime("%d/%m")
         index_padrao = colunas_datas.index(hoje_str) if hoje_str in colunas_datas else 0
 
-        # LAYOUT MENSAL ALINHADO À ESQUERDA E SIMPLIFICADO
-        # c1: Data | c2: Trab | c3: Folga | c4: Suporte | c5: Emergencia
         c1, c2, c3, c4, c5 = st.columns([1.5, 1, 1, 1, 1])
         
         with c1:
@@ -329,7 +302,7 @@ with aba_mensal:
 
         st.markdown("---")
 
-        # FILTROS E TABELA
+        # Filtros e Tabela
         lideres = sorted(df_mensal['LIDER'].unique().tolist()) if 'LIDER' in df_mensal.columns else []
         ilhas = sorted(df_mensal['ILHA'].unique().tolist()) if 'ILHA' in df_mensal.columns else []
         sel_lider = filtro_lider_placeholder.multiselect("Líder", lideres, default=lideres, key="f_lm")
@@ -340,11 +313,11 @@ with aba_mensal:
         if sel_ilha and 'ILHA' in df_f: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
         if busca_nome and 'NOME' in df_f: df_f = df_f[df_f['NOME'].str.contains(busca_nome, case=False)]
 
-        # REMOVE EMAIL E ILHA DA VISÃO MENSAL (Grade Limpa)
-        cols_para_remover = ['EMAIL', 'ADMISSÃO', 'ILHA']
-        cols_visuais = [c for c in df_f.columns if c not in cols_para_remover]
+        # --- CORREÇÃO AQUI: LISTA ROBUSTA DE REMOÇÃO ---
+        # Filtra ignorando maiusculas/minusculas
+        cols_para_remover = ['EMAIL', 'E-MAIL', 'ADMISSÃO', 'ILHA']
+        cols_visuais = [c for c in df_f.columns if c.upper().strip() not in cols_para_remover]
         
-        # Aplica estilo de fonte menor e USE CONTAINER WIDTH para ajustar largura ao texto
         styler = df_f[cols_visuais].style.map(colorir_grade).set_properties(**{'font-size': '12px'})
 
         if pode_editar:
@@ -358,7 +331,6 @@ with aba_diaria:
     if not abas:
         st.warning("Nenhuma aba DIM encontrada.")
     else:
-        # Layout: Seletor | KPIs em linha única
         top_c1, top_c2, top_c3, top_c4, top_c5 = st.columns([1.5, 1, 1, 1.5, 1.5])
         
         with top_c1:
@@ -380,7 +352,6 @@ with aba_diaria:
             
             st.divider()
 
-            # Filtros
             df_dim_f = df_dim.copy()
             if sel_lider and 'LIDER' in df_dim_f: df_dim_f = df_dim_f[df_dim_f['LIDER'].isin(sel_lider)]
             if sel_ilha and 'ILHA' in df_dim_f: df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
@@ -389,8 +360,9 @@ with aba_diaria:
             tipo = st.radio("Modo:", ["📊 Timeline", "▦ Grade"], index=1 if pode_editar else 0, horizontal=True, label_visibility="collapsed")
 
             if pode_editar or tipo == "▦ Grade":
-                # REMOVE EMAIL E ILHA DA VISÃO DIÁRIA TAMBÉM
-                cols_v = [c for c in df_dim_f.columns if c not in ['EMAIL', 'ILHA']]
+                # --- CORREÇÃO AQUI: REMOÇÃO BLINDADA ---
+                cols_para_remover_dim = ['EMAIL', 'E-MAIL', 'ILHA']
+                cols_v = [c for c in df_dim_f.columns if c.upper().strip() not in cols_para_remover_dim]
                 
                 if pode_editar:
                     time_cols = [c for c in cols_v if ':' in c]
