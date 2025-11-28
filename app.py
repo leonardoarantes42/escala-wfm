@@ -14,20 +14,23 @@ st.set_page_config(
 )
 
 # --- CSS: DESIGN E ALINHAMENTO ---
+# --- CSS COMPLETO: DESIGN E ALINHAMENTO ---
 st.markdown("""
     <style>
+        /* Ajuste do topo da página (Padding) */
         .block-container {
             padding-top: 1.5rem;
             padding-bottom: 1rem;
             padding-left: 2rem;
             padding-right: 2rem;
         }
-        /* KPIs à Esquerda */
+
+        /* --- ESTILO DOS KPIS (MÉTRICAS) --- */
         [data-testid="metric-container"] {
             width: 100%;
             display: flex;
             flex-direction: column;
-            align-items: flex-start !important;
+            align-items: flex-start !important; /* Alinha à esquerda */
             justify-content: center !important;
             text-align: left !important;
             background-color: #f8f9fa;
@@ -48,7 +51,7 @@ st.markdown("""
             font-weight: bold;
             color: #1e3a8a;
         }
-        /* Modo Escuro */
+        /* Ajuste para Modo Escuro */
         @media (prefers-color-scheme: dark) {
             [data-testid="metric-container"] {
                 background-color: #262730;
@@ -58,9 +61,36 @@ st.markdown("""
                 color: #4dabf7;
             }
         }
-        /* Fonte da Tabela */
+
+        /* --- ESTILO DA TABELA (DATAFRAME) --- */
         .stDataFrame {
             font-size: 13px;
+        }
+
+        /* FORÇA BRUTA: Centralizar conteúdo das células */
+        [data-testid="stDataFrame"] div[role="gridcell"] > div {
+            display: flex;
+            justify-content: center; 
+            align-items: center;     
+            text-align: center;
+        }
+
+        /* EXCEÇÃO: Coluna 1 (NOME) fica à ESQUERDA e em Negrito */
+        [data-testid="stDataFrame"] div[role="gridcell"][aria-colindex="1"] > div {
+            justify-content: flex-start !important;
+            text-align: left !important;
+            font-weight: bold;
+        }
+        
+        /* Centraliza os Cabeçalhos das colunas */
+        [data-testid="stDataFrame"] div[role="columnheader"] > div {
+            justify-content: center;
+            text-align: center;
+        }
+        
+        /* EXCEÇÃO: Cabeçalho da Coluna 1 fica à ESQUERDA */
+        [data-testid="stDataFrame"] div[role="columnheader"][aria-colindex="1"] > div {
+            justify-content: flex-start;
         }
     </style>
 """, unsafe_allow_html=True)
