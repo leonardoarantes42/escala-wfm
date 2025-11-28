@@ -67,7 +67,7 @@ COLUNAS_FIXAS_BACKEND = ['NOME', 'EMAIL', 'ADMISSÃO', 'ILHA', 'ENTRADA', 'SAIDA
 SENHA_LIDER = "turbi123"
 OPCOES_ATIVIDADE = ["Chat", "E-mail", "P", "1:1", "F", "Treino", "Almoço", "Feedback", "Financeiro", "Reembolsos", "BackOffice"]
 
-# ORDEM DAS ILHAS
+# ORDEM DAS ILHAS PARA AGRUPAMENTO
 ORDEM_DAS_ILHAS = [
     "Suporte", "Emergência", 
     "Financeiro",            
@@ -116,10 +116,8 @@ def carregar_dados_aba(nome_aba):
         df = pd.DataFrame(linhas, columns=cabecalho_encontrado)
         df = df.loc[:, ~df.columns.duplicated()]
         
-        # REMOVIDO: df.dropna(how='all') e filtros de NOME
-        # MOTIVO: Para permitir que linhas de separação (que podem ter só o Nome ou só a Ilha) apareçam.
-        # Mantemos apenas a limpeza básica de linhas totalmente vazias se necessário depois.
-        df = df.dropna(how='all') 
+        # Limpeza básica
+        df = df.dropna(how='all')
         
         return df, worksheet
 
@@ -319,16 +317,15 @@ with aba_mensal:
         if sel_ilha and 'ILHA' in df_f: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
         if busca_nome and 'NOME' in df_f: df_f = df_f[df_f['NOME'].str.contains(busca_nome, case=False)]
 
-        # Ordenação por Categoria
+        # Ordenação
         if 'ILHA' in df_f.columns:
             df_f['ILHA'] = df_f['ILHA'].astype(str).str.strip()
             df_f['ILHA_CAT'] = pd.Categorical(df_f['ILHA'], categories=ORDEM_DAS_ILHAS, ordered=True)
             df_f = df_f.sort_values(by=['ILHA_CAT', 'NOME'], na_position='last').drop(columns=['ILHA_CAT'])
 
-        cols_para_remover = ['EMAIL', 'E-MAIL', 'ADMISSÃO', 'ILHA', 'Z']
+        cols_para_remover = ['EMAIL', 'E-MAIL', 'ADMISSÃO', 'ILHA']
         cols_visuais = [c for c in df_f.columns if c.upper().strip() not in cols_para_remover]
         
-        # Apenas cores básicas, sem bordas roxas (já que foi feito na planilha)
         styler = df_f[cols_visuais].style.map(colorir_mensal)
 
         if pode_editar: st.data_editor(df_f, use_container_width=True, hide_index=True, key="ed_m")
@@ -385,8 +382,7 @@ with aba_diaria:
             else:
                 df_exibicao = filtrar_e_ordenar_dim(df_dim_f, tipo)
                 
-                # --- REMOÇÃO FORÇADA DE COLUNA Z ---
-                # Garante que Z não apareça, não importa como esteja escrito
+                # Remoção de colunas da grade (Incluindo Z, se existir)
                 cols_para_remover_dim = ['EMAIL', 'E-MAIL', 'ILHA', 'Z']
                 cols_v = [c for c in df_exibicao.columns if c.upper().strip() not in cols_para_remover_dim]
                 
