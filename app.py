@@ -13,49 +13,65 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS PERSONALIZADO (VISUAL) ---
+# --- CSS PARA DESIGN COMPACTO E CENTRALIZADO ---
 st.markdown("""
     <style>
-        /* Ajuste do topo para não esconder as abas */
+        /* Ajuste do topo */
         .block-container {
-            padding-top: 2rem;
+            padding-top: 1.5rem;
             padding-bottom: 1rem;
-            padding-left: 3rem;
-            padding-right: 3rem;
+            padding-left: 2rem;
+            padding-right: 2rem;
         }
         
-        /* Centralizar e diminuir métricas (KPIs) */
-        [data-testid="stMetricValue"] {
-            font-size: 24px !important; /* Diminui o número */
-            text-align: center !important;
-        }
-        [data-testid="stMetricLabel"] {
-            font-size: 14px !important;
-            text-align: center !important;
-            justify-content: center !important;
-        }
-        [data-testid="stMetricDelta"] {
-            text-align: center !important;
-            justify-content: center !important;
-        }
-        
-        /* Centralizar o container da métrica */
-        div[data-testid="metric-container"] {
+        /* FORÇA BRUTA: Centralizar Métricas (KPIs) */
+        [data-testid="metric-container"] {
+            width: 100%;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            background-color: #f8f9fa; /* Fundo cinza bem claro */
-            padding: 10px;
+            align-items: center !important;
+            justify-content: center !important;
+            text-align: center !important;
+            background-color: #f8f9fa;
+            border: 1px solid #e0e0e0;
             border-radius: 8px;
-            border: 1px solid #eee;
+            padding: 10px 0px;
+        }
+        
+        /* Centraliza o Label (Título do KPI) */
+        [data-testid="stMetricLabel"] {
+            width: 100%;
+            justify-content: center !important;
+            font-size: 14px !important;
+            color: #555;
         }
 
-        /* Ajuste para modo escuro */
+        /* Centraliza o Valor (Número) */
+        [data-testid="stMetricValue"] {
+            width: 100%;
+            text-align: center !important;
+            font-size: 26px !important;
+            font-weight: bold;
+            color: #1e3a8a; /* Azul Turbi */
+        }
+
+        /* Ajustes para Dark Mode */
         @media (prefers-color-scheme: dark) {
-            div[data-testid="metric-container"] {
+            [data-testid="metric-container"] {
                 background-color: #262730;
                 border: 1px solid #444;
             }
+            [data-testid="stMetricValue"] {
+                color: #4dabf7;
+            }
+            [data-testid="stMetricLabel"] {
+                color: #ddd;
+            }
+        }
+        
+        /* Diminuir tamanho da fonte das tabelas */
+        .stDataFrame {
+            font-size: 12px;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -119,7 +135,7 @@ def carregar_dados_aba(nome_aba):
         st.error(f"Erro ao carregar aba '{nome_aba}': {e}")
         return None, None
 
-# --- FUNÇÕES DE KPI (CORRIGIDAS) ---
+# --- FUNÇÕES DE KPI ---
 def calcular_kpis_mensal_detalhado(df_mensal, data_escolhida):
     metrics = {"Trabalhando": 0, "Folga": 0, "PorIlha": {}}
     if data_escolhida in df_mensal.columns:
@@ -132,11 +148,9 @@ def calcular_kpis_mensal_detalhado(df_mensal, data_escolhida):
     return metrics
 
 def calcular_resumo_dia_dim(df_dim):
-    # CORREÇÃO DO ERRO DO PANDAS AQUI
     cols_horarios = [c for c in df_dim.columns if ':' in c]
     if not cols_horarios: return {"Trabalhando": 0, "Folga": 0}
 
-    # Forma segura de concatenar strings linha a linha sem usar astype no vetor
     def juntar_linha(row):
         return "".join([str(val).upper() for val in row])
 
@@ -256,7 +270,6 @@ def criar_grafico_timeline(df_dim, data_referencia_str="2025-01-01", colorir_por
 
 # ================= MAIN APP =================
 
-# --- SIDEBAR (Filtros) ---
 with st.sidebar:
     st.image("logo_turbi.png", width=140) 
     st.divider()
@@ -273,13 +286,9 @@ with st.sidebar:
         filtro_ilha_placeholder = st.empty()
         busca_nome = st.text_input("Buscar Nome")
 
-# --- TOPO DA PÁGINA (Título e Alinhamento) ---
-st.markdown("### 🚙 Sistema de Escalas Turbi") # Título menor (H3)
+st.markdown("### 🚙 Sistema de Escalas Turbi") 
 
 df_global, _ = carregar_dados_aba('Mensal')
-
-# --- TABS ---
-# Importante: Definir as tabs ANTES de preencher o conteúdo
 aba_mensal, aba_diaria = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária"])
 
 # ================= ABA MENSAL =================
@@ -288,41 +297,37 @@ with aba_mensal:
     
     df_mensal = df_global
     if df_mensal is not None:
-        
-        # --- SELETOR DE DATA ALINHADO ---
         colunas_datas = [c for c in df_mensal.columns if '/' in c]
+        hoje_str = datetime.now().strftime("%d/%m")
+        index_padrao = colunas_datas.index(hoje_str) if hoje_str in colunas_datas else 0
+
+        # --- LAYOUT OTIMIZADO (TUDO NA MESMA LINHA) ---
+        # c1: Data | c2: Trab | c3: Folga | c4: Tabela Ilha
+        c1, c2, c3, c4 = st.columns([1.5, 1, 1, 2.5])
         
-        # Cria colunas para apertar o seletor e deixá-lo menor
-        c_label, c_select, c_blank = st.columns([0.15, 0.20, 0.65]) 
-        
-        with c_label:
-            st.markdown("##### Status do Dia:") # Texto alinhado verticalmente com o select
-        with c_select:
-            hoje_str = datetime.now().strftime("%d/%m")
-            index_padrao = colunas_datas.index(hoje_str) if hoje_str in colunas_datas else 0
+        with c1:
+            st.markdown("**Status do Dia:**")
             data_kpi_selecionada = st.selectbox("Data", colunas_datas, index=index_padrao, label_visibility="collapsed")
         
-        # Cálculos KPI
         kpis = calcular_kpis_mensal_detalhado(df_mensal, data_kpi_selecionada)
         
-        # --- KPIS CENTRALIZADOS E MENORES ---
-        # Usamos 5 colunas para forçar os cards a ficarem mais estreitos
-        km1, km2, km3, km4, km5 = st.columns(5)
+        with c2:
+            st.metric("✅ Trabalhando", kpis["Trabalhando"])
         
-        km1.metric("✅ Trabalhando", kpis["Trabalhando"])
-        km2.metric("🛋️ Folgas", kpis["Folga"])
+        with c3:
+            st.metric("🛋️ Folgas", kpis["Folga"])
         
-        # Tabela de Ilhas (Compacta)
-        with km3:
+        with c4:
+            # Tabela de Ilhas Compacta ao lado das métricas
             if kpis["PorIlha"]:
                 df_ilhas = pd.DataFrame(list(kpis["PorIlha"].items()), columns=['Ilha', 'Qtd'])
-                st.dataframe(df_ilhas, hide_index=True, use_container_width=True, height=120)
+                st.dataframe(df_ilhas, hide_index=True, use_container_width=True, height=100)
             else:
-                st.caption("Sem dados.")
+                st.info("Sem dados.")
 
         st.markdown("---")
 
-        # --- TABELA MENSAL ---
+        # --- FILTROS E TABELA ---
         lideres = sorted(df_mensal['LIDER'].unique().tolist()) if 'LIDER' in df_mensal.columns else []
         ilhas = sorted(df_mensal['ILHA'].unique().tolist()) if 'ILHA' in df_mensal.columns else []
         sel_lider = filtro_lider_placeholder.multiselect("Líder", lideres, default=lideres, key="f_lm")
@@ -333,12 +338,17 @@ with aba_mensal:
         if sel_ilha and 'ILHA' in df_f: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
         if busca_nome and 'NOME' in df_f: df_f = df_f[df_f['NOME'].str.contains(busca_nome, case=False)]
 
-        cols_visuais = [c for c in df_f.columns if c not in ['EMAIL', 'ADMISSÃO']]
+        # REMOVE EMAIL E ILHA DA VISÃO MENSAL (Grade Limpa)
+        cols_para_remover = ['EMAIL', 'ADMISSÃO', 'ILHA']
+        cols_visuais = [c for c in df_f.columns if c not in cols_para_remover]
         
+        # Aplica estilo de fonte menor (12px)
+        styler = df_f[cols_visuais].style.map(colorir_grade).set_properties(**{'font-size': '12px'})
+
         if pode_editar:
             st.data_editor(df_f, use_container_width=True, hide_index=True, key="ed_m")
         else:
-            st.dataframe(df_f[cols_visuais].style.map(colorir_grade), use_container_width=True, height=600, hide_index=True)
+            st.dataframe(styler, use_container_width=True, height=600, hide_index=True)
 
 # ================= ABA DIÁRIA =================
 with aba_diaria:
@@ -346,48 +356,49 @@ with aba_diaria:
     if not abas:
         st.warning("Nenhuma aba DIM encontrada.")
     else:
-        # Header compacto
-        c_sel, c_btn = st.columns([0.3, 0.7]) # Coluna menor para o seletor
-        with c_sel: aba_sel = st.selectbox("Selecione o Dia:", abas, label_visibility="collapsed")
-        with c_btn: 
+        # Layout Otimizado: Seletor | KPIs em linha única
+        top_c1, top_c2, top_c3, top_c4, top_c5 = st.columns([2, 1, 1, 1.5, 1.5])
+        
+        with top_c1:
+            aba_sel = st.selectbox("Selecione o Dia:", abas, label_visibility="collapsed")
             if st.button("🔄 Atualizar"): st.cache_data.clear(); st.rerun()
         
         df_dim, ws_dim = carregar_dados_aba(aba_sel)
         
         if df_dim is not None:
-            # --- KPIS DIÁRIOS ---
             analise = analisar_gargalos_dim(df_dim)
             resumo_dia = calcular_resumo_dia_dim(df_dim)
             
-            # Usamos colunas estreitas para forçar cards menores
-            k1, k2, k3, k4, k5 = st.columns(5)
-            k1.metric("👥 Escalados", resumo_dia["Trabalhando"])
-            k2.metric("🚫 Folgas", resumo_dia["Folga"])
+            with top_c2: st.metric("👥 Escalados", resumo_dia["Trabalhando"])
+            with top_c3: st.metric("🚫 Folgas", resumo_dia["Folga"])
 
             if analise:
-                k3.metric("⚠️ Menos Chat", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
-                k4.metric("☕ Pico Pausa", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
+                with top_c4: st.metric("⚠️ Menos Chat", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
+                with top_c5: st.metric("☕ Pico Pausa", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
             
             st.divider()
 
-            # --- FILTROS E VISUALIZAÇÃO ---
+            # Filtros
             df_dim_f = df_dim.copy()
             if sel_lider and 'LIDER' in df_dim_f: df_dim_f = df_dim_f[df_dim_f['LIDER'].isin(sel_lider)]
             if sel_ilha and 'ILHA' in df_dim_f: df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
             if busca_nome and 'NOME' in df_dim_f: df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
             
-            # Toggle Visão
             tipo = st.radio("Modo:", ["📊 Timeline", "▦ Grade"], index=1 if pode_editar else 0, horizontal=True, label_visibility="collapsed")
 
             if pode_editar or tipo == "▦ Grade":
-                cols_v = [c for c in df_dim_f.columns if c != 'EMAIL']
+                # REMOVE EMAIL E ILHA DA VISÃO DIÁRIA TAMBÉM
+                cols_v = [c for c in df_dim_f.columns if c not in ['EMAIL', 'ILHA']]
+                
                 if pode_editar:
                     time_cols = [c for c in cols_v if ':' in c]
                     column_config = {col: st.column_config.SelectboxColumn(col, options=OPCOES_ATIVIDADE, required=True, width="small") for col in time_cols}
-                    st.info("✏️ Modo Edição: Use os menus para alterar as atividades.")
+                    st.info("✏️ Modo Edição")
                     st.data_editor(df_dim_f[cols_v], use_container_width=True, hide_index=True, key="ed_d", column_config=column_config)
                 else:
-                    st.dataframe(df_dim_f[cols_v].style.map(colorir_grade), use_container_width=True, height=600, hide_index=True)
+                    # Aplica fonte menor aqui também
+                    styler_dim = df_dim_f[cols_v].style.map(colorir_grade).set_properties(**{'font-size': '12px'})
+                    st.dataframe(styler_dim, use_container_width=True, height=600, hide_index=True)
             else:
                 c_spacer, c_opt = st.columns([3,1])
                 with c_opt: cor_opt = st.radio("Cor:", ["Atividade", "Ilha"], horizontal=True)
