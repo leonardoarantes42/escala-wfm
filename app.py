@@ -351,8 +351,8 @@ with aba_mensal:
         
         styler = (df_f[cols_visuais].style
                   .map(colorir_mensal)
-                  .set_properties(**{'font-size': '10px', 'text-align': 'center'})
-                  .set_properties(subset=['NOME'], **{'text-align': 'left'}))
+                  .set_properties(**{'font-size': '10px', 'text-align': 'center !important', 'vertical-align': 'middle'})
+                  .set_properties(subset=['NOME'], **{'text-align': 'left !important'}))
 
         if pode_editar:
             st.data_editor(df_f, use_container_width=True, hide_index=True, key="ed_m")
@@ -405,8 +405,8 @@ with aba_diaria:
                     # --- APLICAÇÃO DE ESTILO E ALINHAMENTO (Diário) ---
                     styler_dim = (df_dim_f[cols_v].style
                                   .map(colorir_diario)
-                                  .set_properties(**{'font-size': '12px', 'text-align': 'center'})
-                                  .set_properties(subset=['NOME'], **{'text-align': 'left'}))
+                                  .set_properties(**{'font-size': '12px', 'text-align': 'center !important', 'vertical-align': 'middle'})
+                                  .set_properties(subset=['NOME'], **{'text-align': 'left !important'}))
                     
                     st.dataframe(styler_dim, use_container_width=True, height=600, hide_index=True)
             else:
