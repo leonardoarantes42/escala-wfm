@@ -7,16 +7,46 @@ from datetime import datetime, timedelta
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
-    page_title="Sistema de Escalas Turbi", 
+    page_title="Escalas Turbi", 
     layout="wide", 
     page_icon="logo_turbi.png", 
     initial_sidebar_state="expanded"
 )
 
+# --- CSS PARA DESIGN COMPACTO E LIMPO ---
+st.markdown("""
+    <style>
+        /* Diminui o espaço em branco no topo */
+        .block-container {
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+            padding-left: 2rem;
+            padding-right: 2rem;
+        }
+        /* Estiliza os cartões de métricas para ficarem mais compactos */
+        [data-testid="stMetric"] {
+            background-color: #f0f2f6;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 5px solid #1e3a8a; /* Azul Turbi */
+        }
+        /* No modo escuro, ajusta o fundo do metric */
+        @media (prefers-color-scheme: dark) {
+            [data-testid="stMetric"] {
+                background-color: #262730;
+                border-left: 5px solid #4dabf7;
+            }
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- CONSTANTES ---
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1sZ8fpjLMfJb25TfJL9Rj8Yhkdw91sZ0yNWGZIgKPO8Q"
 COLUNAS_FIXAS_BACKEND = ['NOME', 'EMAIL', 'ADMISSÃO', 'ILHA', 'ENTRADA', 'SAIDA', 'LIDER']
 SENHA_LIDER = "turbi123"
+
+# Opções para o Menu Suspenso (Dropdown)
+OPCOES_ATIVIDADE = ["Chat", "E-mail", "P", "1:1", "F", "Treino", "Almoço", "Feedback"]
 
 # --- CONEXÃO GOOGLE SHEETS ---
 @st.cache_resource
@@ -75,17 +105,50 @@ def carregar_dados_aba(nome_aba):
         return None, None
 
 # --- NOVAS FUNÇÕES DE KPI ---
-def calcular_kpis_data_especifica(df_mensal, data_escolhida):
-    metrics = {"Trabalhando": 0, "Folga": 0, "Afastado": 0}
+def calcular_kpis_mensal_detalhado(df_mensal, data_escolhida):
+    """Calcula Geral e quebra por Ilha"""
+    metrics = {"Trabalhando": 0, "Folga": 0, "PorIlha": {}}
+    
     if data_escolhida in df_mensal.columns:
+        # Geral
         contagem = df_mensal[data_escolhida].value_counts()
         metrics["Trabalhando"] = contagem.get("T", 0)
         metrics["Folga"] = contagem.get("F", 0)
-        metrics["Afastado"] = contagem.get("FR", 0) + contagem.get("AF", 0) + contagem.get("ATESTADO", 0)
+        
+        # Por Ilha (Somente quem está 'T')
+        if 'ILHA' in df_mensal.columns:
+            df_trabalhando = df_mensal[df_mensal[data_escolhida] == 'T']
+            metrics["PorIlha"] = df_trabalhando['ILHA'].value_counts().to_dict()
+            
     return metrics
 
-def analisar_gargalos_dim(df_dim):
+def calcular_resumo_dia_dim(df_dim):
+    """Calcula total trabalhando e total folga no dia baseado no DIM"""
+    # Se a pessoa tem pelo menos um horário preenchido que não seja 'F' ou vazio, ela está trabalhando
     cols_horarios = [c for c in df_dim.columns if ':' in c]
+    if not cols_horarios: return {"Trabalhando": 0, "Folga": 0}
+
+    # Cria string da linha
+    resumo = df_dim[cols_horarios].apply(lambda x: ''.join(x.astype(str).upper()), axis=1)
+    
+    # Quem tem alguma atividade (Chat, Email, P) e não é só F
+    # Lógica simples: Se tem CHAT ou EMAIL ou T ou P, conta como trabalhando
+    trabalhando = resumo.str.contains('CHAT|EMAIL|E-MAIL|P|TREINO|1:1|1X1').sum()
+    folga = len(df_dim) - trabalhando
+    
+    return {"Trabalhando": trabalhando, "Folga": folga}
+
+def analisar_gargalos_dim(df_dim):
+    # Filtra apenas colunas entre 06:00 e 23:00
+    cols_horarios = []
+    for c in df_dim.columns:
+        if ':' in c:
+            try:
+                hora = int(c.split(':')[0])
+                if 6 <= hora <= 23: # Restrição de horário solicitada
+                    cols_horarios.append(c)
+            except: pass
+    
     if not cols_horarios: return None
 
     menor_chat_valor = 9999
@@ -121,8 +184,9 @@ def colorir_grade(val):
     elif val == 'F': color = 'background-color: #fce8e6; color: #c5221f'
     elif val == 'FR': color = 'background-color: #fff8e1; color: #f9ab00'
     elif 'CHAT' in val: color = 'background-color: #d2e3fc; color: #174ea6'
-    elif 'EMAIL' in val: color = 'background-color: #fad2cf; color: #a50e0e'
+    elif 'EMAIL' in val or 'E-MAIL' in val: color = 'background-color: #fad2cf; color: #a50e0e'
     elif val == 'P' or 'PAUSA' in val: color = 'background-color: #fff8e1; color: #f9ab00'
+    elif '1:1' in val or '1X1' in val: color = 'background-color: #f3e5f5; color: #4a148c'
     return color
 
 def criar_grafico_timeline(df_dim, data_referencia_str="2025-01-01", colorir_por="Atividade"):
@@ -148,6 +212,7 @@ def criar_grafico_timeline(df_dim, data_referencia_str="2025-01-01", colorir_por
                 else:
                     fim_dt = inicio_dt + timedelta(hours=1)
                 
+                # Ajuste de virada de dia
                 if fim_dt <= inicio_dt: fim_dt = fim_dt + timedelta(days=1)
 
                 lista_timeline.append({
@@ -161,7 +226,7 @@ def criar_grafico_timeline(df_dim, data_referencia_str="2025-01-01", colorir_por
     cores_atividade_map = {
         'CHAT': '#4285F4', 'E-MAIL': '#EA4335', 'EMAIL': '#EA4335',
         'P': '#FBBC05', 'PAUSA': '#FBBC05', 'T': '#34A853', 'TREINO': '#34A853', 
-        'F': '#9AA0A6', '1X1': '#8E24AA', 'PADRINHO': '#F06292', 
+        'F': '#9AA0A6', '1X1': '#8E24AA', '1:1': '#8E24AA', 'PADRINHO': '#F06292', 
         'MADRINHA': '#BA68C8', 'FINANCEIRO': '#4DB6AC', 'ASSISTIR AVD': '#7986CB'
     }
 
@@ -175,28 +240,37 @@ def criar_grafico_timeline(df_dim, data_referencia_str="2025-01-01", colorir_por
     )
     
     fig.update_yaxes(autorange="reversed")
+    
+    # --- CONFIGURAÇÃO DA TIMELINE FIXA (06h - 07h prox dia) ---
+    start_range = datetime.strptime(f"{data_referencia_str} 06:00", "%Y-%m-%d %H:%M")
+    end_range = start_range + timedelta(days=1, hours=1) # Até 07:00 do dia seguinte
+
+    fig.update_xaxes(
+        range=[start_range, end_range], # Trava o eixo X
+        side="top", 
+        tickformat="%H:%M", 
+        gridcolor='#eee', 
+        title=""
+    )
+    
     fig.update_layout(
-        xaxis=dict(side="top", tickformat="%H:%M", gridcolor='#eee', title=""),
         yaxis_title="",
         font=dict(family="Arial", size=12),
-        margin=dict(l=10, r=10, t=60, b=100),
+        margin=dict(l=10, r=10, t=60, b=50), # Margens ajustadas
         legend=dict(
-            orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5,
+            orientation="h", yanchor="top", y=-0.05, xanchor="center", x=0.5,
             title=dict(text=f"<b>{coluna_cor}</b>", side="top")
         )
     )
     return fig
 
 # ================= MAIN APP =================
-st.title("🚙 Sistema de Escalas Turbi")
-df_global, _ = carregar_dados_aba('Mensal')
 
-# --- SIDEBAR ---
+# Título Compacto na Sidebar para economizar espaço
 with st.sidebar:
-    st.image("logo_turbi.png", width=150) 
+    st.image("logo_turbi.png", width=140) 
+    st.markdown("### 🚙 Escalas Turbi") # Título menor
     st.divider()
-    
-    st.header("⚙️ Painel")
     
     modo_edicao = st.checkbox("Modo Edição (Líderes)")
     pode_editar = False
@@ -207,13 +281,16 @@ with st.sidebar:
         else: st.error("Senha incorreta")
     
     st.divider()
-    with st.expander("🔍 Filtros Avançados"):
+    with st.expander("🔍 Filtros"):
         filtro_lider_placeholder = st.empty()
         filtro_ilha_placeholder = st.empty()
         busca_nome = st.text_input("Buscar Nome")
 
+# Carrega Dados Globais
+df_global, _ = carregar_dados_aba('Mensal')
+
 # --- TABS ---
-aba_mensal, aba_diaria = st.tabs(["📅 Visão Mensal (Macro)", "⏱️ Visão Diária (Operação)"])
+aba_mensal, aba_diaria = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária"])
 
 # ================= ABA MENSAL =================
 with aba_mensal:
@@ -225,27 +302,36 @@ with aba_mensal:
         # --- SELETOR DE DATA PARA KPI ---
         colunas_datas = [c for c in df_mensal.columns if '/' in c]
         
-        kpi_col1, kpi_col2 = st.columns([1, 3])
+        # Layout compacto para KPIs
+        kpi_col1, kpi_col2, kpi_col3 = st.columns([1, 1, 3])
         with kpi_col1:
-            st.markdown("### 📊 Status do Dia:")
+            st.write("") # Espaço para alinhar
+            st.markdown("**Status do Dia:**")
         with kpi_col2:
             hoje_str = datetime.now().strftime("%d/%m")
             index_padrao = colunas_datas.index(hoje_str) if hoje_str in colunas_datas else 0
             
             data_kpi_selecionada = st.selectbox(
-                "Escolha a data para visualizar os indicadores:", 
-                colunas_datas, 
-                index=index_padrao,
-                label_visibility="collapsed"
+                "Data", colunas_datas, index=index_padrao, label_visibility="collapsed"
             )
-
-        kpis = calcular_kpis_data_especifica(df_mensal, data_kpi_selecionada)
         
-        c1, c2, c3 = st.columns(3)
-        c1.metric("✅ Trabalhando", kpis["Trabalhando"])
-        c2.metric("🛋️ Folgas", kpis["Folga"])
-        c3.metric("🏥 Afastados/Férias", kpis["Afastado"])
-        st.divider()
+        # Cálculos
+        kpis = calcular_kpis_mensal_detalhado(df_mensal, data_kpi_selecionada)
+        
+        # Exibição KPIs Mensais
+        st.markdown("---")
+        km1, km2, km3 = st.columns(3)
+        km1.metric("✅ Total Trabalhando", kpis["Trabalhando"])
+        km2.metric("🛋️ Total Folgas", kpis["Folga"])
+        
+        # Mostra detalhe por ilha (usando um dataframe limpo em vez de várias métricas)
+        if kpis["PorIlha"]:
+            df_ilhas = pd.DataFrame(list(kpis["PorIlha"].items()), columns=['Ilha', 'Qtd'])
+            km3.dataframe(df_ilhas, hide_index=True, use_container_width=True, height=150)
+        else:
+            km3.info("Sem dados de ilha.")
+
+        st.markdown("---")
 
         # --- FILTROS E TABELA ---
         lideres = sorted(df_mensal['LIDER'].unique().tolist()) if 'LIDER' in df_mensal.columns else []
@@ -271,36 +357,29 @@ with aba_diaria:
     if not abas:
         st.warning("Nenhuma aba DIM encontrada.")
     else:
-        c_sel, c_btn, c_cor = st.columns([3, 1, 2])
-        with c_sel: aba_sel = st.selectbox("Selecione o Dia:", abas)
+        # Header compacto
+        c_sel, c_btn = st.columns([3, 1])
+        with c_sel: aba_sel = st.selectbox("Selecione o Dia:", abas, label_visibility="collapsed")
         with c_btn: 
-            st.write(""); 
             if st.button("🔄 Atualizar"): st.cache_data.clear(); st.rerun()
         
         df_dim, ws_dim = carregar_dados_aba(aba_sel)
         
         if df_dim is not None:
-            # --- ANÁLISE DE GARGALOS ---
+            # --- ANÁLISE KPI DIÁRIA ---
             analise = analisar_gargalos_dim(df_dim)
+            resumo_dia = calcular_resumo_dia_dim(df_dim)
             
+            # Linha única de KPIs
+            k1, k2, k3, k4 = st.columns(4)
+            k1.metric("👥 Escalados Hoje", resumo_dia["Trabalhando"])
+            k2.metric("🚫 Folgas Hoje", resumo_dia["Folga"])
+
             if analise:
-                st.markdown(f"### 🌡️ Termômetro da Operação: {aba_sel}")
-                k1, k2 = st.columns(2)
-                
-                k1.metric(
-                    label="⚠️ Horário com MENOS Chat", 
-                    value=f"{analise['min_chat_hora']}",
-                    delta=f"{analise['min_chat_valor']} pessoas",
-                    delta_color="inverse"
-                )
-                
-                k2.metric(
-                    label="☕ Horário com MAIS Pausas", 
-                    value=f"{analise['max_pausa_hora']}",
-                    delta=f"{analise['max_pausa_valor']} pessoas em pausa",
-                    delta_color="off"
-                )
-                st.divider()
+                k3.metric("⚠️ Menos Chat", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']} pessoas", delta_color="inverse")
+                k4.metric("☕ Pico Pausa", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']} pessoas", delta_color="off")
+            
+            st.divider()
 
             # --- FILTROS ---
             df_dim_f = df_dim.copy()
@@ -308,14 +387,42 @@ with aba_diaria:
             if sel_ilha and 'ILHA' in df_dim_f: df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
             if busca_nome and 'NOME' in df_dim_f: df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
             
-            tipo = st.radio("Modo:", ["📊 Timeline", "▦ Grade"], index=1 if pode_editar else 0, horizontal=True)
+            # Toggle Visão
+            tipo = st.radio("Modo:", ["📊 Timeline", "▦ Grade"], index=1 if pode_editar else 0, horizontal=True, label_visibility="collapsed")
 
             if pode_editar or tipo == "▦ Grade":
+                # --- VISÃO GRADE COM DROPDOWN ---
                 cols_v = [c for c in df_dim_f.columns if c != 'EMAIL']
-                if pode_editar: st.data_editor(df_dim_f, use_container_width=True, hide_index=True, key="ed_d")
-                else: st.dataframe(df_dim_f[cols_v].style.map(colorir_grade), use_container_width=True, height=600, hide_index=True)
+                
+                if pode_editar:
+                    # Configuração para transformar colunas de horário em Dropdown
+                    # Identifica colunas que têm ':' no nome (ex: 09:00)
+                    time_cols = [c for c in cols_v if ':' in c]
+                    
+                    column_config = {
+                        col: st.column_config.SelectboxColumn(
+                            col,
+                            options=OPCOES_ATIVIDADE,
+                            required=True,
+                            width="small"
+                        ) for col in time_cols
+                    }
+                    
+                    st.info("✏️ Modo Edição: Use os menus para alterar as atividades.")
+                    st.data_editor(
+                        df_dim_f[cols_v], 
+                        use_container_width=True, 
+                        hide_index=True, 
+                        key="ed_d",
+                        column_config=column_config # Aplica os dropdowns
+                    )
+                else:
+                    st.dataframe(df_dim_f[cols_v].style.map(colorir_grade), use_container_width=True, height=600, hide_index=True)
             else:
-                with c_cor: cor_opt = st.radio("Colorir por:", ["Atividade", "Ilha"], horizontal=True)
+                # --- VISÃO TIMELINE ---
+                c_spacer, c_opt = st.columns([3,1])
+                with c_opt: cor_opt = st.radio("Cor:", ["Atividade", "Ilha"], horizontal=True)
+                
                 with st.spinner("Gerando gráfico..."):
                     try:
                         dm = aba_sel.replace("DIM", "").strip()
@@ -323,5 +430,7 @@ with aba_diaria:
                     except: dt_ref = "2025-01-01"
 
                     fig = criar_grafico_timeline(df_dim_f, dt_ref, cor_opt)
-                    if fig: st.plotly_chart(fig, use_container_width=True)
+                    if fig: 
+                        # Plotly com config para tentar travar o zoom se quiser, mas o range fixo já ajuda
+                        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
                     else: st.warning("Erro ao gerar gráfico.")
