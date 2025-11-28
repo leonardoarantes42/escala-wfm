@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS: DESIGN LIMPO E KPIS ---
+# --- CSS: DESIGN LIMPO ---
 st.markdown("""
     <style>
         .block-container {
@@ -22,17 +22,39 @@ st.markdown("""
             padding-left: 2rem;
             padding-right: 2rem;
         }
-        /* Estilo dos KPIs */
+        /* KPIs à Esquerda */
         [data-testid="metric-container"] {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start !important;
+            justify-content: center !important;
+            text-align: left !important;
             background-color: #f8f9fa;
             border: 1px solid #e0e0e0;
             border-radius: 8px;
-            padding: 10px;
+            padding: 10px 15px;
+        }
+        [data-testid="stMetricLabel"] {
+            width: 100%;
+            justify-content: flex-start !important;
+            font-size: 14px !important;
+            color: #555;
+        }
+        [data-testid="stMetricValue"] {
+            width: 100%;
+            text-align: left !important;
+            font-size: 26px !important;
+            font-weight: bold;
+            color: #1e3a8a;
         }
         @media (prefers-color-scheme: dark) {
             [data-testid="metric-container"] {
                 background-color: #262730;
                 border: 1px solid #444;
+            }
+            [data-testid="stMetricValue"] {
+                color: #4dabf7;
             }
         }
         .stDataFrame { font-size: 13px; }
@@ -45,14 +67,21 @@ COLUNAS_FIXAS_BACKEND = ['NOME', 'EMAIL', 'ADMISSÃO', 'ILHA', 'ENTRADA', 'SAIDA
 SENHA_LIDER = "turbi123"
 OPCOES_ATIVIDADE = ["Chat", "E-mail", "P", "1:1", "F", "Treino", "Almoço", "Feedback", "Financeiro", "Reembolsos", "BackOffice"]
 
-# --- CONEXÃO GOOGLE SHEETS ---
+# ORDEM DAS ILHAS PARA AGRUPAMENTO
+ORDEM_DAS_ILHAS = [
+    "Suporte", "Emergência", # Grupo 1
+    "Financeiro",            # Grupo 2 (Terá destaque)
+    "E-mail", "Pleno", "RA", "Staff" # Outros
+]
+
+# --- CONEXÃO ---
 @st.cache_resource
 def conectar_google_sheets():
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     credentials = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scopes)
     return gspread.authorize(credentials)
 
-# --- CARREGAMENTO DE DADOS ---
+# --- CARREGAMENTO ---
 @st.cache_data(ttl=300)
 def listar_abas_dim():
     client = conectar_google_sheets()
@@ -96,42 +125,8 @@ def carregar_dados_aba(nome_aba):
         st.error(f"Erro ao carregar aba '{nome_aba}': {e}")
         return None, None
 
-# --- LÓGICA DE FILTRAGEM E ORDENAÇÃO (CHAT/FOLGAS/HORÁRIO) ---
-def filtrar_e_ordenar_dim(df, modo):
-    """
-    Filtra o dataframe baseado no modo e ordena por horário de entrada.
-    """
-    df_filtrado = df.copy()
-    cols_horarios = [c for c in df.columns if ':' in c]
-    
-    # 1. Cria coluna auxiliar de tempo para ordenar
-    if 'ENTRADA' in df_filtrado.columns:
-        # Converte para datetime para ordenar corretamente (06:00 antes de 09:00)
-        df_filtrado['SORT_TEMP'] = pd.to_datetime(df_filtrado['ENTRADA'], format='%H:%M', errors='coerce')
-    else:
-        df_filtrado['SORT_TEMP'] = pd.NaT
+# --- NOVAS REGRAS DE KPI E FILTRO ---
 
-    # 2. Lógica de Filtro
-    if modo == "💬 Apenas Chat":
-        # Mantém apenas quem tem "CHAT" escrito na linha
-        mask = df_filtrado[cols_horarios].apply(lambda row: row.astype(str).str.upper().str.contains('CHAT').any(), axis=1)
-        df_filtrado = df_filtrado[mask]
-        
-    elif modo == "🚫 Apenas Folgas":
-        # Mantém quem tem "F" escrito na linha
-        mask = df_filtrado[cols_horarios].apply(lambda row: row.astype(str).str.upper().str.contains('F').any(), axis=1)
-        df_filtrado = df_filtrado[mask]
-
-    # 3. Ordenação
-    # Ordena pela hora de entrada. Quem não tem hora vai pro final.
-    df_filtrado = df_filtrado.sort_values(by='SORT_TEMP', na_position='last')
-    
-    # Remove a coluna temporária para não aparecer na tela
-    df_filtrado = df_filtrado.drop(columns=['SORT_TEMP'])
-    
-    return df_filtrado
-
-# --- KPIS E ANÁLISE ---
 def calcular_kpis_mensal_detalhado(df_mensal, data_escolhida):
     metrics = {"Trabalhando": 0, "Folga": 0, "Suporte": 0, "Emergencia": 0}
     if data_escolhida in df_mensal.columns:
@@ -145,13 +140,27 @@ def calcular_kpis_mensal_detalhado(df_mensal, data_escolhida):
     return metrics
 
 def calcular_resumo_dia_dim(df_dim):
+    """
+    Conta Escalados (Apenas quem tem CHAT) e Folgas totais.
+    """
     cols_horarios = [c for c in df_dim.columns if ':' in c]
     if not cols_horarios: return {"Trabalhando": 0, "Folga": 0}
-    def juntar_linha(row): return "".join([str(val).upper() for val in row])
+
+    def juntar_linha(row):
+        return "".join([str(val).upper() for val in row])
+
     resumo = df_dim[cols_horarios].apply(juntar_linha, axis=1)
-    trabalhando = resumo.str.contains('CHAT|EMAIL|E-MAIL|P|TREINO|1:1|1X1|FINANCEIRO|REEMBOLSOS|BACKOFFICE').sum()
-    folga = len(df_dim) - trabalhando
-    return {"Trabalhando": trabalhando, "Folga": folga}
+    
+    # REQUISITO: Escalados conta APENAS quem tem CHAT
+    escalados_chat = resumo.str.contains('CHAT').sum()
+    
+    # REQUISITO: Folga conta quem tem 'F' e NÃO tem atividade de trabalho
+    # Se tiver 'F' mas tiver 'CHAT' (ex: folga parcial/extra), não conta como folga total
+    tem_trabalho = resumo.str.contains('CHAT|EMAIL|E-MAIL|P|TREINO|1:1|1X1|FINANCEIRO|REEMBOLSOS|BACKOFFICE')
+    tem_folga = resumo.str.contains('F')
+    folga_total = ((tem_folga) & (~tem_trabalho)).sum()
+    
+    return {"Trabalhando": escalados_chat, "Folga": folga_total}
 
 def analisar_gargalos_dim(df_dim):
     cols_horarios = []
@@ -159,20 +168,63 @@ def analisar_gargalos_dim(df_dim):
         if ':' in c:
             try:
                 hora = int(c.split(':')[0])
-                if 9 <= hora <= 22: cols_horarios.append(c)
+                if 9 <= hora <= 22: # Filtro 09h as 22h
+                    cols_horarios.append(c)
             except: pass
     if not cols_horarios: return None
+
     menor_chat_valor = 9999; menor_chat_hora = "-"
     maior_pausa_valor = -1; maior_pausa_hora = "-"
+
     for hora in cols_horarios:
         coluna_limpa = df_dim[hora].astype(str).str.upper().str.strip()
         qtd_chat = coluna_limpa.eq('CHAT').sum()
         qtd_pausa = coluna_limpa.isin(['P', 'PAUSA']).sum()
-        if qtd_chat < menor_chat_valor: menor_chat_valor = qtd_chat; menor_chat_hora = hora
-        if qtd_pausa > maior_pausa_valor: maior_pausa_valor = qtd_pausa; maior_pausa_hora = hora
-    return {"min_chat_hora": menor_chat_hora, "min_chat_valor": menor_chat_valor, "max_pausa_hora": maior_pausa_hora, "max_pausa_valor": maior_pausa_valor}
 
-# --- VISUALIZAÇÃO E CORES ---
+        if qtd_chat < menor_chat_valor:
+            menor_chat_valor = qtd_chat
+            menor_chat_hora = hora
+        if qtd_pausa > maior_pausa_valor:
+            maior_pausa_valor = qtd_pausa
+            maior_pausa_hora = hora
+            
+    return {
+        "min_chat_hora": menor_chat_hora, "min_chat_valor": menor_chat_valor,
+        "max_pausa_hora": maior_pausa_hora, "max_pausa_valor": maior_pausa_valor
+    }
+
+def filtrar_e_ordenar_dim(df, modo):
+    df_filtrado = df.copy()
+    cols_horarios = [c for c in df.columns if ':' in c]
+    
+    if 'ENTRADA' in df_filtrado.columns:
+        df_filtrado['SORT_TEMP'] = pd.to_datetime(df_filtrado['ENTRADA'], format='%H:%M', errors='coerce')
+    else:
+        df_filtrado['SORT_TEMP'] = pd.NaT
+
+    if modo == "💬 Apenas Chat":
+        # Mostra apenas quem tem pelo menos 1 'CHAT'
+        mask = df_filtrado[cols_horarios].apply(lambda row: row.astype(str).str.upper().str.contains('CHAT').any(), axis=1)
+        df_filtrado = df_filtrado[mask]
+        
+    elif modo == "🚫 Apenas Folgas":
+        # REQUISITO: Mostrar SÓ quem tem 'F' e NÃO tem outras coisas
+        def is_pure_folga(row):
+            s = "".join([str(val).upper() for val in row])
+            has_f = 'F' in s
+            has_work = any(x in s for x in ['CHAT', 'EMAIL', 'E-MAIL', 'P', '1:1', 'TREINO', 'FINANCEIRO'])
+            return has_f and not has_work
+            
+        mask = df_filtrado[cols_horarios].apply(is_pure_folga, axis=1)
+        df_filtrado = df_filtrado[mask]
+
+    df_filtrado = df_filtrado.sort_values(by='SORT_TEMP', na_position='last')
+    df_filtrado = df_filtrado.drop(columns=['SORT_TEMP'])
+    
+    return df_filtrado
+
+# --- ESTILOS VISUAIS ---
+
 def colorir_mensal(val):
     val = str(val).upper().strip() if isinstance(val, str) else str(val)
     if val == 'T': return 'background-color: #c9daf8; color: black' 
@@ -190,6 +242,28 @@ def colorir_diario(val):
     elif 'REEMBOLSOS' in val: return 'background-color: #d4edbc; color: black'
     elif 'BACKOFFICE' in val: return 'background-color: #5a3286; color: white'
     return ''
+
+def estilo_separacao_financeiro(df):
+    """
+    Desenha uma borda grossa especificamente acima da ilha FINANCEIRO
+    para criar a separação visual solicitada.
+    """
+    estilos = pd.DataFrame('', index=df.index, columns=df.columns)
+    if 'ILHA' in df.columns:
+        ilhas = df['ILHA'].astype(str).str.strip()
+        # Identifica onde começa o Financeiro (Linha atual é Financeiro E anterior não era)
+        is_fin = ilhas == "Financeiro"
+        was_not_fin = ilhas.shift(1) != "Financeiro"
+        inicio_financeiro = is_fin & was_not_fin
+        
+        # Aplica a borda
+        idx_fin = inicio_financeiro[inicio_financeiro].index
+        for idx in idx_fin:
+            if idx in estilos.index:
+                # Borda Roxa (cor do Nubank/Financeiro moderno) para destacar
+                estilos.loc[idx, :] = 'border-top: 3px solid #5a3286 !important;'
+                
+    return estilos
 
 def criar_grafico_timeline(df_dim, data_referencia_str="2025-01-01", colorir_por="Atividade"):
     lista_timeline = []
@@ -274,10 +348,20 @@ with aba_mensal:
         if sel_ilha and 'ILHA' in df_f: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
         if busca_nome and 'NOME' in df_f: df_f = df_f[df_f['NOME'].str.contains(busca_nome, case=False)]
 
-        cols_para_remover = ['EMAIL', 'E-MAIL', 'ADMISSÃO', 'ILHA']
+        # Ordenação
+        if 'ILHA' in df_f.columns:
+            df_f['ILHA'] = df_f['ILHA'].astype(str).str.strip()
+            df_f['ILHA_CAT'] = pd.Categorical(df_f['ILHA'], categories=ORDEM_DAS_ILHAS, ordered=True)
+            df_f = df_f.sort_values(by=['ILHA_CAT', 'NOME'], na_position='last').drop(columns=['ILHA_CAT'])
+
+        cols_para_remover = ['EMAIL', 'E-MAIL', 'ADMISSÃO', 'ILHA', 'Z'] # Remove Z se existir
         cols_visuais = [c for c in df_f.columns if c.upper().strip() not in cols_para_remover]
         
-        styler = df_f[cols_visuais].style.map(colorir_mensal)
+        # Aplica a separação visual para o Financeiro
+        styler = (df_f[cols_visuais].style
+                  .map(colorir_mensal)
+                  .apply(estilo_separacao_financeiro, axis=None)) # <--- Separador Financeiro
+
         if pode_editar: st.data_editor(df_f, use_container_width=True, hide_index=True, key="ed_m")
         else: st.dataframe(styler, use_container_width=True, height=600, hide_index=True)
 
@@ -309,10 +393,15 @@ with aba_diaria:
             if sel_ilha and 'ILHA' in df_dim_f: df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
             if busca_nome and 'NOME' in df_dim_f: df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
             
-            # --- SELETOR DE MODO DE VISÃO COM ÍCONES ---
-            modo_visao = st.radio("Modo de Visualização:", ["📊 Timeline", "▦ Grade Completa", "💬 Apenas Chat", "🚫 Apenas Folgas"], index=1 if pode_editar else 0, horizontal=True, label_visibility="collapsed")
+            # Ordenação Diária
+            if 'ILHA' in df_dim_f.columns:
+                df_dim_f['ILHA'] = df_dim_f['ILHA'].astype(str).str.strip()
+                df_dim_f['ILHA_CAT'] = pd.Categorical(df_dim_f['ILHA'], categories=ORDEM_DAS_ILHAS, ordered=True)
+                df_dim_f = df_dim_f.sort_values(by=['ILHA_CAT', 'NOME'], na_position='last').drop(columns=['ILHA_CAT'])
 
-            if modo_visao == "📊 Timeline":
+            tipo = st.radio("Modo:", ["📊 Timeline", "▦ Grade Completa", "💬 Apenas Chat", "🚫 Apenas Folgas"], index=1 if pode_editar else 0, horizontal=True, label_visibility="collapsed")
+
+            if tipo == "📊 Timeline":
                 c_spacer, c_opt = st.columns([3,1])
                 with c_opt: cor_opt = st.radio("Cor:", ["Atividade", "Ilha"], horizontal=True)
                 with st.spinner("Gerando gráfico..."):
@@ -325,20 +414,20 @@ with aba_diaria:
                     else: st.warning("Erro ao gerar gráfico.")
             
             else:
-                # --- LÓGICA PARA GRADES (Completa, Chat ou Folga) ---
-                # 1. Filtra e Ordena usando a nova função
-                df_exibicao = filtrar_e_ordenar_dim(df_dim_f, modo_visao)
+                # Filtrar e Ordenar
+                df_exibicao = filtrar_e_ordenar_dim(df_dim_f, tipo)
                 
-                cols_para_remover_dim = ['EMAIL', 'E-MAIL', 'ILHA']
+                # Ignora Coluna Z aqui também
+                cols_para_remover_dim = ['EMAIL', 'E-MAIL', 'ILHA', 'Z']
                 cols_v = [c for c in df_exibicao.columns if c.upper().strip() not in cols_para_remover_dim]
                 
-                if pode_editar and modo_visao == "▦ Grade Completa": # Edição só na grade completa para segurança
+                if pode_editar and tipo == "▦ Grade Completa":
                     time_cols = [c for c in cols_v if ':' in c]
                     column_config = {col: st.column_config.SelectboxColumn(col, options=OPCOES_ATIVIDADE, required=True, width="small") for col in time_cols}
                     st.info("✏️ Modo Edição")
                     st.data_editor(df_exibicao[cols_v], use_container_width=True, hide_index=True, key="ed_d", column_config=column_config)
                 else:
-                    if modo_visao != "▦ Grade Completa":
+                    if tipo != "▦ Grade Completa":
                         st.caption(f"Mostrando **{len(df_exibicao)}** analistas ordenados por horário de entrada.")
                     styler_dim = df_exibicao[cols_v].style.map(colorir_diario)
                     st.dataframe(styler_dim, use_container_width=True, height=600, hide_index=True)
