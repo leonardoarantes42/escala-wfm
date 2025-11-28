@@ -351,7 +351,7 @@ with aba_mensal:
         
         styler = (df_f[cols_visuais].style
                   .map(colorir_mensal)
-                  .set_properties(**{'font-size': '12px', 'text-align': 'center'})
+                  .set_properties(**{'font-size': '10px', 'text-align': 'center'})
                   .set_properties(subset=['NOME'], **{'text-align': 'left'}))
 
         if pode_editar:
