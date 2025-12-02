@@ -13,16 +13,46 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS: DESIGN LIMPO ---
+# --- CSS: DESIGN LIMPO + TÍTULO FIXO ---
 st.markdown("""
     <style>
+        /* Ajuste de margens */
         .block-container {
             padding-top: 1.5rem;
             padding-bottom: 1rem;
             padding-left: 2rem;
             padding-right: 2rem;
         }
-        /* KPIs à Esquerda */
+        
+        /* --- TÍTULO FIXO (STICKY HEADER) --- */
+        /* Isso faz o título grudar no topo quando rolar a página */
+        h3 {
+            position: sticky;
+            top: 0;
+            z-index: 999; /* Garante que fique por cima de tudo */
+            background-color: #ffffff; /* Fundo branco para não misturar com o texto que passa por baixo */
+            padding-top: 10px;
+            padding-bottom: 10px;
+            margin-top: 0px !important;
+            border-bottom: 2px solid #f0f2f6; /* Uma linha sutil para separar */
+        }
+        
+        /* Ajuste do fundo do título para Modo Escuro */
+        @media (prefers-color-scheme: dark) {
+            h3 {
+                background-color: #0e1117; /* Cor de fundo padrão do tema escuro */
+                border-bottom: 2px solid #333;
+            }
+            [data-testid="metric-container"] {
+                background-color: #262730;
+                border: 1px solid #444;
+            }
+            [data-testid="stMetricValue"] {
+                color: #4dabf7;
+            }
+        }
+
+        /* Estilo dos KPIs */
         [data-testid="metric-container"] {
             width: 100%;
             display: flex;
@@ -48,18 +78,11 @@ st.markdown("""
             font-weight: bold;
             color: #1e3a8a;
         }
-        @media (prefers-color-scheme: dark) {
-            [data-testid="metric-container"] {
-                background-color: #262730;
-                border: 1px solid #444;
-            }
-            [data-testid="stMetricValue"] {
-                color: #4dabf7;
-            }
-        }
+        
+        /* Tabelas */
         .stDataFrame { font-size: 13px; }
         
-        /* Garante Sticky Header */
+        /* Garante Sticky Header da Tabela também */
         [data-testid="stDataFrame"] > div {
             overflow: auto;
         }
@@ -118,11 +141,11 @@ def carregar_dados_aba(nome_aba):
         if 'NOME' in df.columns:
             df = df[df['NOME'].astype(str).str.strip() != '']
 
-        # 2. Corte Lateral (Aumentado para 35 no Diário)
+        # Corte Lateral
         if nome_aba == 'Mensal':
             df = df.iloc[:, :39] 
         else:
-            df = df.iloc[:, :35] # <--- AUMENTADO AQUI
+            df = df.iloc[:, :35]
 
         return df, worksheet
 
@@ -222,38 +245,18 @@ def colorir_diario(val):
 
 # ================= MAIN APP =================
 
-df_global, _ = carregar_dados_aba('Mensal')
-
-# --- SIDEBAR COM FILTROS E RODAPÉ ---
 with st.sidebar:
     st.image("logo_turbi.png", width=140) 
     st.divider()
-    
-    # 1. Filtros (Agora começam VAZIOS [])
-    st.markdown("### 🔍 Filtros")
-    
-    # Carrega opções únicas
-    if df_global is not None:
-        opcoes_lider = sorted(df_global['LIDER'].unique().tolist()) if 'LIDER' in df_global.columns else []
-        opcoes_ilha = sorted(df_global['ILHA'].unique().tolist()) if 'ILHA' in df_global.columns else []
-    else:
-        opcoes_lider = []
-        opcoes_ilha = []
+    with st.expander("🔍 Filtros"):
+        filtro_lider_placeholder = st.empty()
+        filtro_ilha_placeholder = st.empty()
+        busca_nome = st.text_input("Buscar Nome")
 
-    # default=[] significa que começa vazio. Na lógica abaixo, vazio = mostra tudo.
-    sel_lider = st.multiselect("Líder", options=opcoes_lider, default=[])
-    sel_ilha = st.multiselect("Ilha", options=opcoes_ilha, default=[])
-    busca_nome = st.text_input("Buscar Nome")
-
-    # Espaço flexível para empurrar o rodapé
-    st.markdown("<div style='height: 50px;'></div>", unsafe_allow_html=True)
-    
-    # Rodapé
-    st.divider()
-    st.caption("Made by **Leonardo Arantes**")
-
+# TÍTULO AGORA É FIXO NO TOPO
 st.markdown("### 🚙 Sistema de Escalas Turbi") 
 
+df_global, _ = carregar_dados_aba('Mensal')
 aba_mensal, aba_diaria = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária"])
 
 # ================= ABA MENSAL =================
@@ -278,8 +281,13 @@ with aba_mensal:
 
         st.markdown("---")
 
+        lideres = sorted(df_mensal['LIDER'].unique().tolist()) if 'LIDER' in df_mensal.columns else []
+        ilhas = sorted(df_mensal['ILHA'].unique().tolist()) if 'ILHA' in df_mensal.columns else []
+        sel_lider = filtro_lider_placeholder.multiselect("Líder", lideres, default=lideres, key="f_lm")
+        sel_ilha = filtro_ilha_placeholder.multiselect("Ilha", ilhas, default=ilhas, key="f_im")
+
         df_f = df_mensal.copy()
-        # Lógica de Filtro: Se a lista estiver vazia (default), NÃO filtra (mostra tudo)
+        # Lógica de Filtro (Vazio = Todos)
         if sel_lider: df_f = df_f[df_f['LIDER'].isin(sel_lider)]
         if sel_ilha: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
         if busca_nome: df_f = df_f[df_f['NOME'].str.contains(busca_nome, case=False)]
@@ -288,8 +296,6 @@ with aba_mensal:
         cols_visuais = [c for c in df_f.columns if c.upper().strip() not in cols_para_remover]
         
         styler = df_f[cols_visuais].style.map(colorir_mensal)
-        
-        # height=600 garante o Header Fixo
         st.dataframe(styler, use_container_width=True, height=600, hide_index=True)
 
 # ================= ABA DIÁRIA =================
@@ -318,7 +324,6 @@ with aba_diaria:
             st.divider()
 
             df_dim_f = df_dim.copy()
-            # Lógica de Filtro: Se a lista estiver vazia (default), NÃO filtra (mostra tudo)
             if sel_lider: df_dim_f = df_dim_f[df_dim_f['LIDER'].isin(sel_lider)]
             if sel_ilha: df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
             if busca_nome: df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
@@ -337,6 +342,4 @@ with aba_diaria:
                 st.caption(f"Mostrando **{len(df_exibicao)}** analistas ordenados por horário de entrada.")
                 
             styler_dim = df_exibicao[cols_v].style.map(colorir_diario)
-            
-            # height=600 garante o Header Fixo aqui também
             st.dataframe(styler_dim, use_container_width=True, height=600, hide_index=True)
