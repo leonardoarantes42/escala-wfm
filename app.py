@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
+import plotly.express as px
 from datetime import datetime, timedelta
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
@@ -12,44 +13,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS: DESIGN LIMPO, ALINHADO E STICKY HEADER ---
+# --- CSS: DESIGN LIMPO ---
 st.markdown("""
     <style>
-        /* Ajuste do topo da página */
         .block-container {
             padding-top: 1.5rem;
             padding-bottom: 1rem;
             padding-left: 2rem;
             padding-right: 2rem;
         }
-
-        /* --- TÍTULO FIXO (STICKY HEADER) --- */
-        h3 {
-            position: sticky;
-            top: 0;
-            z-index: 999;
-            background-color: #ffffff; /* Fundo branco para cobrir o texto ao rolar */
-            padding-top: 15px;
-            padding-bottom: 15px;
-            margin-top: 0px !important;
-            border-bottom: 2px solid #f0f2f6;
-        }
-        
-        /* Ajuste para Modo Escuro */
-        @media (prefers-color-scheme: dark) {
-            h3 {
-                background-color: #0e1117;
-                border-bottom: 2px solid #333;
-            }
-            [data-testid="metric-container"] {
-                background-color: #262730;
-                border: 1px solid #444;
-            }
-            [data-testid="stMetricValue"] {
-                color: #4dabf7;
-            }
-        }
-
         /* KPIs à Esquerda */
         [data-testid="metric-container"] {
             width: 100%;
@@ -76,8 +48,21 @@ st.markdown("""
             font-weight: bold;
             color: #1e3a8a;
         }
-        
+        @media (prefers-color-scheme: dark) {
+            [data-testid="metric-container"] {
+                background-color: #262730;
+                border: 1px solid #444;
+            }
+            [data-testid="stMetricValue"] {
+                color: #4dabf7;
+            }
+        }
         .stDataFrame { font-size: 13px; }
+        
+        /* Garante Sticky Header */
+        [data-testid="stDataFrame"] > div {
+            overflow: auto;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -116,13 +101,7 @@ def carregar_dados_aba(nome_aba):
             linha_upper = [str(col).upper().strip() for col in linha]
             if "NOME" in linha_upper or "NOMES" in linha_upper:
                 indice_cabecalho = i
-                # Normaliza nomes de colunas (LÍDER -> LIDER)
-                cabecalho_encontrado = []
-                for col in linha:
-                    val = str(col).upper().strip()
-                    if val == 'NOMES': val = 'NOME'
-                    if val == 'LÍDER': val = 'LIDER' # Correção crítica
-                    cabecalho_encontrado.append(val)
+                cabecalho_encontrado = ['NOME' if str(col).upper().strip() == 'NOMES' else str(col).upper().strip() for col in linha]
                 break
         
         if indice_cabecalho == -1:
@@ -139,11 +118,11 @@ def carregar_dados_aba(nome_aba):
         if 'NOME' in df.columns:
             df = df[df['NOME'].astype(str).str.strip() != '']
 
-        # Corte Lateral
+        # 2. Corte Lateral (Aumentado para 35 no Diário)
         if nome_aba == 'Mensal':
             df = df.iloc[:, :39] 
         else:
-            df = df.iloc[:, :35]
+            df = df.iloc[:, :35] # <--- AUMENTADO AQUI
 
         return df, worksheet
 
@@ -173,12 +152,8 @@ def calcular_resumo_dia_dim(df_dim):
     escalados_chat = resumo.str.contains('CHAT').sum()
     tem_trabalho = resumo.str.contains('CHAT|EMAIL|E-MAIL|P|TREINO|1:1|1X1|FINANCEIRO|REEMBOLSOS|BACKOFFICE')
     tem_folga = resumo.str.contains('F')
-    # Proteção: Verifica se coluna ILHA existe antes de usar
-    if 'ILHA' in df_dim.columns:
-        eh_sup_emerg = df_dim['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
-        folga_filtrada = ((tem_folga) & (~tem_trabalho) & (eh_sup_emerg)).sum()
-    else:
-        folga_filtrada = 0
+    eh_sup_emerg = df_dim['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
+    folga_filtrada = ((tem_folga) & (~tem_trabalho) & (eh_sup_emerg)).sum()
     return {"Trabalhando": escalados_chat, "Folga": folga_filtrada}
 
 def analisar_gargalos_dim(df_dim):
@@ -187,7 +162,8 @@ def analisar_gargalos_dim(df_dim):
         if ':' in c:
             try:
                 hora = int(c.split(':')[0])
-                if 9 <= hora <= 22: cols_horarios.append(c)
+                if 9 <= hora <= 22:
+                    cols_horarios.append(c)
             except: pass
     if not cols_horarios: return None
     menor_chat_valor = 9999; menor_chat_hora = "-"
@@ -203,7 +179,6 @@ def analisar_gargalos_dim(df_dim):
 def filtrar_e_ordenar_dim(df, modo):
     df_filtrado = df.copy()
     cols_horarios = [c for c in df.columns if ':' in c]
-    
     if 'ENTRADA' in df_filtrado.columns:
         df_filtrado['SORT_TEMP'] = pd.to_datetime(df_filtrado['ENTRADA'], format='%H:%M', errors='coerce')
     else: df_filtrado['SORT_TEMP'] = pd.NaT
@@ -223,8 +198,7 @@ def filtrar_e_ordenar_dim(df, modo):
         df_filtrado = df_filtrado[mask]
         df_filtrado = df_filtrado.sort_values(by='SORT_TEMP', na_position='last')
 
-    if 'SORT_TEMP' in df_filtrado.columns:
-        df_filtrado = df_filtrado.drop(columns=['SORT_TEMP'])
+    df_filtrado = df_filtrado.drop(columns=['SORT_TEMP'])
     return df_filtrado
 
 # --- ESTILOS VISUAIS ---
@@ -250,31 +224,34 @@ def colorir_diario(val):
 
 df_global, _ = carregar_dados_aba('Mensal')
 
-# --- SIDEBAR ---
+# --- SIDEBAR COM FILTROS E RODAPÉ ---
 with st.sidebar:
     st.image("logo_turbi.png", width=140) 
     st.divider()
     
+    # 1. Filtros (Agora começam VAZIOS [])
     st.markdown("### 🔍 Filtros")
+    
     # Carrega opções únicas
     if df_global is not None:
-        # Segurança: Verifica se coluna existe antes de pegar unique
         opcoes_lider = sorted(df_global['LIDER'].unique().tolist()) if 'LIDER' in df_global.columns else []
         opcoes_ilha = sorted(df_global['ILHA'].unique().tolist()) if 'ILHA' in df_global.columns else []
     else:
         opcoes_lider = []
         opcoes_ilha = []
 
-    # Filtros vazios por padrão (default=[])
+    # default=[] significa que começa vazio. Na lógica abaixo, vazio = mostra tudo.
     sel_lider = st.multiselect("Líder", options=opcoes_lider, default=[])
     sel_ilha = st.multiselect("Ilha", options=opcoes_ilha, default=[])
     busca_nome = st.text_input("Buscar Nome")
 
+    # Espaço flexível para empurrar o rodapé
     st.markdown("<div style='height: 50px;'></div>", unsafe_allow_html=True)
+    
+    # Rodapé
     st.divider()
     st.caption("Made by **Leonardo Arantes**")
 
-# TÍTULO PRINCIPAL (Sticky)
 st.markdown("### 🚙 Sistema de Escalas Turbi") 
 
 aba_mensal, aba_diaria = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária"])
@@ -302,19 +279,17 @@ with aba_mensal:
         st.markdown("---")
 
         df_f = df_mensal.copy()
-        
-        # Filtros (Verifica se LIDER/ILHA existem e se o filtro não está vazio)
-        if 'LIDER' in df_f.columns and sel_lider: 
-            df_f = df_f[df_f['LIDER'].isin(sel_lider)]
-        if 'ILHA' in df_f.columns and sel_ilha: 
-            df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
-        if 'NOME' in df_f.columns and busca_nome: 
-            df_f = df_f[df_f['NOME'].str.contains(busca_nome, case=False)]
+        # Lógica de Filtro: Se a lista estiver vazia (default), NÃO filtra (mostra tudo)
+        if sel_lider: df_f = df_f[df_f['LIDER'].isin(sel_lider)]
+        if sel_ilha: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
+        if busca_nome: df_f = df_f[df_f['NOME'].str.contains(busca_nome, case=False)]
 
         cols_para_remover = ['EMAIL', 'E-MAIL', 'ADMISSÃO', 'ILHA', 'Z']
         cols_visuais = [c for c in df_f.columns if c.upper().strip() not in cols_para_remover]
         
         styler = df_f[cols_visuais].style.map(colorir_mensal)
+        
+        # height=600 garante o Header Fixo
         st.dataframe(styler, use_container_width=True, height=600, hide_index=True)
 
 # ================= ABA DIÁRIA =================
@@ -343,14 +318,10 @@ with aba_diaria:
             st.divider()
 
             df_dim_f = df_dim.copy()
-            
-            # Filtros Seguros (Checa se coluna existe + se filtro não está vazio)
-            if 'LIDER' in df_dim_f.columns and sel_lider: 
-                df_dim_f = df_dim_f[df_dim_f['LIDER'].isin(sel_lider)]
-            if 'ILHA' in df_dim_f.columns and sel_ilha: 
-                df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
-            if 'NOME' in df_dim_f.columns and busca_nome: 
-                df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
+            # Lógica de Filtro: Se a lista estiver vazia (default), NÃO filtra (mostra tudo)
+            if sel_lider: df_dim_f = df_dim_f[df_dim_f['LIDER'].isin(sel_lider)]
+            if sel_ilha: df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
+            if busca_nome: df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
             
             tipo = st.radio("Modo:", ["▦ Grade Completa", "💬 Apenas Chat", "🚫 Apenas Folgas"], horizontal=True, label_visibility="collapsed")
 
@@ -366,4 +337,6 @@ with aba_diaria:
                 st.caption(f"Mostrando **{len(df_exibicao)}** analistas ordenados por horário de entrada.")
                 
             styler_dim = df_exibicao[cols_v].style.map(colorir_diario)
+            
+            # height=600 garante o Header Fixo aqui também
             st.dataframe(styler_dim, use_container_width=True, height=600, hide_index=True)
