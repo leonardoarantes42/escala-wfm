@@ -58,17 +58,11 @@ st.markdown("""
             }
         }
         .stDataFrame { font-size: 13px; }
-        
-        /* Ajuste para garantir Sticky Header */
-        [data-testid="stDataFrame"] > div {
-            overflow: auto;
-        }
     </style>
 """, unsafe_allow_html=True)
 
 # --- CONSTANTES ---
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1sZ8fpjLMfJb25TfJL9Rj8Yhkdw91sZ0yNWGZIgKPO8Q"
-# Não precisamos mais do "Z" aqui pois vamos cortar as colunas na raiz
 COLUNAS_FIXAS_BACKEND = ['NOME', 'EMAIL', 'ADMISSÃO', 'ILHA', 'ENTRADA', 'SAIDA', 'LIDER']
 
 # --- CONEXÃO ---
@@ -121,8 +115,6 @@ def carregar_dados_aba(nome_aba):
             df = df[df['NOME'].astype(str).str.strip() != '']
 
         # 2. Corte Lateral (Limitar até coluna AG ou AM)
-        # Visão Mensal: até AM (aprox 39 colunas)
-        # Visão Diária: até AG (aprox 33 colunas)
         if nome_aba == 'Mensal':
             df = df.iloc[:, :39] 
         else:
@@ -136,27 +128,17 @@ def carregar_dados_aba(nome_aba):
 
 # --- KPIS ---
 def calcular_kpis_mensal_detalhado(df_mensal, data_escolhida):
-    """
-    Calcula:
-    - No Chat (Emer e Supt): Quem tem 'T' E é de Suporte ou Emergência
-    - Folgas: Total de 'F'
-    - Detalhe por Ilha
-    """
     metrics = {"NoChat": 0, "Folga": 0, "Suporte": 0, "Emergencia": 0}
     
     if data_escolhida in df_mensal.columns:
-        # Folgas (Geral)
         metrics["Folga"] = df_mensal[data_escolhida].value_counts().get("F", 0)
         
         if 'ILHA' in df_mensal.columns:
-            # Filtros para "No Chat (Emer e Supt)"
-            # Regra: Coluna do dia é 'T' E Coluna Ilha contém Suporte ou Emergência
             mask_trabalhando = df_mensal[data_escolhida] == 'T'
             mask_ilhas_chat = df_mensal['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
             
             metrics["NoChat"] = len(df_mensal[mask_trabalhando & mask_ilhas_chat])
 
-            # Contagens individuais para os cards laterais (apenas quem está trabalhando T)
             df_t = df_mensal[mask_trabalhando]
             metrics["Suporte"] = df_t[df_t['ILHA'].str.contains("Suporte", case=False, na=False)].shape[0]
             metrics["Emergencia"] = df_t[df_t['ILHA'].str.contains("Emergência|Emergencia", case=False, na=False)].shape[0]
@@ -172,10 +154,8 @@ def calcular_resumo_dia_dim(df_dim):
 
     resumo = df_dim[cols_horarios].apply(juntar_linha, axis=1)
     
-    # KPI 1: No Chat (Quem tem a palavra CHAT na linha)
     escalados_chat = resumo.str.contains('CHAT').sum()
     
-    # KPI 2: Folgas (Suporte e Emergência apenas)
     tem_trabalho = resumo.str.contains('CHAT|EMAIL|E-MAIL|P|TREINO|1:1|1X1|FINANCEIRO|REEMBOLSOS|BACKOFFICE')
     tem_folga = resumo.str.contains('F')
     eh_sup_emerg = df_dim['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
@@ -190,7 +170,7 @@ def analisar_gargalos_dim(df_dim):
         if ':' in c:
             try:
                 hora = int(c.split(':')[0])
-                if 9 <= hora <= 22: # Filtro 09h as 22h
+                if 9 <= hora <= 22: 
                     cols_horarios.append(c)
             except: pass
     if not cols_horarios: return None
@@ -214,6 +194,40 @@ def analisar_gargalos_dim(df_dim):
         "min_chat_hora": menor_chat_hora, "min_chat_valor": menor_chat_valor,
         "max_pausa_hora": maior_pausa_hora, "max_pausa_valor": maior_pausa_valor
     }
+
+def filtrar_e_ordenar_dim(df, modo):
+    df_filtrado = df.copy()
+    cols_horarios = [c for c in df.columns if ':' in c]
+    
+    # Prepara coluna de tempo para ordenar (apenas se for filtrar)
+    if 'ENTRADA' in df_filtrado.columns:
+        df_filtrado['SORT_TEMP'] = pd.to_datetime(df_filtrado['ENTRADA'], format='%H:%M', errors='coerce')
+    else:
+        df_filtrado['SORT_TEMP'] = pd.NaT
+
+    if modo == "💬 Apenas Chat":
+        mask = df_filtrado[cols_horarios].apply(lambda row: row.astype(str).str.upper().str.contains('CHAT').any(), axis=1)
+        df_filtrado = df_filtrado[mask]
+        # Ordena por horário
+        df_filtrado = df_filtrado.sort_values(by='SORT_TEMP', na_position='last')
+        
+    elif modo == "🚫 Apenas Folgas":
+        def is_pure_folga(row):
+            s = "".join([str(val).upper() for val in row])
+            has_f = 'F' in s
+            has_work = any(x in s for x in ['CHAT', 'EMAIL', 'E-MAIL', 'P', '1:1', 'TREINO', 'FINANCEIRO'])
+            return has_f and not has_work
+        mask = df_filtrado[cols_horarios].apply(is_pure_folga, axis=1)
+        df_filtrado = df_filtrado[mask]
+        # Ordena por horário
+        df_filtrado = df_filtrado.sort_values(by='SORT_TEMP', na_position='last')
+
+    # Se for "Grade Completa", o 'modo' não entra nos IFs acima, então retorna o df original sem sort
+    # Mas precisamos limpar a coluna temporária se ela foi criada
+    if 'SORT_TEMP' in df_filtrado.columns:
+        df_filtrado = df_filtrado.drop(columns=['SORT_TEMP'])
+    
+    return df_filtrado
 
 # --- ESTILOS VISUAIS ---
 def colorir_mensal(val):
@@ -264,8 +278,7 @@ with aba_mensal:
         
         kpis = calcular_kpis_mensal_detalhado(df_mensal, data_kpi_selecionada)
         
-        # NOVOS TÍTULOS KPIS
-        with c2: st.metric("✅ Escalados (Sup/Emerg)", kpis["NoChat"])
+        with c2: st.metric("✅ No Chat (Emer e Supt)", kpis["NoChat"])
         with c3: st.metric("🛋️ Folgas", kpis["Folga"])
         with c4: st.metric("🎧 Suporte", kpis["Suporte"])
         with c5: st.metric("🚨 Emergência", kpis["Emergencia"])
@@ -282,14 +295,10 @@ with aba_mensal:
         if sel_ilha and 'ILHA' in df_f: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
         if busca_nome and 'NOME' in df_f: df_f = df_f[df_f['NOME'].str.contains(busca_nome, case=False)]
 
-        # SEM ORDENAÇÃO CUSTOMIZADA: Respeita ordem da planilha
-        
         cols_para_remover = ['EMAIL', 'E-MAIL', 'ADMISSÃO', 'ILHA', 'Z']
         cols_visuais = [c for c in df_f.columns if c.upper().strip() not in cols_para_remover]
         
         styler = df_f[cols_visuais].style.map(colorir_mensal)
-        
-        # height=600 ajuda a manter o Header Fixo (Sticky)
         st.dataframe(styler, use_container_width=True, height=600, hide_index=True)
 
 # ================= ABA DIÁRIA =================
@@ -310,7 +319,7 @@ with aba_diaria:
             resumo_dia = calcular_resumo_dia_dim(df_dim)
             
             with top_c2: st.metric("👥 No Chat", resumo_dia["Trabalhando"])
-            with top_c3: st.metric("🛋️ Folgas (Sup/Emerg)", resumo_dia["Folga"])
+            with top_c3: st.metric("🚫 Folgas (Sup/Emerg)", resumo_dia["Folga"])
             
             if analise:
                 with top_c4: st.metric("⚠️ Menos Chat (09h-22h)", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
@@ -322,13 +331,18 @@ with aba_diaria:
             if sel_ilha and 'ILHA' in df_dim_f: df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
             if busca_nome and 'NOME' in df_dim_f: df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
             
-            # SEM ORDENAÇÃO CUSTOMIZADA NO DIÁRIO (Conforme pedido)
+            # --- SELETOR DE MODO DE VISÃO ---
+            modo_visao = st.radio("Modo:", ["▦ Grade Completa", "💬 Apenas Chat", "🚫 Apenas Folgas"], horizontal=True, label_visibility="collapsed")
+
+            # Filtra e Ordena (se necessário)
+            df_exibicao = filtrar_e_ordenar_dim(df_dim_f, modo_visao)
             
             cols_para_remover_dim = ['EMAIL', 'E-MAIL', 'ILHA', 'Z']
-            cols_v = [c for c in df_dim_f.columns if c.upper().strip() not in cols_para_remover_dim]
+            cols_v = [c for c in df_exibicao.columns if c.upper().strip() not in cols_para_remover_dim]
             
-            st.caption(f"Mostrando **{len(df_dim_f)}** analistas.")
-            styler_dim = df_dim_f[cols_v].style.map(colorir_diario)
-            
-            # Header fixo também aqui
+            # Legenda de ordenação
+            if modo_visao != "▦ Grade Completa":
+                st.caption(f"Mostrando **{len(df_exibicao)}** analistas ordenados por horário de entrada.")
+                
+            styler_dim = df_exibicao[cols_v].style.map(colorir_diario)
             st.dataframe(styler_dim, use_container_width=True, height=600, hide_index=True)
