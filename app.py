@@ -265,7 +265,7 @@ with aba_mensal:
         kpis = calcular_kpis_mensal_detalhado(df_mensal, data_kpi_selecionada)
         
         # NOVOS TÍTULOS KPIS
-        with c2: st.metric("✅ No Chat (Emer e Supt)", kpis["NoChat"])
+        with c2: st.metric("✅ Escalados (Emer e Supt)", kpis["NoChat"])
         with c3: st.metric("🛋️ Folgas", kpis["Folga"])
         with c4: st.metric("🎧 Suporte", kpis["Suporte"])
         with c5: st.metric("🚨 Emergência", kpis["Emergencia"])
