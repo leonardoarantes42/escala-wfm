@@ -310,7 +310,7 @@ with aba_diaria:
             resumo_dia = calcular_resumo_dia_dim(df_dim)
             
             with top_c2: st.metric("👥 No Chat", resumo_dia["Trabalhando"])
-            with top_c3: st.metric("🚫 Folgas (Sup/Emerg)", resumo_dia["Folga"])
+            with top_c3: st.metric("🛋️ Folgas (Sup/Emerg)", resumo_dia["Folga"])
             
             if analise:
                 with top_c4: st.metric("⚠️ Menos Chat (09h-22h)", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
