@@ -265,7 +265,7 @@ with aba_mensal:
         kpis = calcular_kpis_mensal_detalhado(df_mensal, data_kpi_selecionada)
         
         # NOVOS TÍTULOS KPIS
-        with c2: st.metric("✅ Escalados (Emer e Supt)", kpis["NoChat"])
+        with c2: st.metric("✅ Escalados (Sup/Emerg)", kpis["NoChat"])
         with c3: st.metric("🛋️ Folgas", kpis["Folga"])
         with c4: st.metric("🎧 Suporte", kpis["Suporte"])
         with c5: st.metric("🚨 Emergência", kpis["Emergencia"])
@@ -310,7 +310,7 @@ with aba_diaria:
             resumo_dia = calcular_resumo_dia_dim(df_dim)
             
             with top_c2: st.metric("👥 No Chat", resumo_dia["Trabalhando"])
-            with top_c3: st.metric("🚫 Folgas (Sup/Emerg)", resumo_dia["Folga"])
+            with top_c3: st.metric("🛋️ Folgas (Sup/Emerg)", resumo_dia["Folga"])
             
             if analise:
                 with top_c4: st.metric("⚠️ Menos Chat (09h-22h)", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
