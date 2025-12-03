@@ -15,27 +15,25 @@ st.set_page_config(
 # --- CSS: TRAVAMENTO DE TELA E DESIGN ---
 st.markdown("""
     <style>
-        /* 1. Remove margens excessivas do topo para aproveitar espaço */
+        /* 1. Ajuste do Topo para o Título não cortar */
         .block-container {
-            padding-top: 1rem;
+            padding-top: 3.5rem; /* Aumentado para o título aparecer inteiro */
             padding-bottom: 0rem;
-            padding-left: 1.5rem;
-            padding-right: 1.5rem;
+            padding-left: 2rem;
+            padding-right: 2rem;
         }
         
-        /* 2. TRAVA O SCROLL DA PÁGINA INTEIRA 
-           Isso garante que o Título e os KPIs nunca saiam da tela.
-           O usuário só vai rolar a tabela. */
+        /* 2. TRAVA O SCROLL DA PÁGINA INTEIRA */
         section[data-testid="stSidebar"] + section {
             overflow: hidden !important;
         }
         
-        /* Oculta a barra de rolagem principal caso ela tente aparecer */
+        /* Oculta barras de rolagem globais */
         ::-webkit-scrollbar {
             display: none;
         }
 
-        /* 3. KPIs (Métricas) com altura padronizada */
+        /* 3. Estilo dos KPIs */
         [data-testid="metric-container"] {
             width: 100%;
             display: flex;
@@ -47,7 +45,7 @@ st.markdown("""
             border: 1px solid #e0e0e0;
             border-radius: 8px;
             padding: 10px 15px;
-            height: 110px; /* Garante alinhamento visual */
+            height: 110px;
         }
         [data-testid="stMetricLabel"] {
             width: 100%;
@@ -73,15 +71,19 @@ st.markdown("""
             [data-testid="stMetricLabel"] { color: #ddd; }
         }
 
-        /* 4. Rodapé Fixo NA SIDEBAR (Canto Inferior) */
+        /* 4. Rodapé Fixo PRESO NA SIDEBAR */
+        /* Agora ele é relativo à largura da sidebar, não da tela */
         .sidebar-footer {
             position: fixed;
             bottom: 10px;
-            width: 100%;
+            left: 0;
+            width: 21rem; /* Largura padrão da sidebar do Streamlit */
             font-size: 11px;
             color: #666;
             text-align: center;
-            padding-right: 20px; /* Compensa padding da sidebar */
+            z-index: 100;
+            pointer-events: none;
+            background: transparent;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -117,7 +119,6 @@ def carregar_dados_aba(nome_aba):
         indice_cabecalho = -1
         cabecalho_bruto = []
         
-        # Procura onde começa o cabeçalho
         for i, linha in enumerate(dados[:5]):
             linha_upper = [str(col).upper().strip() for col in linha]
             if "NOME" in linha_upper or "NOMES" in linha_upper:
@@ -129,44 +130,36 @@ def carregar_dados_aba(nome_aba):
             st.error(f"Erro: Cabeçalho não encontrado na aba '{nome_aba}'.")
             return None, None
 
-        # --- NOVA LÓGICA DE RENOMEAÇÃO DE COLUNAS ---
-        # Resolve o problema das 06:00 e 07:00 que sumiam
+        # --- TRATAMENTO DE COLUNAS REPETIDAS (06:00, 07:00) ---
         cabecalho_tratado = []
         contagem_cols = {}
 
         for col in cabecalho_bruto:
             col_str = str(col).strip().upper()
-            if col_str == "NOMES": col_str = "NOME" # Padronização
+            if col_str == "NOMES": col_str = "NOME"
             
-            # Se a coluna já apareceu antes (ex: segundo 06:00)
             if col_str in contagem_cols:
                 contagem_cols[col_str] += 1
-                # Adiciona o sufixo _fim para torná-la única
                 novo_nome = f"{col_str}_fim"
                 cabecalho_tratado.append(novo_nome)
             else:
-                if col_str != "": # Só conta se não for vazio
+                if col_str != "":
                     contagem_cols[col_str] = 1
                 cabecalho_tratado.append(col_str)
 
         linhas = dados[indice_cabecalho + 1:]   
         df = pd.DataFrame(linhas, columns=cabecalho_tratado)
-        
-        # IMPORTANTE: Removemos o drop_duplicates() antigo que causava o erro.
-        # Removemos apenas colunas vazias
         df = df.loc[:, df.columns != '']
         
-        # Limpeza Básica de linhas vazias
         if 'ILHA' in df.columns:
             df = df[df['ILHA'].astype(str).str.strip() != '']
         if 'NOME' in df.columns:
             df = df[df['NOME'].astype(str).str.strip() != '']
 
-        # Cortes
         if nome_aba == 'Mensal':
              df = df.iloc[:, :39] 
         else:
-             pass # NÃO CORTA MAIS O DIÁRIO, deixa ir até o final (07:00_fim)
+             pass 
 
         return df, worksheet
 
@@ -205,7 +198,6 @@ def analisar_gargalos_dim(df_dim):
     for c in df_dim.columns:
         if ':' in c:
             try:
-                # O split resolve o problema do "_fim" (ex: "06:00_fim" vira 6)
                 hora = int(c.split(':')[0])
                 if 9 <= hora <= 22:
                     cols_horarios.append(c)
@@ -331,7 +323,7 @@ with aba_mensal:
         
         styler = df_f[cols_visuais].style.map(colorir_mensal)
         
-        # Altura ajustada para evitar scroll duplo
+        # Visão Mensal funciona bem com 580px
         st.dataframe(styler, use_container_width=True, height=580, hide_index=True)
 
 # ================= ABA DIÁRIA =================
@@ -381,5 +373,8 @@ with aba_diaria:
             
             styler_dim = df_exibicao[cols_v].style.map(colorir_diario)
             
-            # Altura ajustada para evitar scroll duplo
-            st.dataframe(styler_dim, use_container_width=True, height=580, hide_index=True)
+            # --- AJUSTE CRÍTICO AQUI ---
+            # Reduzi a altura para 500px na aba diária.
+            # Como temos os "Radio Buttons" em cima, precisamos de uma tabela menor 
+            # para que tudo caiba na tela sem gerar scroll na página.
+            st.dataframe(styler_dim, use_container_width=True, height=500, hide_index=True)
