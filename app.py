@@ -2,8 +2,7 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
-import plotly.express as px
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
@@ -13,42 +12,30 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS: DESIGN E CORREÇÕES DE UX ---
+# --- CSS: TRAVAMENTO DE TELA E DESIGN ---
 st.markdown("""
     <style>
-        /* 1. Ajuste do Container Principal para Scroll Único */
+        /* 1. Remove margens excessivas do topo para aproveitar espaço */
         .block-container {
-            padding-top: 0rem; /* Remove padding do topo para o Header Sticky colar */
-            padding-bottom: 1rem;
-            padding-left: 2rem;
-            padding-right: 2rem;
+            padding-top: 1rem;
+            padding-bottom: 0rem;
+            padding-left: 1.5rem;
+            padding-right: 1.5rem;
         }
         
-        /* Remove a barra de rolagem da PÁGINA inteira, forçando o uso do scroll da tabela */
+        /* 2. TRAVA O SCROLL DA PÁGINA INTEIRA 
+           Isso garante que o Título e os KPIs nunca saiam da tela.
+           O usuário só vai rolar a tabela. */
         section[data-testid="stSidebar"] + section {
             overflow: hidden !important;
         }
         
-        /* 2. Título Fixo (Sticky Header) */
-        .sticky-header {
-            position: sticky;
-            top: 0;
-            z-index: 999;
-            background-color: #0e1117; /* Cor de fundo igual ao tema dark padrão */
-            padding-top: 1.5rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid #303030;
-            margin-bottom: 1rem;
-        }
-        /* Ajuste para tema claro se necessário */
-        @media (prefers-color-scheme: light) {
-            .sticky-header {
-                background-color: #ffffff;
-                border-bottom: 1px solid #e0e0e0;
-            }
+        /* Oculta a barra de rolagem principal caso ela tente aparecer */
+        ::-webkit-scrollbar {
+            display: none;
         }
 
-        /* 3. KPIs (Métricas) */
+        /* 3. KPIs (Métricas) com altura padronizada */
         [data-testid="metric-container"] {
             width: 100%;
             display: flex;
@@ -60,14 +47,14 @@ st.markdown("""
             border: 1px solid #e0e0e0;
             border-radius: 8px;
             padding: 10px 15px;
-            height: 110px; /* Altura fixa para alinhar todos os cards */
+            height: 110px; /* Garante alinhamento visual */
         }
         [data-testid="stMetricLabel"] {
             width: 100%;
             justify-content: flex-start !important;
             font-size: 14px !important;
             color: #555;
-            word-wrap: break-word; /* Permite que títulos longos quebrem linha */
+            word-wrap: break-word;
             white-space: normal !important;
         }
         [data-testid="stMetricValue"] {
@@ -82,33 +69,19 @@ st.markdown("""
                 background-color: #262730;
                 border: 1px solid #444;
             }
-            [data-testid="stMetricValue"] {
-                color: #4dabf7;
-            }
-            [data-testid="stMetricLabel"] {
-                color: #ddd;
-            }
+            [data-testid="stMetricValue"] { color: #4dabf7; }
+            [data-testid="stMetricLabel"] { color: #ddd; }
         }
 
-        /* 4. Tabela */
-        .stDataFrame { font-size: 13px; }
-        [data-testid="stDataFrame"] > div {
-            overflow: auto;
-        }
-
-        /* 5. Rodapé Fixo no Canto Inferior Esquerdo */
-        .footer-fixed {
+        /* 4. Rodapé Fixo NA SIDEBAR (Canto Inferior) */
+        .sidebar-footer {
             position: fixed;
             bottom: 10px;
-            left: 20px;
-            z-index: 1000;
-            font-size: 12px;
+            width: 100%;
+            font-size: 11px;
             color: #666;
-            background-color: transparent;
-            pointer-events: none; /* Para não bloquear cliques na sidebar se sobrepor */
-        }
-        @media (prefers-color-scheme: dark) {
-            .footer-fixed { color: #888; }
+            text-align: center;
+            padding-right: 20px; /* Compensa padding da sidebar */
         }
     </style>
 """, unsafe_allow_html=True)
@@ -123,7 +96,7 @@ def conectar_google_sheets():
     credentials = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scopes)
     return gspread.authorize(credentials)
 
-# --- CARREGAMENTO ---
+# --- CARREGAMENTO E TRATAMENTO ---
 @st.cache_data(ttl=300)
 def listar_abas_dim():
     client = conectar_google_sheets()
@@ -142,40 +115,58 @@ def carregar_dados_aba(nome_aba):
         dados = worksheet.get_all_values()
         
         indice_cabecalho = -1
-        cabecalho_encontrado = []
+        cabecalho_bruto = []
+        
+        # Procura onde começa o cabeçalho
         for i, linha in enumerate(dados[:5]):
             linha_upper = [str(col).upper().strip() for col in linha]
             if "NOME" in linha_upper or "NOMES" in linha_upper:
                 indice_cabecalho = i
-                cabecalho_encontrado = ['NOME' if str(col).upper().strip() == 'NOMES' else str(col).upper().strip() for col in linha]
+                cabecalho_bruto = linha
                 break
         
         if indice_cabecalho == -1:
             st.error(f"Erro: Cabeçalho não encontrado na aba '{nome_aba}'.")
             return None, None
 
+        # --- NOVA LÓGICA DE RENOMEAÇÃO DE COLUNAS ---
+        # Resolve o problema das 06:00 e 07:00 que sumiam
+        cabecalho_tratado = []
+        contagem_cols = {}
+
+        for col in cabecalho_bruto:
+            col_str = str(col).strip().upper()
+            if col_str == "NOMES": col_str = "NOME" # Padronização
+            
+            # Se a coluna já apareceu antes (ex: segundo 06:00)
+            if col_str in contagem_cols:
+                contagem_cols[col_str] += 1
+                # Adiciona o sufixo _fim para torná-la única
+                novo_nome = f"{col_str}_fim"
+                cabecalho_tratado.append(novo_nome)
+            else:
+                if col_str != "": # Só conta se não for vazio
+                    contagem_cols[col_str] = 1
+                cabecalho_tratado.append(col_str)
+
         linhas = dados[indice_cabecalho + 1:]   
-        df = pd.DataFrame(linhas, columns=cabecalho_encontrado)
-        df = df.loc[:, ~df.columns.duplicated()]
+        df = pd.DataFrame(linhas, columns=cabecalho_tratado)
         
-        # Limpeza Básica
+        # IMPORTANTE: Removemos o drop_duplicates() antigo que causava o erro.
+        # Removemos apenas colunas vazias
+        df = df.loc[:, df.columns != '']
+        
+        # Limpeza Básica de linhas vazias
         if 'ILHA' in df.columns:
             df = df[df['ILHA'].astype(str).str.strip() != '']
         if 'NOME' in df.columns:
             df = df[df['NOME'].astype(str).str.strip() != '']
 
-        # CORREÇÃO DO CORTE DE HORÁRIO:
-        # Removemos o corte rígido (.iloc[:, :35]). 
-        # Agora pegamos TODAS as colunas e limpamos as vazias depois.
+        # Cortes
         if nome_aba == 'Mensal':
-             df = df.iloc[:, :39] # Mantém corte apenas no Mensal se necessário
+             df = df.iloc[:, :39] 
         else:
-             # Para o Diário, não cortamos colunas. 
-             # Isso garante que se a planilha for até 07:00, o código leia.
-             pass 
-
-        # Remove colunas totalmente vazias (sem cabeçalho) caso existam no final
-        df = df.loc[:, df.columns != '']
+             pass # NÃO CORTA MAIS O DIÁRIO, deixa ir até o final (07:00_fim)
 
         return df, worksheet
 
@@ -214,6 +205,7 @@ def analisar_gargalos_dim(df_dim):
     for c in df_dim.columns:
         if ':' in c:
             try:
+                # O split resolve o problema do "_fim" (ex: "06:00_fim" vira 6)
                 hora = int(c.split(':')[0])
                 if 9 <= hora <= 22:
                     cols_horarios.append(c)
@@ -275,9 +267,6 @@ def colorir_diario(val):
 
 # ================= MAIN APP =================
 
-# --- RODAPÉ FIXO INSERIDO VIA HTML/CSS ---
-st.markdown('<div class="footer-fixed">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
-
 df_global, _ = carregar_dados_aba('Mensal')
 
 # --- SIDEBAR COM FILTROS ---
@@ -298,12 +287,15 @@ with st.sidebar:
     sel_ilha = st.multiselect("Ilha", options=opcoes_ilha, default=[])
     busca_nome = st.text_input("Buscar Nome")
 
-# --- CABEÇALHO FIXO ---
-st.markdown("""
-    <div class="sticky-header">
-        <h3 style='margin:0; padding:0;'>🚙 Sistema de Escalas Turbi</h3>
-    </div>
-""", unsafe_allow_html=True)
+    # Rodapé fixo dentro da sidebar
+    st.markdown('''
+        <div class="sidebar-footer">
+            Made by <b>Leonardo Arantes</b>
+        </div>
+    ''', unsafe_allow_html=True)
+
+# --- CABEÇALHO ---
+st.markdown("### 🚙 Sistema de Escalas Turbi")
 
 aba_mensal, aba_diaria = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária"])
 
@@ -315,9 +307,7 @@ with aba_mensal:
         hoje_str = datetime.now().strftime("%d/%m")
         index_padrao = colunas_datas.index(hoje_str) if hoje_str in colunas_datas else 0
 
-        # Layout ajustado para 5 colunas iguais
         c1, c2, c3, c4, c5 = st.columns(5)
-        
         with c1:
             st.markdown("**Status do Dia:**")
             data_kpi_selecionada = st.selectbox("Data", colunas_datas, index=index_padrao, label_visibility="collapsed")
@@ -341,8 +331,8 @@ with aba_mensal:
         
         styler = df_f[cols_visuais].style.map(colorir_mensal)
         
-        # Height aumentado para 750px para ocupar melhor a tela e evitar double scroll
-        st.dataframe(styler, use_container_width=True, height=750, hide_index=True)
+        # Altura ajustada para evitar scroll duplo
+        st.dataframe(styler, use_container_width=True, height=580, hide_index=True)
 
 # ================= ABA DIÁRIA =================
 with aba_diaria:
@@ -350,7 +340,6 @@ with aba_diaria:
     if not abas:
         st.warning("Nenhuma aba DIM encontrada.")
     else:
-        # Layout ajustado para 5 colunas IGUAIS para alinhar o "Pico Pausa"
         top_c1, top_c2, top_c3, top_c4, top_c5 = st.columns(5)
         
         with top_c1:
@@ -392,5 +381,5 @@ with aba_diaria:
             
             styler_dim = df_exibicao[cols_v].style.map(colorir_diario)
             
-            # Height aumentado para 750px
-            st.dataframe(styler_dim, use_container_width=True, height=750, hide_index=True)
+            # Altura ajustada para evitar scroll duplo
+            st.dataframe(styler_dim, use_container_width=True, height=580, hide_index=True)
