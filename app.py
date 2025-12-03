@@ -12,12 +12,12 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS: TRAVAMENTO DE TELA E DESIGN ---
+# --- CSS: DESIGN COMPACTO E AJUSTES DE MENU ---
 st.markdown("""
     <style>
-        /* 1. Ajuste do Topo para o Título não cortar */
+        /* 1. Ajuste do Topo (Mais compacto) */
         .block-container {
-            padding-top: 3.5rem; /* Aumentado para o título aparecer inteiro */
+            padding-top: 2rem; /* Reduzi de 3.5rem para 2rem */
             padding-bottom: 0rem;
             padding-left: 2rem;
             padding-right: 2rem;
@@ -27,13 +27,9 @@ st.markdown("""
         section[data-testid="stSidebar"] + section {
             overflow: hidden !important;
         }
-        
-        /* Oculta barras de rolagem globais */
-        ::-webkit-scrollbar {
-            display: none;
-        }
+        ::-webkit-scrollbar { display: none; }
 
-        /* 3. Estilo dos KPIs */
+        /* 3. KPIs (Métricas) MENORES */
         [data-testid="metric-container"] {
             width: 100%;
             display: flex;
@@ -44,21 +40,16 @@ st.markdown("""
             background-color: #f8f9fa;
             border: 1px solid #e0e0e0;
             border-radius: 8px;
-            padding: 10px 15px;
-            height: 110px;
+            padding: 8px 12px; /* Padding reduzido */
+            height: 85px; /* Altura reduzida de 110px para 85px */
         }
         [data-testid="stMetricLabel"] {
-            width: 100%;
-            justify-content: flex-start !important;
-            font-size: 14px !important;
+            font-size: 12px !important; /* Fonte menor (era 14px) */
             color: #555;
-            word-wrap: break-word;
             white-space: normal !important;
         }
         [data-testid="stMetricValue"] {
-            width: 100%;
-            text-align: left !important;
-            font-size: 26px !important;
+            font-size: 20px !important; /* Fonte menor (era 26px) */
             font-weight: bold;
             color: #1e3a8a;
         }
@@ -71,25 +62,77 @@ st.markdown("""
             [data-testid="stMetricLabel"] { color: #ddd; }
         }
 
-        /* 4. Rodapé Fixo PRESO NA SIDEBAR */
-        /* Agora ele é relativo à largura da sidebar, não da tela */
+        /* 4. Título Principal Menor */
+        h3 {
+            font-size: 1.5rem !important; /* Reduzi o tamanho do título */
+            padding-bottom: 0.5rem;
+        }
+
+        /* 5. Rodapé Fixo e Espaçamento da Sidebar */
+        /* Isso garante que o conteúdo da sidebar não fique escondido atrás do rodapé */
+        [data-testid="stSidebar"] > div:first-child {
+            padding-bottom: 60px; /* Espaço extra no final da rolagem */
+        }
+        
         .sidebar-footer {
             position: fixed;
-            bottom: 10px;
+            bottom: 0;
             left: 0;
-            width: 21rem; /* Largura padrão da sidebar do Streamlit */
+            width: 21rem; /* Largura da sidebar */
+            padding: 10px;
             font-size: 11px;
             color: #666;
             text-align: center;
-            z-index: 100;
-            pointer-events: none;
-            background: transparent;
+            background-color: #f0f2f6; /* Fundo sólido para leitura */
+            border-top: 1px solid #e0e0e0;
+            z-index: 101;
+        }
+        @media (prefers-color-scheme: dark) {
+            .sidebar-footer { 
+                background-color: #262730; 
+                border-top: 1px solid #444;
+                color: #888;
+            }
+        }
+        
+        /* Botão do Link Personalizado */
+        .custom-link-btn {
+            display: block;
+            width: 100%;
+            padding: 8px;
+            text-align: center;
+            background-color: #ffffff;
+            color: #1f77b4;
+            border: 1px solid #1f77b4;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 15px;
+            transition: 0.3s;
+        }
+        .custom-link-btn:hover {
+            background-color: #1f77b4;
+            color: white !important;
+            text-decoration: none;
+        }
+        @media (prefers-color-scheme: dark) {
+            .custom-link-btn {
+                background-color: #0e1117;
+                color: #4dabf7;
+                border: 1px solid #4dabf7;
+            }
+            .custom-link-btn:hover {
+                background-color: #4dabf7;
+                color: #0e1117 !important;
+            }
         }
     </style>
 """, unsafe_allow_html=True)
 
 # --- CONSTANTES ---
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1sZ8fpjLMfJb25TfJL9Rj8Yhkdw91sZ0yNWGZIgKPO8Q"
+LINK_FORMULARIO = "https://docs.google.com/forms/u/0/d/e/1FAIpQLScWvMZ60ISW6RqF0_ZxN_hD5ugOCITUQRlqiFi249EvmLbXyQ/formResponse"
 
 # --- CONEXÃO ---
 @st.cache_resource
@@ -98,7 +141,7 @@ def conectar_google_sheets():
     credentials = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scopes)
     return gspread.authorize(credentials)
 
-# --- CARREGAMENTO E TRATAMENTO ---
+# --- CARREGAMENTO ---
 @st.cache_data(ttl=300)
 def listar_abas_dim():
     client = conectar_google_sheets()
@@ -130,7 +173,6 @@ def carregar_dados_aba(nome_aba):
             st.error(f"Erro: Cabeçalho não encontrado na aba '{nome_aba}'.")
             return None, None
 
-        # --- TRATAMENTO DE COLUNAS REPETIDAS (06:00, 07:00) ---
         cabecalho_tratado = []
         contagem_cols = {}
 
@@ -143,23 +185,18 @@ def carregar_dados_aba(nome_aba):
                 novo_nome = f"{col_str}_fim"
                 cabecalho_tratado.append(novo_nome)
             else:
-                if col_str != "":
-                    contagem_cols[col_str] = 1
+                if col_str != "": contagem_cols[col_str] = 1
                 cabecalho_tratado.append(col_str)
 
         linhas = dados[indice_cabecalho + 1:]   
         df = pd.DataFrame(linhas, columns=cabecalho_tratado)
         df = df.loc[:, df.columns != '']
         
-        if 'ILHA' in df.columns:
-            df = df[df['ILHA'].astype(str).str.strip() != '']
-        if 'NOME' in df.columns:
-            df = df[df['NOME'].astype(str).str.strip() != '']
+        if 'ILHA' in df.columns: df = df[df['ILHA'].astype(str).str.strip() != '']
+        if 'NOME' in df.columns: df = df[df['NOME'].astype(str).str.strip() != '']
 
-        if nome_aba == 'Mensal':
-             df = df.iloc[:, :39] 
-        else:
-             pass 
+        if nome_aba == 'Mensal': df = df.iloc[:, :39] 
+        else: pass 
 
         return df, worksheet
 
@@ -199,8 +236,7 @@ def analisar_gargalos_dim(df_dim):
         if ':' in c:
             try:
                 hora = int(c.split(':')[0])
-                if 9 <= hora <= 22:
-                    cols_horarios.append(c)
+                if 9 <= hora <= 22: cols_horarios.append(c)
             except: pass
     if not cols_horarios: return None
     menor_chat_valor = 9999; menor_chat_hora = "-"
@@ -266,6 +302,13 @@ with st.sidebar:
     st.image("logo_turbi.png", width=140) 
     st.divider()
     
+    # LINK PARA O FORMULÁRIO (Botão Visual)
+    st.markdown(f'''
+        <a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">
+            📝 Alteração de folga/horário
+        </a>
+    ''', unsafe_allow_html=True)
+    
     st.markdown("### 🔍 Filtros")
     
     if df_global is not None:
@@ -279,14 +322,14 @@ with st.sidebar:
     sel_ilha = st.multiselect("Ilha", options=opcoes_ilha, default=[])
     busca_nome = st.text_input("Buscar Nome")
 
-    # Rodapé fixo dentro da sidebar
+    # Rodapé fixo dentro da sidebar (Com fundo sólido para não conflitar)
     st.markdown('''
         <div class="sidebar-footer">
             Made by <b>Leonardo Arantes</b>
         </div>
     ''', unsafe_allow_html=True)
 
-# --- CABEÇALHO ---
+# --- CABEÇALHO MENOR ---
 st.markdown("### 🚙 Sistema de Escalas Turbi")
 
 aba_mensal, aba_diaria = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária"])
@@ -306,7 +349,7 @@ with aba_mensal:
         
         kpis = calcular_kpis_mensal_detalhado(df_mensal, data_kpi_selecionada)
         
-        with c2: st.metric("✅ No Chat (Sup/Emerg)", kpis["NoChat"])
+        with c2: st.metric("✅ No Chat", kpis["NoChat"])
         with c3: st.metric("🛋️ Folgas", kpis["Folga"])
         with c4: st.metric("🎧 Suporte", kpis["Suporte"])
         with c5: st.metric("🚨 Emergência", kpis["Emergencia"])
@@ -323,8 +366,8 @@ with aba_mensal:
         
         styler = df_f[cols_visuais].style.map(colorir_mensal)
         
-        # Visão Mensal funciona bem com 580px
-        st.dataframe(styler, use_container_width=True, height=580, hide_index=True)
+        # Aumentei um pouquinho o height já que economizamos espaço no topo
+        st.dataframe(styler, use_container_width=True, height=600, hide_index=True)
 
 # ================= ABA DIÁRIA =================
 with aba_diaria:
@@ -345,11 +388,11 @@ with aba_diaria:
             resumo_dia = calcular_resumo_dia_dim(df_dim)
             
             with top_c2: st.metric("👥 No Chat", resumo_dia["Trabalhando"])
-            with top_c3: st.metric("🛋️ Folgas (Sup/Emerg)", resumo_dia["Folga"])
+            with top_c3: st.metric("🛋️ Folgas (Sup)", resumo_dia["Folga"])
             
             if analise:
-                with top_c4: st.metric("⚠️ Menos Chat (09-22h)", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
-                with top_c5: st.metric("☕ Pico Pausa (09-22h)", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
+                with top_c4: st.metric("⚠️ -Chat (09-22h)", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
+                with top_c5: st.metric("☕ +Pausa (09-22h)", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
             
             st.divider()
 
@@ -373,8 +416,5 @@ with aba_diaria:
             
             styler_dim = df_exibicao[cols_v].style.map(colorir_diario)
             
-            # --- AJUSTE CRÍTICO AQUI ---
-            # Reduzi a altura para 500px na aba diária.
-            # Como temos os "Radio Buttons" em cima, precisamos de uma tabela menor 
-            # para que tudo caiba na tela sem gerar scroll na página.
-            st.dataframe(styler_dim, use_container_width=True, height=500, hide_index=True)
+            # Altura ajustada: 520px deve ser perfeito com os KPIs menores
+            st.dataframe(styler_dim, use_container_width=True, height=520, hide_index=True)
