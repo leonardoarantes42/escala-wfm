@@ -367,7 +367,7 @@ with aba_mensal:
 
         cols_clean = [c for c in df_f.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ADMISSÃO', 'ILHA', 'Z']]
         
-        html_tabela = renderizar_tabela_html(df_f[cols_clean], 'mensal')
+        html_tabela = renderizar_tabela_html(df_f[cols_clean], modo_cores='mensal', classe_altura='height-mensal')
         st.markdown(html_tabela, unsafe_allow_html=True)
 
 # ================= ABA DIÁRIA =================
