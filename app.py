@@ -331,7 +331,7 @@ with aba_mensal:
         kpis = calcular_kpis_mensal_detalhado(df_mensal, dia_para_mostrar)
         
         kc1, kc2, kc3, kc4 = st.columns(4)
-        with kc1: st.metric("✅ No Chat (S&P/Emerg)", kpis["NoChat"])
+        with kc1: st.metric("✅ Escalados (S&P/Emerg)", kpis["NoChat"])
         with kc2: st.metric("🛋️ Folgas", kpis["Folga"])
         with kc3: st.metric("🎧 Suporte", kpis["Suporte"])
         with kc4: st.metric("🚨 Emergência", kpis["Emergencia"])
@@ -362,7 +362,7 @@ with aba_diaria:
             resumo_dia = calcular_resumo_dia_dim(df_dim)
             
             kc1, kc2, kc3, kc4 = st.columns(4)
-            with kc1: st.metric("👥 No Chat (S&P/Emerg)", resumo_dia["Trabalhando"])
+            with kc1: st.metric("👥 No Chat", resumo_dia["Trabalhando"])
             with kc2: st.metric("🛋️ Folgas", resumo_dia["Folga"])
             if analise:
                 with kc3: st.metric("⚠️ Menos Chats", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
