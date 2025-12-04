@@ -371,12 +371,14 @@ with aba_mensal:
         st.markdown(html_tabela, unsafe_allow_html=True)
 
 # ================= ABA DIÁRIA =================
+# ================= ABA DIÁRIA =================
 with aba_diaria:
     abas = listar_abas_dim()
     
     if not abas:
         st.warning("Sem dados.")
     else:
+        # Lógica para encontrar a aba baseada no texto da busca
         aba_selecionada = next((aba for aba in abas if texto_busca in aba), abas[0])
         
         df_dim, ws_dim = carregar_dados_aba(aba_selecionada)
@@ -389,24 +391,24 @@ with aba_diaria:
             with kc1: st.metric("👥 No Chat", resumo_dia["Trabalhando"])
             with kc2: st.metric("🛋️ Folgas", resumo_dia["Folga"])
             if analise:
-                with kc3: st.metric("⚠️ Menos Chats", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
-                with kc4: st.metric("☕ Mais Pausas", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
+                with kc3: st.metric("⚠️ -Chat", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
+                with kc4: st.metric("☕ +Pausa", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
             
+            # Filtros
             df_dim_f = df_dim.copy()
             if sel_lider: df_dim_f = df_dim_f[df_dim_f['LIDER'].isin(sel_lider)]
             if sel_ilha: df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
             if busca_nome: df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
             
-            tipo = st.radio("Modo:", ["▦ Grade", "💬 Apenas Chat", "🚫 Apenas Folgas"], horizontal=True, label_visibility="collapsed")
+            # Botões de Modo
+            tipo = st.radio("Modo:", ["▦ Grade", "💬 Chat", "🚫 Folgas"], horizontal=True, label_visibility="collapsed")
 
             if tipo == "▦ Grade": df_exibicao = df_dim_f
             else: df_exibicao = filtrar_e_ordenar_dim(df_dim_f, "💬 Apenas Chat" if "Chat" in tipo else "🚫 Apenas Folgas")
             
             cols_v = [c for c in df_exibicao.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ILHA', 'Z']]
-
-            html_tabela = renderizar_tabela_html(df_f[cols_clean], modo_cores='mensal', classe_altura='height-mensal')
-            st.markdown(html_tabela, unsafe_allow_html=True)
-
+            
+            # --- CORREÇÃO: Renderiza APENAS a tabela diária ---
             html_tabela_dim = renderizar_tabela_html(df_exibicao[cols_v], modo_cores='diario', classe_altura='height-diaria')
             st.markdown(html_tabela_dim, unsafe_allow_html=True)
 
