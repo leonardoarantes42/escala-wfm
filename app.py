@@ -293,7 +293,7 @@ with st.sidebar:
     st.image("logo_turbi.png", width=180) 
     st.divider()
     
-    st.markdown("##### 🔍 Filtros")
+    st.markdown("#### 🔍 Filtros")
     if df_global is not None:
         opcoes_lider = sorted(df_global['LIDER'].unique().tolist()) if 'LIDER' in df_global.columns else []
         opcoes_ilha = sorted(df_global['ILHA'].unique().tolist()) if 'ILHA' in df_global.columns else []
