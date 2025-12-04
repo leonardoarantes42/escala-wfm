@@ -48,7 +48,7 @@ st.markdown("""
         /* Altura específica para VISÃO DIÁRIA */
         /* Como tem os botões em cima, descontamos mais espaço (tabela menor) */
         .height-diaria {
-            height: calc(100vh - 280px); 
+            height: calc(100vh - 300px); 
         }
         
         table {
