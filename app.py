@@ -12,33 +12,42 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS: LAYOUT RESPONSIVO E COMPACTO ---
+# --- CSS: O SEGREDO DO LAYOUT FIXO ---
 st.markdown("""
     <style>
-        /* 1. LAYOUT GERAL */
+        /* 1. REMOVE ESPAÇOS EM BRANCO DO TOPO */
+        /* Isso resolve o problema do título ocupar muito espaço mesmo sendo pequeno */
         .block-container {
-            padding-top: 3.5rem !important; /* Aumentado para não cortar o topo */
-            padding-bottom: 0rem;
-            padding-left: 1rem;
-            padding-right: 1rem;
+            padding-top: 1.5rem !important; /* Mínimo necessário */
+            padding-bottom: 0rem !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
         }
         
-        /* Remove a rolagem da página principal (foco total na tabela) */
-        section[data-testid="stSidebar"] + section {
+        /* 2. TRAVAMENTO TOTAL DA PÁGINA (APP MODE) */
+        /* Essa é a regra mágica. Ela proíbe a página inteira de rolar.
+           Assim, o Título, Abas e KPIs nunca vão "subir". */
+        [data-testid="stAppViewContainer"] {
             overflow: hidden !important;
         }
         
-        /* 2. TABELA COM ALTURA INTELIGENTE (O Grande Truque) */
+        /* Esconde barra de rolagem do navegador */
+        ::-webkit-scrollbar { display: none; }
+        
+        /* 3. TABELA COM SCROLL INTERNO INTELIGENTE */
         .table-container {
-            /* Calcula: Altura da tela - espaço do topo (KPIs + Abas) */
-            height: calc(100vh - 210px); 
-            overflow-y: auto;
+            /* Calcula: Altura da Tela (100vh) - Cabeçalho (aprox 240px) */
+            /* Se o título estiver cortando embaixo, aumente o 240px para 250px */
+            height: calc(100vh - 240px); 
+            overflow-y: auto; /* Permite rolar apenas aqui dentro */
             overflow-x: auto;
             display: block;
             border: 1px solid #444;
             border-radius: 4px;
+            background-color: #0e1117; /* Fundo para evitar transparência */
         }
         
+        /* Estilos da Tabela */
         table {
             width: 100%;
             border-collapse: separate; 
@@ -46,57 +55,56 @@ st.markdown("""
             font-family: sans-serif;
             font-size: 11px;
         }
-        
         th, td {
-            padding: 4px 6px; /* Células mais compactas */
+            padding: 4px 6px;
             text-align: center;
             border-bottom: 1px solid #444;
             border-right: 1px solid #444;
             white-space: nowrap;
         }
         
-        /* CABEÇALHO DA TABELA FIXO */
+        /* Cabeçalho da Tabela Fixo */
         thead th {
             position: sticky;
             top: 0;
             background-color: #0e1117; 
             color: white;
-            z-index: 5;
+            z-index: 10; /* Z-index alto para ficar por cima */
             border-bottom: 2px solid #666;
             height: 35px;
             font-size: 11px;
         }
 
-        /* PRIMEIRA COLUNA FIXA (NOME) */
+        /* Primeira Coluna Fixa (NOME) */
         table td:first-child, table th:first-child {
             position: sticky;
             left: 0;
             background-color: #1c1e24; 
-            z-index: 6; 
+            z-index: 11; /* Maior que o header normal */
             border-right: 2px solid #666; 
             font-weight: bold;
             text-align: left;
             min-width: 140px;
         }
-        
+        /* Canto Superior Esquerdo (Cruzamento) */
         thead th:first-child {
-            z-index: 7;
+            z-index: 12; /* O maior de todos */
             background-color: #0e1117;
         }
 
-        /* Modo Claro */
+        /* Ajustes Modo Claro */
         @media (prefers-color-scheme: light) {
-            .table-container { border: 1px solid #ddd; }
+            .table-container { border: 1px solid #ddd; background-color: #fff; }
             th, td { border-bottom: 1px solid #ddd; border-right: 1px solid #ddd; }
             thead th { background-color: #f0f2f6; color: black; border-bottom: 2px solid #ccc; }
             table td:first-child, table th:first-child { background-color: #ffffff; border-right: 2px solid #ccc;}
             thead th:first-child { background-color: #f0f2f6; }
         }
 
-        /* 3. KPIS SUPER COMPACTOS */
+        /* 4. KPIS MINIATURA */
         [data-testid="metric-container"] {
             padding: 4px 8px;
-            height: 50px; /* Bem fininho */
+            height: 50px;
             border-radius: 6px;
             border: 1px solid #333;
             background-color: #1c1e24;
@@ -104,33 +112,37 @@ st.markdown("""
         }
         [data-testid="stMetricLabel"] { font-size: 10px !important; margin-bottom: 0 !important; }
         [data-testid="stMetricValue"] { font-size: 18px !important; }
-
         @media (prefers-color-scheme: light) {
             [data-testid="metric-container"] { background-color: #f8f9fa; border: 1px solid #ddd; }
         }
-        
-        /* TÍTULOS */
-        h3 { font-size: 18px !important; margin: 0 !important; padding: 0 !important;}
-        .stCaption { font-size: 10px !important; margin-top: -5px !important;}
 
-        /* 4. SIDEBAR E LINK */
+        /* 5. SIDEBAR: REMOVENDO ESPAÇOS EXTRAS */
+        /* Aproxima o botão do logo */
         .custom-link-btn {
             display: block; width: 100%; padding: 8px; text-align: center;
             border: 1px solid #1f77b4; border-radius: 4px;
-            font-size: 12px; margin-top: 20px; margin-bottom: 10px; 
+            font-size: 12px; 
+            margin-top: 0px; /* Remove margem do topo */
+            margin-bottom: 20px; 
             text-decoration: none; color: #1f77b4; font-weight: bold;
         }
         .custom-link-btn:hover { background-color: #1f77b4; color: white !important; }
 
-        /* Rodapé */
+        /* Rodapé Absoluto */
         .footer-simple {
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid #444;
-            color: #666;
-            font-size: 10px;
-            text-align: center;
+            position: fixed; bottom: 0; left: 0; width: 336px;
+            padding: 10px; border-top: 1px solid #444;
+            background-color: #262730; color: #666; font-size: 10px; text-align: center; z-index: 99;
         }
+        @media (prefers-color-scheme: light) {
+            .footer-simple { background-color: #f0f2f6; border-top: 1px solid #ddd; }
+        }
+        
+        /* Ajuste fino dos elementos do Streamlit para economizar espaço */
+        h3 { font-size: 16px !important; margin: 0 !important; padding: 0 !important; padding-top: 5px !important;}
+        .stCaption { margin-top: -5px !important; margin-bottom: 0 !important;}
+        div[data-testid="stVerticalBlock"] > div { gap: 0.5rem !important; } /* Reduz espaço entre elementos verticais */
+        
     </style>
 """, unsafe_allow_html=True)
 
@@ -277,7 +289,6 @@ def renderizar_tabela_html(df, modo_cores='diario'):
             elif 'BACKOFFICE' in val: return 'background-color: #5a3286; color: white'
         return ''
 
-    # hide(axis="index") remove os números e deixa o NOME como 1ª coluna
     styler = df.style.map(get_color).hide(axis="index")
     html = styler.to_html()
     return f'<div class="table-container">{html}</div>'
@@ -286,10 +297,11 @@ def renderizar_tabela_html(df, modo_cores='diario'):
 
 df_global, _ = carregar_dados_aba('Mensal')
 
-# --- SIDEBAR REORGANIZADA ---
+# --- SIDEBAR COMPACTA ---
 with st.sidebar:
     st.image("logo_turbi.png", width=110) 
-    st.divider()
+    # LINK COLADO NO LOGO (Sem st.divider antes)
+    st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
     
     st.markdown("##### 🔍 Filtros")
     if df_global is not None:
@@ -301,15 +313,11 @@ with st.sidebar:
     sel_ilha = st.multiselect("Ilha", options=opcoes_ilha, default=[])
     busca_nome = st.text_input("Buscar Nome")
 
-    st.divider()
-
-    # LINK NO FINAL DO MENU
-    st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
-
-    # RODAPÉ ABSOLUTO
+    # Rodapé Absoluto
     st.markdown('<div class="footer-simple">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
 
 # --- CABEÇALHO COMPACTO ---
+# Ajuste fino das colunas
 c_title, c_spacer, c_search = st.columns([2, 0.5, 1.2])
 with c_title:
     st.markdown("### 🚙 Sistema de Escalas Turbi")
