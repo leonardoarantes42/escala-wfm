@@ -340,7 +340,7 @@ with c_title:
 with c_search:
     hoje_display = datetime.now().strftime("%d/%m")
     texto_busca = st.text_input("Busca", value=hoje_display, label_visibility="collapsed")
-    st.caption("Digite dia/mês (Ex: 04/12)")
+    st.caption("Digite dia/mês (Ex: 04/12) para alterar as quantidades ")
 
 aba_mensal, aba_diaria = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária"])
 
@@ -357,8 +357,8 @@ with aba_mensal:
         kc1, kc2, kc3, kc4 = st.columns(4)
         with kc1: st.metric("✅ Escalados (S&P/Emerg)", kpis["NoChat"])
         with kc2: st.metric("🛋️ Folgas", kpis["Folga"])
-        with kc3: st.metric("🎧 Suporte", kpis["Suporte"])
-        with kc4: st.metric("🚨 Emergência", kpis["Emergencia"])
+        with kc3: st.metric("🎧 Escalados(Suporte)", kpis["Suporte"])
+        with kc4: st.metric("🚨 Escalados(Emergência)", kpis["Emergencia"])
 
         df_f = df_mensal.copy()
         if sel_lider: df_f = df_f[df_f['LIDER'].isin(sel_lider)]
