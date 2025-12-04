@@ -12,126 +12,129 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS: ESTILO EXCEL, COLUNA FIXA E COMPACTAÇÃO ---
+# --- CSS: COLUNA FIXA, DESIGN E CORREÇÕES ---
 st.markdown("""
     <style>
         /* 1. LAYOUT GERAL E SCROLL */
         .block-container {
-            padding-top: 0.5rem !important;
+            padding-top: 2rem !important; /* Aumentado para não cortar o título */
             padding-bottom: 0rem;
             padding-left: 1rem;
             padding-right: 1rem;
         }
-        /* Esconde scroll da página principal */
+        
+        /* Remove a rolagem da página principal (para focar na tabela) */
         section[data-testid="stSidebar"] + section {
             overflow: hidden !important;
         }
-        ::-webkit-scrollbar { display: none; }
-
-        /* 2. SIDEBAR E RODAPÉ */
-        [data-testid="stSidebar"] .block-container {
-            padding-bottom: 80px; /* Espaço para o rodapé não cobrir o último item */
-        }
-        .sidebar-footer-fixed {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 336px; /* Largura exata da Sidebar expandida */
-            background-color: #f0f2f6;
-            padding: 10px;
-            text-align: center;
-            font-size: 11px;
-            color: #666;
-            border-top: 1px solid #ddd;
-            z-index: 999999; /* Garante que fique sobre tudo na sidebar */
-        }
-        @media (prefers-color-scheme: dark) {
-            .sidebar-footer-fixed {
-                background-color: #262730;
-                border-top: 1px solid #444;
-                color: #888;
-            }
-        }
-
-        /* 3. KPIS MINIATURA */
-        [data-testid="metric-container"] {
-            padding: 4px 8px;
-            height: 55px; /* Altura mínima */
-            border-radius: 4px;
-            box-shadow: none;
-            border: 1px solid #eee;
-        }
-        [data-testid="stMetricLabel"] {
-            font-size: 10px !important;
-            margin-bottom: 0px !important;
-        }
-        [data-testid="stMetricValue"] {
-            font-size: 16px !important;
-            padding-top: 0px !important;
-        }
-
-        /* 4. TABELA HTML PERSONALIZADA (ESTILO EXCEL) */
+        
+        /* 2. TABELA HTML PERSONALIZADA (ESTILO EXCEL) */
         .table-container {
-            max-height: 520px; /* Altura fixa para scroll interno */
+            max-height: 550px; /* Altura da tabela com scroll */
             overflow-y: auto;
             overflow-x: auto;
-            border: 1px solid #444;
             display: block;
+            border: 1px solid #444;
+            border-radius: 4px;
         }
+        
         table {
             width: 100%;
-            border-collapse: collapse;
+            border-collapse: separate; /* Necessário para sticky funcionar bem */
+            border-spacing: 0;
             font-family: sans-serif;
-            font-size: 11px; /* Fonte bem pequena para notebook */
+            font-size: 11px; /* Fonte compacta */
         }
+        
         th, td {
-            padding: 4px 6px;
+            padding: 6px 8px;
             text-align: center;
-            border: 1px solid #444;
-            white-space: nowrap; /* Não quebra linha */
+            border-bottom: 1px solid #444;
+            border-right: 1px solid #444;
+            white-space: nowrap;
         }
         
         /* CABEÇALHO FIXO (Sticky Header) */
         thead th {
             position: sticky;
             top: 0;
-            background-color: #0e1117; /* Cor de fundo do header */
+            background-color: #0e1117; 
             color: white;
             z-index: 5;
             border-bottom: 2px solid #666;
+            height: 40px;
         }
 
-        /* PRIMEIRA COLUNA FIXA (Sticky Column) */
+        /* --- A MÁGICA DA COLUNA FIXA --- */
+        /* Fixa a primeira coluna (NOME) */
         table td:first-child, table th:first-child {
             position: sticky;
             left: 0;
-            background-color: #1c1e24; /* Um pouco mais claro que o fundo */
-            z-index: 6; /* Fica acima do scroll horizontal */
-            border-right: 2px solid #666;
+            background-color: #1c1e24; /* Fundo escuro para cobrir o scroll */
+            z-index: 6; 
+            border-right: 2px solid #666; /* Borda destaque na direita */
             font-weight: bold;
             text-align: left;
-            min-width: 120px;
+            min-width: 150px; /* Largura mínima para caber o nome */
         }
-        /* Canto superior esquerdo (Cruzamento Header/Coluna) */
+        
+        /* O "Canto" (Cruzamento do Cabeçalho com a Coluna Fixa) */
         thead th:first-child {
             z-index: 7;
             background-color: #0e1117;
         }
 
-        /* Modo Claro */
+        /* AJUSTES MODO CLARO */
         @media (prefers-color-scheme: light) {
             .table-container { border: 1px solid #ddd; }
-            th, td { border: 1px solid #ddd; }
-            thead th { background-color: #f0f2f6; color: black; }
-            table td:first-child, table th:first-child { background-color: #ffffff; }
+            th, td { border-bottom: 1px solid #ddd; border-right: 1px solid #ddd; }
+            thead th { background-color: #f0f2f6; color: black; border-bottom: 2px solid #ccc; }
+            
+            /* Fundo da coluna fixa no modo claro */
+            table td:first-child, table th:first-child { 
+                background-color: #ffffff; 
+                border-right: 2px solid #ccc;
+            }
             thead th:first-child { background-color: #f0f2f6; }
         }
 
-        /* LINK BOTÃO */
+        /* 3. KPIS MINIATURA */
+        [data-testid="metric-container"] {
+            padding: 4px 10px;
+            height: 60px;
+            border-radius: 6px;
+            border: 1px solid #333;
+            background-color: #1c1e24;
+        }
+        [data-testid="stMetricLabel"] { font-size: 11px !important; }
+        [data-testid="stMetricValue"] { font-size: 18px !important; }
+
+        @media (prefers-color-scheme: light) {
+            [data-testid="metric-container"] {
+                background-color: #f8f9fa;
+                border: 1px solid #ddd;
+            }
+        }
+
+        /* 4. LINK BOTÃO */
         .custom-link-btn {
-            display: block; width: 100%; padding: 5px; text-align: center;
+            display: block; width: 100%; padding: 6px; text-align: center;
             border: 1px solid #1f77b4; border-radius: 4px;
-            font-size: 12px; margin-bottom: 10px; text-decoration: none; color: #1f77b4;
+            font-size: 13px; margin-bottom: 15px; text-decoration: none; color: #1f77b4; font-weight: bold;
+        }
+        .custom-link-btn:hover { background-color: #1f77b4; color: white !important; }
+
+        /* 5. RODAPÉ SIDEBAR (SIMPLES) */
+        .footer-simple {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 1px solid #444;
+            color: #666;
+            font-size: 11px;
+            text-align: center;
+        }
+        @media (prefers-color-scheme: light) {
+            .footer-simple { border-top: 1px solid #ddd; }
         }
     </style>
 """, unsafe_allow_html=True)
@@ -181,6 +184,7 @@ def carregar_dados_aba(nome_aba):
         for col in cabecalho_bruto:
             col_str = str(col).strip().upper()
             if col_str == "NOMES": col_str = "NOME"
+            
             if col_str in contagem_cols:
                 contagem_cols[col_str] += 1
                 novo_nome = f"{col_str}_fim"
@@ -220,7 +224,6 @@ def calcular_resumo_dia_dim(df_dim):
     resumo = df_dim[cols_horarios].apply(juntar_linha, axis=1)
     escalados_chat = resumo.str.contains('CHAT').sum()
     tem_folga = resumo.str.contains('F')
-    # Simplifiquei a lógica para ganhar performance
     eh_sup_emerg = df_dim['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
     tem_trabalho = resumo.str.contains('CHAT|EMAIL|E-MAIL|P|TREINO|1:1|FINANCEIRO')
     folga_filtrada = ((tem_folga) & (~tem_trabalho) & (eh_sup_emerg)).sum()
@@ -263,9 +266,8 @@ def filtrar_e_ordenar_dim(df, modo):
 
     return df_f.drop(columns=['SORT_TEMP'])
 
-# --- ESTILIZAÇÃO (Retorna HTML para a nova tabela) ---
+# --- ESTILIZAÇÃO HTML ---
 def renderizar_tabela_html(df, modo_cores='diario'):
-    # Função interna para aplicar cores
     def get_color(val):
         val = str(val).upper().strip()
         if modo_cores == 'mensal':
@@ -281,20 +283,18 @@ def renderizar_tabela_html(df, modo_cores='diario'):
             elif 'BACKOFFICE' in val: return 'background-color: #5a3286; color: white'
         return ''
 
-    # Converte para Styler e aplica CSS
-    styler = df.style.map(get_color)
+    # --- CORREÇÃO DO ÍNDICE: hide(axis="index") ---
+    # Isso remove os números 0,1,2 e deixa NOME como a primeira coluna de fato.
+    styler = df.style.map(get_color).hide(axis="index")
     
-    # Gera HTML
     html = styler.to_html()
-    
-    # Envolve em uma div com classe para scroll e sticky
     return f'<div class="table-container">{html}</div>'
 
 # ================= MAIN APP =================
 
 df_global, _ = carregar_dados_aba('Mensal')
 
-# --- SIDEBAR ---
+# --- SIDEBAR (Limpa e Organizada) ---
 with st.sidebar:
     st.image("logo_turbi.png", width=110) 
     st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
@@ -310,16 +310,16 @@ with st.sidebar:
     sel_ilha = st.multiselect("Ilha", options=opcoes_ilha, default=[])
     busca_nome = st.text_input("Buscar Nome")
 
-    # RODAPÉ FIXO CORRIGIDO (Largura travada na sidebar)
-    st.markdown('<div class="sidebar-footer-fixed">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
+    # RODAPÉ SIMPLES (Sem flutuar, apenas no final do conteúdo)
+    st.markdown('<div class="footer-simple">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
 
-# --- CABEÇALHO HÍBRIDO (Título Esquerda + Busca Direita) ---
-# Isso resolve o problema de espaço vertical
+# --- CABEÇALHO ---
 c_title, c_spacer, c_search = st.columns([2, 1, 1.5])
 with c_title:
     st.markdown("### 🚙 Sistema de Escalas Turbi")
 with c_search:
     hoje_display = datetime.now().strftime("%d/%m")
+    # Texto de busca com legenda
     texto_busca = st.text_input("Buscar Dia", value=hoje_display, label_visibility="collapsed", placeholder="Dia/Mês")
     st.caption("Digite dia/mês (Ex: 04/12)")
 
@@ -331,7 +331,6 @@ with aba_mensal:
         df_mensal = df_global
         colunas_datas = [c for c in df_mensal.columns if '/' in c]
         
-        # Lógica de Busca também funciona aqui
         dia_para_mostrar = texto_busca if texto_busca in colunas_datas else colunas_datas[0]
         
         kpis = calcular_kpis_mensal_detalhado(df_mensal, dia_para_mostrar)
@@ -342,7 +341,6 @@ with aba_mensal:
         with kc3: st.metric("🎧 Suporte", kpis["Suporte"])
         with kc4: st.metric("🚨 Emergência", kpis["Emergencia"])
 
-        # Filtros
         df_f = df_mensal.copy()
         if sel_lider: df_f = df_f[df_f['LIDER'].isin(sel_lider)]
         if sel_ilha: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
@@ -350,7 +348,6 @@ with aba_mensal:
 
         cols_clean = [c for c in df_f.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ADMISSÃO', 'ILHA', 'Z']]
         
-        # RENDERIZAÇÃO HTML (Para Sticky Column funcionar se quiser no mensal também)
         html_tabela = renderizar_tabela_html(df_f[cols_clean], 'mensal')
         st.markdown(html_tabela, unsafe_allow_html=True)
 
@@ -361,7 +358,6 @@ with aba_diaria:
     if not abas:
         st.warning("Sem dados.")
     else:
-        # Busca Aba Inteligente
         aba_selecionada = next((aba for aba in abas if texto_busca in aba), abas[0])
         
         df_dim, ws_dim = carregar_dados_aba(aba_selecionada)
@@ -377,7 +373,6 @@ with aba_diaria:
                 with kc3: st.metric("⚠️ -Chat", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
                 with kc4: st.metric("☕ +Pausa", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
             
-            # Filtros e Modos
             df_dim_f = df_dim.copy()
             if sel_lider: df_dim_f = df_dim_f[df_dim_f['LIDER'].isin(sel_lider)]
             if sel_ilha: df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
@@ -390,6 +385,5 @@ with aba_diaria:
             
             cols_v = [c for c in df_exibicao.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ILHA', 'Z']]
             
-            # RENDERIZAÇÃO HTML COM CSS STICKY
             html_tabela_dim = renderizar_tabela_html(df_exibicao[cols_v], 'diario')
             st.markdown(html_tabela_dim, unsafe_allow_html=True)
