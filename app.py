@@ -31,7 +31,7 @@ st.markdown("""
         /* 2. TABELA COM ALTURA INTELIGENTE (O Grande Truque) */
         .table-container {
             /* Calcula: Altura da tela - espaço do topo (KPIs + Abas) */
-            height: calc(100vh - 260px); 
+            height: calc(100vh - 270px); 
             overflow-y: auto;
             overflow-x: auto;
             display: block;
@@ -135,7 +135,7 @@ st.markdown("""
         }
         /* 6. AJUSTE DE ESPAÇAMENTO: Puxar as abas para cima */
         [data-testid="stTabs"] {
-            margin-top: -40px !important; /* Aumente o número negativo se quiser subir mais */
+            margin-top: -50px !important; /* Aumente o número negativo se quiser subir mais */
         }
     </style>
 """, unsafe_allow_html=True)
