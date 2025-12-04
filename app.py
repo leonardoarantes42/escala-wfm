@@ -123,7 +123,10 @@ st.markdown("""
             text-decoration: none; color: #1f77b4; font-weight: bold;
         }
         .custom-link-btn:hover { background-color: #1f77b4; color: white !important; }
-
+        [data-testid="stSidebar"] [data-testid="stImage"] {
+            display: flex;
+            justify-content: center;
+        }
         /* Rodapé */
         .footer-simple {
             margin-top: 10px;
