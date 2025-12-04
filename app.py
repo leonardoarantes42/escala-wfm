@@ -1,4 +1,4 @@
-import streamlit as st
+iimport streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
@@ -124,7 +124,7 @@ st.markdown("""
         }
         .custom-link-btn:hover { background-color: #1f77b4; color: white !important; }
         
-        [data-testid="stSidebar"] [data-testid="st.image"] {
+        [data-testid="st.sidebar"] [data-testid="st.image"] {
             display: flex;
             justify-content: right;
         }
