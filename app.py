@@ -28,15 +28,27 @@ st.markdown("""
             overflow: hidden !important;
         }
         
-        /* 2. TABELA COM ALTURA INTELIGENTE (O Grande Truque) */
+        /* 2. CONFIGURAÇÃO DA TABELA (Base) */
         .table-container {
-            /* Calcula: Altura da tela - espaço do topo (KPIs + Abas) */
-            height: calc(100vh - 280px); 
+            /* Removemos o height fixo daqui */
             overflow-y: auto;
             overflow-x: auto;
             display: block;
             border: 1px solid #444;
             border-radius: 4px;
+            background-color: #0e1117;
+        }
+
+        /* Altura específica para VISÃO MENSAL */
+        /* Como tem menos coisas em cima, descontamos menos espaço (tabela maior) */
+        .height-mensal {
+            height: calc(100vh - 200px); 
+        }
+
+        /* Altura específica para VISÃO DIÁRIA */
+        /* Como tem os botões em cima, descontamos mais espaço (tabela menor) */
+        .height-diaria {
+            height: calc(100vh - 290px); 
         }
         
         table {
@@ -271,7 +283,8 @@ def filtrar_e_ordenar_dim(df, modo):
     return df_f.drop(columns=['SORT_TEMP'])
 
 # --- ESTILIZAÇÃO HTML ---
-def renderizar_tabela_html(df, modo_cores='diario'):
+# Adicionei o parâmetro 'classe_altura'
+def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria'):
     def get_color(val):
         val = str(val).upper().strip()
         if modo_cores == 'mensal':
@@ -287,10 +300,11 @@ def renderizar_tabela_html(df, modo_cores='diario'):
             elif 'BACKOFFICE' in val: return 'background-color: #5a3286; color: white'
         return ''
 
-    # hide(axis="index") remove os números e deixa o NOME como 1ª coluna
     styler = df.style.map(get_color).hide(axis="index")
     html = styler.to_html()
-    return f'<div class="table-container">{html}</div>'
+    
+    # AQUI ESTÁ A MÁGICA: Injetamos as duas classes (a base + a de altura)
+    return f'<div class="table-container {classe_altura}">{html}</div>'
 
 # ================= MAIN APP =================
 
@@ -389,6 +403,10 @@ with aba_diaria:
             else: df_exibicao = filtrar_e_ordenar_dim(df_dim_f, "💬 Apenas Chat" if "Chat" in tipo else "🚫 Apenas Folgas")
             
             cols_v = [c for c in df_exibicao.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ILHA', 'Z']]
-            
-            html_tabela_dim = renderizar_tabela_html(df_exibicao[cols_v], 'diario')
+
+            html_tabela = renderizar_tabela_html(df_f[cols_clean], modo_cores='mensal', classe_altura='height-mensal')
+            st.markdown(html_tabela, unsafe_allow_html=True)
+
+            html_tabela_dim = renderizar_tabela_html(df_exibicao[cols_v], modo_cores='diario', classe_altura='height-diaria')
             st.markdown(html_tabela_dim, unsafe_allow_html=True)
+
