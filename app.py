@@ -340,7 +340,7 @@ with c_title:
 with c_search:
     hoje_display = datetime.now().strftime("%d/%m")
     texto_busca = st.text_input("Busca", value=hoje_display, label_visibility="collapsed")
-    st.caption("Digite dia/mês (Ex: 04/12) para alterar as quantidades ")
+    st.caption("Digite dia/mês (Ex: 04/12) para alterar os dados abaixo ")
 
 aba_mensal, aba_diaria = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária"])
 
@@ -391,8 +391,8 @@ with aba_diaria:
             with kc1: st.metric("👥 No Chat", resumo_dia["Trabalhando"])
             with kc2: st.metric("🛋️ Folgas", resumo_dia["Folga"])
             if analise:
-                with kc3: st.metric("⚠️ -Chat", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
-                with kc4: st.metric("☕ +Pausa", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
+                with kc3: st.metric("⚠️ Menos Chats", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
+                with kc4: st.metric("☕ Mais Pausas", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
             
             # Filtros
             df_dim_f = df_dim.copy()
@@ -401,7 +401,7 @@ with aba_diaria:
             if busca_nome: df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
             
             # Botões de Modo
-            tipo = st.radio("Modo:", ["▦ Grade", "💬 Chat", "🚫 Folgas"], horizontal=True, label_visibility="collapsed")
+            tipo = st.radio("Modo:", ["▦ Grade", "💬 Apenas Chat", "🚫Apenas Folgas"], horizontal=True, label_visibility="collapsed")
 
             if tipo == "▦ Grade": df_exibicao = df_dim_f
             else: df_exibicao = filtrar_e_ordenar_dim(df_dim_f, "💬 Apenas Chat" if "Chat" in tipo else "🚫 Apenas Folgas")
