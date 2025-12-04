@@ -12,25 +12,26 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS: COLUNA FIXA, DESIGN E CORREÇÕES ---
+# --- CSS: LAYOUT RESPONSIVO E COMPACTO ---
 st.markdown("""
     <style>
-        /* 1. LAYOUT GERAL E SCROLL */
+        /* 1. LAYOUT GERAL */
         .block-container {
-            padding-top: 2rem !important; /* Aumentado para não cortar o título */
+            padding-top: 3.5rem !important; /* Aumentado para não cortar o topo */
             padding-bottom: 0rem;
             padding-left: 1rem;
             padding-right: 1rem;
         }
         
-        /* Remove a rolagem da página principal (para focar na tabela) */
+        /* Remove a rolagem da página principal (foco total na tabela) */
         section[data-testid="stSidebar"] + section {
             overflow: hidden !important;
         }
         
-        /* 2. TABELA HTML PERSONALIZADA (ESTILO EXCEL) */
+        /* 2. TABELA COM ALTURA INTELIGENTE (O Grande Truque) */
         .table-container {
-            max-height: 550px; /* Altura da tabela com scroll */
+            /* Calcula: Altura da tela - espaço do topo (KPIs + Abas) */
+            height: calc(100vh - 210px); 
             overflow-y: auto;
             overflow-x: auto;
             display: block;
@@ -40,21 +41,21 @@ st.markdown("""
         
         table {
             width: 100%;
-            border-collapse: separate; /* Necessário para sticky funcionar bem */
+            border-collapse: separate; 
             border-spacing: 0;
             font-family: sans-serif;
-            font-size: 11px; /* Fonte compacta */
+            font-size: 11px;
         }
         
         th, td {
-            padding: 6px 8px;
+            padding: 4px 6px; /* Células mais compactas */
             text-align: center;
             border-bottom: 1px solid #444;
             border-right: 1px solid #444;
             white-space: nowrap;
         }
         
-        /* CABEÇALHO FIXO (Sticky Header) */
+        /* CABEÇALHO DA TABELA FIXO */
         thead th {
             position: sticky;
             top: 0;
@@ -62,79 +63,73 @@ st.markdown("""
             color: white;
             z-index: 5;
             border-bottom: 2px solid #666;
-            height: 40px;
+            height: 35px;
+            font-size: 11px;
         }
 
-        /* --- A MÁGICA DA COLUNA FIXA --- */
-        /* Fixa a primeira coluna (NOME) */
+        /* PRIMEIRA COLUNA FIXA (NOME) */
         table td:first-child, table th:first-child {
             position: sticky;
             left: 0;
-            background-color: #1c1e24; /* Fundo escuro para cobrir o scroll */
+            background-color: #1c1e24; 
             z-index: 6; 
-            border-right: 2px solid #666; /* Borda destaque na direita */
+            border-right: 2px solid #666; 
             font-weight: bold;
             text-align: left;
-            min-width: 150px; /* Largura mínima para caber o nome */
+            min-width: 140px;
         }
         
-        /* O "Canto" (Cruzamento do Cabeçalho com a Coluna Fixa) */
         thead th:first-child {
             z-index: 7;
             background-color: #0e1117;
         }
 
-        /* AJUSTES MODO CLARO */
+        /* Modo Claro */
         @media (prefers-color-scheme: light) {
             .table-container { border: 1px solid #ddd; }
             th, td { border-bottom: 1px solid #ddd; border-right: 1px solid #ddd; }
             thead th { background-color: #f0f2f6; color: black; border-bottom: 2px solid #ccc; }
-            
-            /* Fundo da coluna fixa no modo claro */
-            table td:first-child, table th:first-child { 
-                background-color: #ffffff; 
-                border-right: 2px solid #ccc;
-            }
+            table td:first-child, table th:first-child { background-color: #ffffff; border-right: 2px solid #ccc;}
             thead th:first-child { background-color: #f0f2f6; }
         }
 
-        /* 3. KPIS MINIATURA */
+        /* 3. KPIS SUPER COMPACTOS */
         [data-testid="metric-container"] {
-            padding: 4px 10px;
-            height: 60px;
+            padding: 4px 8px;
+            height: 50px; /* Bem fininho */
             border-radius: 6px;
             border: 1px solid #333;
             background-color: #1c1e24;
+            justify-content: center !important;
         }
-        [data-testid="stMetricLabel"] { font-size: 11px !important; }
+        [data-testid="stMetricLabel"] { font-size: 10px !important; margin-bottom: 0 !important; }
         [data-testid="stMetricValue"] { font-size: 18px !important; }
 
         @media (prefers-color-scheme: light) {
-            [data-testid="metric-container"] {
-                background-color: #f8f9fa;
-                border: 1px solid #ddd;
-            }
+            [data-testid="metric-container"] { background-color: #f8f9fa; border: 1px solid #ddd; }
         }
+        
+        /* TÍTULOS */
+        h3 { font-size: 18px !important; margin: 0 !important; padding: 0 !important;}
+        .stCaption { font-size: 10px !important; margin-top: -5px !important;}
 
-        /* 4. LINK BOTÃO */
+        /* 4. SIDEBAR E LINK */
         .custom-link-btn {
-            display: block; width: 100%; padding: 6px; text-align: center;
+            display: block; width: 100%; padding: 8px; text-align: center;
             border: 1px solid #1f77b4; border-radius: 4px;
-            font-size: 13px; margin-bottom: 15px; text-decoration: none; color: #1f77b4; font-weight: bold;
+            font-size: 12px; margin-top: 20px; margin-bottom: 10px; 
+            text-decoration: none; color: #1f77b4; font-weight: bold;
         }
         .custom-link-btn:hover { background-color: #1f77b4; color: white !important; }
 
-        /* 5. RODAPÉ SIDEBAR (SIMPLES) */
+        /* Rodapé */
         .footer-simple {
-            margin-top: 30px;
+            margin-top: 10px;
             padding-top: 10px;
             border-top: 1px solid #444;
             color: #666;
-            font-size: 11px;
+            font-size: 10px;
             text-align: center;
-        }
-        @media (prefers-color-scheme: light) {
-            .footer-simple { border-top: 1px solid #ddd; }
         }
     </style>
 """, unsafe_allow_html=True)
@@ -184,7 +179,6 @@ def carregar_dados_aba(nome_aba):
         for col in cabecalho_bruto:
             col_str = str(col).strip().upper()
             if col_str == "NOMES": col_str = "NOME"
-            
             if col_str in contagem_cols:
                 contagem_cols[col_str] += 1
                 novo_nome = f"{col_str}_fim"
@@ -283,10 +277,8 @@ def renderizar_tabela_html(df, modo_cores='diario'):
             elif 'BACKOFFICE' in val: return 'background-color: #5a3286; color: white'
         return ''
 
-    # --- CORREÇÃO DO ÍNDICE: hide(axis="index") ---
-    # Isso remove os números 0,1,2 e deixa NOME como a primeira coluna de fato.
+    # hide(axis="index") remove os números e deixa o NOME como 1ª coluna
     styler = df.style.map(get_color).hide(axis="index")
-    
     html = styler.to_html()
     return f'<div class="table-container">{html}</div>'
 
@@ -294,10 +286,9 @@ def renderizar_tabela_html(df, modo_cores='diario'):
 
 df_global, _ = carregar_dados_aba('Mensal')
 
-# --- SIDEBAR (Limpa e Organizada) ---
+# --- SIDEBAR REORGANIZADA ---
 with st.sidebar:
     st.image("logo_turbi.png", width=110) 
-    st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
     st.divider()
     
     st.markdown("##### 🔍 Filtros")
@@ -310,20 +301,24 @@ with st.sidebar:
     sel_ilha = st.multiselect("Ilha", options=opcoes_ilha, default=[])
     busca_nome = st.text_input("Buscar Nome")
 
-    # RODAPÉ SIMPLES (Sem flutuar, apenas no final do conteúdo)
+    st.divider()
+
+    # LINK NO FINAL DO MENU
+    st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
+
+    # RODAPÉ ABSOLUTO
     st.markdown('<div class="footer-simple">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
 
-# --- CABEÇALHO ---
-c_title, c_spacer, c_search = st.columns([2, 1, 1.5])
+# --- CABEÇALHO COMPACTO ---
+c_title, c_spacer, c_search = st.columns([2, 0.5, 1.2])
 with c_title:
     st.markdown("### 🚙 Sistema de Escalas Turbi")
 with c_search:
     hoje_display = datetime.now().strftime("%d/%m")
-    # Texto de busca com legenda
-    texto_busca = st.text_input("Buscar Dia", value=hoje_display, label_visibility="collapsed", placeholder="Dia/Mês")
+    texto_busca = st.text_input("Busca", value=hoje_display, label_visibility="collapsed")
     st.caption("Digite dia/mês (Ex: 04/12)")
 
-aba_mensal, aba_diaria = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária"])
+aba_mensal, aba_diaria = st.tabs(["📅 Mensal", "⏱️ Diária"])
 
 # ================= ABA MENSAL =================
 with aba_mensal:
