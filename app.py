@@ -124,10 +124,6 @@ st.markdown("""
         }
         .custom-link-btn:hover { background-color: #1f77b4; color: white !important; }
         
-        [data-testid="st.sidebar"] [data-testid="st.image"] {
-            display: flex;
-            justify-content: right;
-        }
         /* Rodapé */
         .footer-simple {
             margin-top: 10px;
@@ -294,7 +290,7 @@ df_global, _ = carregar_dados_aba('Mensal')
 
 # --- SIDEBAR REORGANIZADA ---
 with st.sidebar:
-    st.image("logo_turbi.png", width=110) 
+    st.image("logo_turbi.png", width=130) 
     st.divider()
     
     st.markdown("##### 🔍 Filtros")
