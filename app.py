@@ -290,7 +290,7 @@ df_global, _ = carregar_dados_aba('Mensal')
 
 # --- SIDEBAR REORGANIZADA ---
 with st.sidebar:
-    st.image("logo_turbi.png", width=130) 
+    st.image("logo_turbi.png", width=180) 
     st.divider()
     
     st.markdown("##### 🔍 Filtros")
