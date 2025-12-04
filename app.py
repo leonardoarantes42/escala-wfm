@@ -12,120 +12,112 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS: DESIGN COMPACTO E AJUSTES DE MENU ---
+# --- CSS: DESIGN COMPACTO, SCROLL TRAVADO E COLUNA FIXA ---
 st.markdown("""
     <style>
-        /* 1. Ajuste do Topo (Mais compacto) */
+        /* 1. TOPO SUPER COMPACTO */
         .block-container {
-            padding-top: 2rem; /* Reduzi de 3.5rem para 2rem */
+            padding-top: 1rem !important; /* Mínimo possível */
             padding-bottom: 0rem;
-            padding-left: 2rem;
-            padding-right: 2rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
         }
         
-        /* 2. TRAVA O SCROLL DA PÁGINA INTEIRA */
+        /* 2. TRAVA O SCROLL DA PÁGINA (Para Header Fixo) */
         section[data-testid="stSidebar"] + section {
             overflow: hidden !important;
         }
         ::-webkit-scrollbar { display: none; }
 
-        /* 3. KPIs (Métricas) MENORES */
+        /* 3. KPIS COMPACTOS */
         [data-testid="metric-container"] {
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start !important;
-            justify-content: center !important;
-            text-align: left !important;
-            background-color: #f8f9fa;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 8px 12px; /* Padding reduzido */
-            height: 85px; /* Altura reduzida de 110px para 85px */
+            padding: 5px 10px;
+            height: 70px; /* Altura reduzida */
+            border-radius: 6px;
         }
         [data-testid="stMetricLabel"] {
-            font-size: 12px !important; /* Fonte menor (era 14px) */
-            color: #555;
-            white-space: normal !important;
+            font-size: 11px !important;
+            margin-bottom: 0px !important;
         }
         [data-testid="stMetricValue"] {
-            font-size: 20px !important; /* Fonte menor (era 26px) */
-            font-weight: bold;
-            color: #1e3a8a;
-        }
-        @media (prefers-color-scheme: dark) {
-            [data-testid="metric-container"] {
-                background-color: #262730;
-                border: 1px solid #444;
-            }
-            [data-testid="stMetricValue"] { color: #4dabf7; }
-            [data-testid="stMetricLabel"] { color: #ddd; }
+            font-size: 18px !important;
+            padding-top: 0px !important;
         }
 
-        /* 4. Título Principal Menor */
+        /* 4. TÍTULOS MENORES */
         h3 {
-            font-size: 1.5rem !important; /* Reduzi o tamanho do título */
-            padding-bottom: 0.5rem;
+            font-size: 1.2rem !important;
+            margin-bottom: 0.5rem !important;
+            padding: 0 !important;
         }
+        p { font-size: 13px; }
 
-        /* 5. Rodapé Fixo e Espaçamento da Sidebar */
-        /* Isso garante que o conteúdo da sidebar não fique escondido atrás do rodapé */
-        [data-testid="stSidebar"] > div:first-child {
-            padding-bottom: 60px; /* Espaço extra no final da rolagem */
+        /* 5. SIDEBAR MAIS COMPACTA */
+        [data-testid="stSidebar"] .block-container {
+            padding-top: 2rem;
         }
         
-        .sidebar-footer {
+        /* 6. COLUNA FIXA (NOME) NA TABELA */
+        /* Aplica sticky na primeira coluna (th e td) */
+        table th:first-child, table td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 2; /* Fica acima das outras células ao rolar */
+            background-color: #ffffff; /* Fundo opaco para não ver o texto passar por baixo */
+            border-right: 2px solid #e0e0e0; /* Divisória visual */
+        }
+        /* Ajuste de cor para o modo escuro na coluna fixa */
+        @media (prefers-color-scheme: dark) {
+            table th:first-child, table td:first-child {
+                background-color: #262730; 
+                border-right: 2px solid #444;
+            }
+        }
+        
+        /* 7. RODAPÉ SIDEBAR CORRIGIDO */
+        /* Agora usamos um container fixo relativo à sidebar */
+        .sidebar-footer-container {
             position: fixed;
             bottom: 0;
             left: 0;
-            width: 21rem; /* Largura da sidebar */
+            width: 20rem; /* Largura aproximada da sidebar aberta */
+            background-color: #f0f2f6;
             padding: 10px;
+            text-align: center;
             font-size: 11px;
             color: #666;
-            text-align: center;
-            background-color: #f0f2f6; /* Fundo sólido para leitura */
-            border-top: 1px solid #e0e0e0;
-            z-index: 101;
+            border-top: 1px solid #ddd;
+            z-index: 99999;
         }
         @media (prefers-color-scheme: dark) {
-            .sidebar-footer { 
-                background-color: #262730; 
+            .sidebar-footer-container {
+                background-color: #262730;
                 border-top: 1px solid #444;
                 color: #888;
             }
         }
-        
-        /* Botão do Link Personalizado */
+        /* Empurra o conteúdo da sidebar pra cima pra não ficar escondido atrás do rodapé */
+        [data-testid="stSidebarNav"] {
+            margin-bottom: 50px; 
+        }
+
+        /* BOTÃO DO LINK */
         .custom-link-btn {
             display: block;
             width: 100%;
-            padding: 8px;
+            padding: 6px;
             text-align: center;
-            background-color: #ffffff;
+            background-color: transparent;
             color: #1f77b4;
             border: 1px solid #1f77b4;
-            border-radius: 5px;
+            border-radius: 4px;
             text-decoration: none;
-            font-weight: bold;
-            font-size: 14px;
-            margin-bottom: 15px;
-            transition: 0.3s;
+            font-size: 13px;
+            margin-bottom: 10px;
         }
         .custom-link-btn:hover {
             background-color: #1f77b4;
             color: white !important;
-            text-decoration: none;
-        }
-        @media (prefers-color-scheme: dark) {
-            .custom-link-btn {
-                background-color: #0e1117;
-                color: #4dabf7;
-                border: 1px solid #4dabf7;
-            }
-            .custom-link-btn:hover {
-                background-color: #4dabf7;
-                color: #0e1117 !important;
-            }
         }
     </style>
 """, unsafe_allow_html=True)
@@ -147,6 +139,7 @@ def listar_abas_dim():
     client = conectar_google_sheets()
     sh = client.open_by_url(URL_PLANILHA)
     todas_abas = [ws.title for ws in sh.worksheets()]
+    # Filtra apenas abas DIM
     abas_dim = sorted([aba for aba in todas_abas if aba.startswith("DIM")])
     return abas_dim
 
@@ -161,7 +154,6 @@ def carregar_dados_aba(nome_aba):
         
         indice_cabecalho = -1
         cabecalho_bruto = []
-        
         for i, linha in enumerate(dados[:5]):
             linha_upper = [str(col).upper().strip() for col in linha]
             if "NOME" in linha_upper or "NOMES" in linha_upper:
@@ -169,13 +161,10 @@ def carregar_dados_aba(nome_aba):
                 cabecalho_bruto = linha
                 break
         
-        if indice_cabecalho == -1:
-            st.error(f"Erro: Cabeçalho não encontrado na aba '{nome_aba}'.")
-            return None, None
+        if indice_cabecalho == -1: return None, None
 
         cabecalho_tratado = []
         contagem_cols = {}
-
         for col in cabecalho_bruto:
             col_str = str(col).strip().upper()
             if col_str == "NOMES": col_str = "NOME"
@@ -199,9 +188,7 @@ def carregar_dados_aba(nome_aba):
         else: pass 
 
         return df, worksheet
-
     except Exception as e:
-        st.error(f"Erro ao carregar aba '{nome_aba}': {e}")
         return None, None
 
 # --- KPIS ---
@@ -260,7 +247,6 @@ def filtrar_e_ordenar_dim(df, modo):
         mask = df_filtrado[cols_horarios].apply(lambda row: row.astype(str).str.upper().str.contains('CHAT').any(), axis=1)
         df_filtrado = df_filtrado[mask]
         df_filtrado = df_filtrado.sort_values(by='SORT_TEMP', na_position='last')
-        
     elif modo == "🚫 Apenas Folgas":
         def is_pure_folga(row):
             s = "".join([str(val).upper() for val in row])
@@ -297,42 +283,31 @@ def colorir_diario(val):
 
 df_global, _ = carregar_dados_aba('Mensal')
 
-# --- SIDEBAR COM FILTROS ---
+# --- SIDEBAR (Filtros Compactos) ---
 with st.sidebar:
-    st.image("logo_turbi.png", width=140) 
+    st.image("logo_turbi.png", width=120) 
+    st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
     st.divider()
     
-    # LINK PARA O FORMULÁRIO (Botão Visual)
-    st.markdown(f'''
-        <a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">
-            📝 Alteração de folga/horário
-        </a>
-    ''', unsafe_allow_html=True)
-    
-    st.markdown("### 🔍 Filtros")
+    st.markdown("##### 🔍 Filtros") # Título menor
     
     if df_global is not None:
         opcoes_lider = sorted(df_global['LIDER'].unique().tolist()) if 'LIDER' in df_global.columns else []
         opcoes_ilha = sorted(df_global['ILHA'].unique().tolist()) if 'ILHA' in df_global.columns else []
     else:
-        opcoes_lider = []
-        opcoes_ilha = []
+        opcoes_lider = []; opcoes_ilha = []
 
     sel_lider = st.multiselect("Líder", options=opcoes_lider, default=[])
     sel_ilha = st.multiselect("Ilha", options=opcoes_ilha, default=[])
     busca_nome = st.text_input("Buscar Nome")
 
-    # Rodapé fixo dentro da sidebar (Com fundo sólido para não conflitar)
-    st.markdown('''
-        <div class="sidebar-footer">
-            Made by <b>Leonardo Arantes</b>
-        </div>
-    ''', unsafe_allow_html=True)
+    # Rodapé fixo na sidebar
+    st.markdown('<div class="sidebar-footer-container">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
 
-# --- CABEÇALHO MENOR ---
+# --- CABEÇALHO ---
 st.markdown("### 🚙 Sistema de Escalas Turbi")
 
-aba_mensal, aba_diaria = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária"])
+aba_mensal, aba_diaria = st.tabs(["📅 Mensal", "⏱️ Diária"])
 
 # ================= ABA MENSAL =================
 with aba_mensal:
@@ -340,11 +315,12 @@ with aba_mensal:
     if df_mensal is not None:
         colunas_datas = [c for c in df_mensal.columns if '/' in c]
         hoje_str = datetime.now().strftime("%d/%m")
+        # Default para data atual
         index_padrao = colunas_datas.index(hoje_str) if hoje_str in colunas_datas else 0
 
         c1, c2, c3, c4, c5 = st.columns(5)
         with c1:
-            st.markdown("**Status do Dia:**")
+            st.markdown("**Dia:**")
             data_kpi_selecionada = st.selectbox("Data", colunas_datas, index=index_padrao, label_visibility="collapsed")
         
         kpis = calcular_kpis_mensal_detalhado(df_mensal, data_kpi_selecionada)
@@ -365,34 +341,54 @@ with aba_mensal:
         cols_visuais = [c for c in df_f.columns if c.upper().strip() not in cols_para_remover]
         
         styler = df_f[cols_visuais].style.map(colorir_mensal)
-        
-        # Aumentei um pouquinho o height já que economizamos espaço no topo
-        st.dataframe(styler, use_container_width=True, height=600, hide_index=True)
+        st.dataframe(styler, use_container_width=True, height=650, hide_index=True)
 
 # ================= ABA DIÁRIA =================
 with aba_diaria:
     abas = listar_abas_dim()
+    
     if not abas:
         st.warning("Nenhuma aba DIM encontrada.")
     else:
-        top_c1, top_c2, top_c3, top_c4, top_c5 = st.columns(5)
+        # --- LÓGICA INTELIGENTE DE DATA ---
+        hoje = datetime.now().strftime("%d/%m") # Ex: 04/12
         
-        with top_c1:
-            st.markdown("**Selecione o Dia:**")
-            aba_sel = st.selectbox("Dia", abas, label_visibility="collapsed")
+        c_input, c_kpi1, c_kpi2, c_kpi3, c_kpi4 = st.columns([1, 1, 1, 1, 1]) # 1ª coluna igual as outras
         
-        df_dim, ws_dim = carregar_dados_aba(aba_sel)
+        with c_input:
+            st.markdown("**Buscar Dia:**")
+            # Input de texto para a pessoa digitar "04/12"
+            texto_busca = st.text_input("Ex: 04/12", value=hoje, label_visibility="collapsed")
+            st.caption("Digite dia/mês (Ex: 04/12)")
+
+        # Lógica: Tenta achar a aba que contenha o texto digitado
+        aba_selecionada = None
+        for aba in abas:
+            if texto_busca in aba:
+                aba_selecionada = aba
+                break
+        
+        # Se não achou (ou input vazio), pega a primeira aba disponível como fallback
+        if aba_selecionada is None:
+            aba_selecionada = abas[0]
+            if texto_busca != hoje: # Só avisa se o usuário tentou buscar algo
+                st.toast(f"Dia {texto_busca} não encontrado!", icon="❌")
+
+        # Mostra qual aba foi carregada
+        # st.success(f"Visualizando: **{aba_selecionada}**")
+
+        df_dim, ws_dim = carregar_dados_aba(aba_selecionada)
         
         if df_dim is not None:
             analise = analisar_gargalos_dim(df_dim)
             resumo_dia = calcular_resumo_dia_dim(df_dim)
             
-            with top_c2: st.metric("👥 No Chat", resumo_dia["Trabalhando"])
-            with top_c3: st.metric("🛋️ Folgas (Sup)", resumo_dia["Folga"])
+            with c_kpi1: st.metric("👥 No Chat", resumo_dia["Trabalhando"])
+            with c_kpi2: st.metric("🛋️ Folgas", resumo_dia["Folga"])
             
             if analise:
-                with top_c4: st.metric("⚠️ -Chat (09-22h)", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
-                with top_c5: st.metric("☕ +Pausa (09-22h)", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
+                with c_kpi3: st.metric("⚠️ -Chat", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
+                with c_kpi4: st.metric("☕ +Pausa", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
             
             st.divider()
 
@@ -416,5 +412,5 @@ with aba_diaria:
             
             styler_dim = df_exibicao[cols_v].style.map(colorir_diario)
             
-            # Altura ajustada: 520px deve ser perfeito com os KPIs menores
-            st.dataframe(styler_dim, use_container_width=True, height=520, hide_index=True)
+            # Altura ajustada: aumentei um pouco pois compactamos o topo
+            st.dataframe(styler_dim, use_container_width=True, height=580, hide_index=True)
