@@ -124,7 +124,7 @@ st.markdown("""
         }
         .custom-link-btn:hover { background-color: #1f77b4; color: white !important; }
         
-        [data-testid="stSidebar"] [data-testid="stImage"] {
+        [data-testid="stSidebar"] [data-testid="st.image"] {
             display: flex;
             justify-content: right;
         }
