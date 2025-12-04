@@ -110,8 +110,8 @@ st.markdown("""
         }
         
         /* TÍTULOS */
-        h3 { font-size: 18px !important; margin: 0 !important; padding: 0 !important;}
-        .stCaption { font-size: 20px !important; margin-top: -5px !important;}
+        h3 { font-size: 22px !important; margin: 0 !important; padding: 0 !important;}
+        .stCaption { font-size: 10px !important; margin-top: -5px !important;}
 
         /* 4. SIDEBAR E LINK */
         .custom-link-btn {
