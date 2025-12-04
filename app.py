@@ -137,6 +137,10 @@ st.markdown("""
         [data-testid="stTabs"] {
             margin-top: -50px !important; /* Aumente o número negativo se quiser subir mais */
         }
+        /* 7. REDUZ ESPAÇO ACIMA DO BOTÃO DE OPÇÕES (Grade/Chat/Folgas) */
+        [data-testid="stRadio"] {
+            margin-top: -25px !important; /* Puxa os botões para cima */
+        }
     </style>
 """, unsafe_allow_html=True)
 
