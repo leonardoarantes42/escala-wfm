@@ -133,6 +133,10 @@ st.markdown("""
             font-size: 10px;
             text-align: center;
         }
+        /* 6. AJUSTE DE ESPAÇAMENTO: Puxar as abas para cima */
+        [data-testid="stTabs"] {
+            margin-top: -20px !important; /* Aumente o número negativo se quiser subir mais */
+        }
     </style>
 """, unsafe_allow_html=True)
 
