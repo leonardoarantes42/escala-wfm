@@ -31,7 +31,7 @@ st.markdown("""
         /* 2. TABELA COM ALTURA INTELIGENTE (O Grande Truque) */
         .table-container {
             /* Calcula: Altura da tela - espaço do topo (KPIs + Abas) */
-            height: calc(100vh - 210px); 
+            height: calc(100vh - 250px); 
             overflow-y: auto;
             overflow-x: auto;
             display: block;
