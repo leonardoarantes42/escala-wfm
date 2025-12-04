@@ -318,7 +318,7 @@ with c_search:
     texto_busca = st.text_input("Busca", value=hoje_display, label_visibility="collapsed")
     st.caption("Digite dia/mês (Ex: 04/12)")
 
-aba_mensal, aba_diaria = st.tabs(["📅 Mensal", "⏱️ Diária"])
+aba_mensal, aba_diaria = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária"])
 
 # ================= ABA MENSAL =================
 with aba_mensal:
@@ -331,7 +331,7 @@ with aba_mensal:
         kpis = calcular_kpis_mensal_detalhado(df_mensal, dia_para_mostrar)
         
         kc1, kc2, kc3, kc4 = st.columns(4)
-        with kc1: st.metric("✅ No Chat", kpis["NoChat"])
+        with kc1: st.metric("✅ No Chat (S&P/Emerg)", kpis["NoChat"])
         with kc2: st.metric("🛋️ Folgas", kpis["Folga"])
         with kc3: st.metric("🎧 Suporte", kpis["Suporte"])
         with kc4: st.metric("🚨 Emergência", kpis["Emergencia"])
@@ -362,18 +362,18 @@ with aba_diaria:
             resumo_dia = calcular_resumo_dia_dim(df_dim)
             
             kc1, kc2, kc3, kc4 = st.columns(4)
-            with kc1: st.metric("👥 No Chat", resumo_dia["Trabalhando"])
+            with kc1: st.metric("👥 No Chat (S&P/Emerg)", resumo_dia["Trabalhando"])
             with kc2: st.metric("🛋️ Folgas", resumo_dia["Folga"])
             if analise:
-                with kc3: st.metric("⚠️ -Chat", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
-                with kc4: st.metric("☕ +Pausa", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
+                with kc3: st.metric("⚠️ Menos Chats", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
+                with kc4: st.metric("☕ Mais Pausas", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
             
             df_dim_f = df_dim.copy()
             if sel_lider: df_dim_f = df_dim_f[df_dim_f['LIDER'].isin(sel_lider)]
             if sel_ilha: df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
             if busca_nome: df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
             
-            tipo = st.radio("Modo:", ["▦ Grade", "💬 Chat", "🚫 Folgas"], horizontal=True, label_visibility="collapsed")
+            tipo = st.radio("Modo:", ["▦ Grade", "💬 Apenas Chat", "🚫 Apenas Folgas"], horizontal=True, label_visibility="collapsed")
 
             if tipo == "▦ Grade": df_exibicao = df_dim_f
             else: df_exibicao = filtrar_e_ordenar_dim(df_dim_f, "💬 Apenas Chat" if "Chat" in tipo else "🚫 Apenas Folgas")
