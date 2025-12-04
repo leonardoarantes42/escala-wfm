@@ -42,7 +42,7 @@ st.markdown("""
         /* Altura específica para VISÃO MENSAL */
         /* Como tem menos coisas em cima, descontamos menos espaço (tabela maior) */
         .height-mensal {
-            height: calc(100vh - 280px); 
+            height: calc(100vh - 250px); 
         }
 
         /* Altura específica para VISÃO DIÁRIA */
