@@ -117,7 +117,9 @@ st.markdown("""
         .custom-link-btn {
             display: block; width: 100%; padding: 8px; text-align: center;
             border: 1px solid #1f77b4; border-radius: 4px;
-            font-size: 12px; margin-top: 20px; margin-bottom: 10px; 
+            font-size: 12px;
+            margin-top: 0px; /* <--- Alterado para 0px para colar na linha */
+            margin-bottom: 10px;
             text-decoration: none; color: #1f77b4; font-weight: bold;
         }
         .custom-link-btn:hover { background-color: #1f77b4; color: white !important; }
