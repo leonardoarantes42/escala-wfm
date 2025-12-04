@@ -12,112 +12,126 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS: DESIGN COMPACTO, SCROLL TRAVADO E COLUNA FIXA ---
+# --- CSS: ESTILO EXCEL, COLUNA FIXA E COMPACTAÇÃO ---
 st.markdown("""
     <style>
-        /* 1. TOPO SUPER COMPACTO */
+        /* 1. LAYOUT GERAL E SCROLL */
         .block-container {
-            padding-top: 1rem !important; /* Mínimo possível */
+            padding-top: 0.5rem !important;
             padding-bottom: 0rem;
             padding-left: 1rem;
             padding-right: 1rem;
         }
-        
-        /* 2. TRAVA O SCROLL DA PÁGINA (Para Header Fixo) */
+        /* Esconde scroll da página principal */
         section[data-testid="stSidebar"] + section {
             overflow: hidden !important;
         }
         ::-webkit-scrollbar { display: none; }
 
-        /* 3. KPIS COMPACTOS */
-        [data-testid="metric-container"] {
-            padding: 5px 10px;
-            height: 70px; /* Altura reduzida */
-            border-radius: 6px;
-        }
-        [data-testid="stMetricLabel"] {
-            font-size: 11px !important;
-            margin-bottom: 0px !important;
-        }
-        [data-testid="stMetricValue"] {
-            font-size: 18px !important;
-            padding-top: 0px !important;
-        }
-
-        /* 4. TÍTULOS MENORES */
-        h3 {
-            font-size: 1.2rem !important;
-            margin-bottom: 0.5rem !important;
-            padding: 0 !important;
-        }
-        p { font-size: 13px; }
-
-        /* 5. SIDEBAR MAIS COMPACTA */
+        /* 2. SIDEBAR E RODAPÉ */
         [data-testid="stSidebar"] .block-container {
-            padding-top: 2rem;
+            padding-bottom: 80px; /* Espaço para o rodapé não cobrir o último item */
         }
-        
-        /* 6. COLUNA FIXA (NOME) NA TABELA */
-        /* Aplica sticky na primeira coluna (th e td) */
-        table th:first-child, table td:first-child {
-            position: sticky;
-            left: 0;
-            z-index: 2; /* Fica acima das outras células ao rolar */
-            background-color: #ffffff; /* Fundo opaco para não ver o texto passar por baixo */
-            border-right: 2px solid #e0e0e0; /* Divisória visual */
-        }
-        /* Ajuste de cor para o modo escuro na coluna fixa */
-        @media (prefers-color-scheme: dark) {
-            table th:first-child, table td:first-child {
-                background-color: #262730; 
-                border-right: 2px solid #444;
-            }
-        }
-        
-        /* 7. RODAPÉ SIDEBAR CORRIGIDO */
-        /* Agora usamos um container fixo relativo à sidebar */
-        .sidebar-footer-container {
+        .sidebar-footer-fixed {
             position: fixed;
             bottom: 0;
             left: 0;
-            width: 20rem; /* Largura aproximada da sidebar aberta */
+            width: 336px; /* Largura exata da Sidebar expandida */
             background-color: #f0f2f6;
             padding: 10px;
             text-align: center;
             font-size: 11px;
             color: #666;
             border-top: 1px solid #ddd;
-            z-index: 99999;
+            z-index: 999999; /* Garante que fique sobre tudo na sidebar */
         }
         @media (prefers-color-scheme: dark) {
-            .sidebar-footer-container {
+            .sidebar-footer-fixed {
                 background-color: #262730;
                 border-top: 1px solid #444;
                 color: #888;
             }
         }
-        /* Empurra o conteúdo da sidebar pra cima pra não ficar escondido atrás do rodapé */
-        [data-testid="stSidebarNav"] {
-            margin-bottom: 50px; 
+
+        /* 3. KPIS MINIATURA */
+        [data-testid="metric-container"] {
+            padding: 4px 8px;
+            height: 55px; /* Altura mínima */
+            border-radius: 4px;
+            box-shadow: none;
+            border: 1px solid #eee;
+        }
+        [data-testid="stMetricLabel"] {
+            font-size: 10px !important;
+            margin-bottom: 0px !important;
+        }
+        [data-testid="stMetricValue"] {
+            font-size: 16px !important;
+            padding-top: 0px !important;
         }
 
-        /* BOTÃO DO LINK */
-        .custom-link-btn {
+        /* 4. TABELA HTML PERSONALIZADA (ESTILO EXCEL) */
+        .table-container {
+            max-height: 520px; /* Altura fixa para scroll interno */
+            overflow-y: auto;
+            overflow-x: auto;
+            border: 1px solid #444;
             display: block;
-            width: 100%;
-            padding: 6px;
-            text-align: center;
-            background-color: transparent;
-            color: #1f77b4;
-            border: 1px solid #1f77b4;
-            border-radius: 4px;
-            text-decoration: none;
-            font-size: 13px;
-            margin-bottom: 10px;
         }
-        .custom-link-btn:hover {
-            background-color: #1f77b4;
-            color: white !important;
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: sans-serif;
+            font-size: 11px; /* Fonte bem pequena para notebook */
+        }
+        th, td {
+            padding: 4px 6px;
+            text-align: center;
+            border: 1px solid #444;
+            white-space: nowrap; /* Não quebra linha */
+        }
+        
+        /* CABEÇALHO FIXO (Sticky Header) */
+        thead th {
+            position: sticky;
+            top: 0;
+            background-color: #0e1117; /* Cor de fundo do header */
+            color: white;
+            z-index: 5;
+            border-bottom: 2px solid #666;
+        }
+
+        /* PRIMEIRA COLUNA FIXA (Sticky Column) */
+        table td:first-child, table th:first-child {
+            position: sticky;
+            left: 0;
+            background-color: #1c1e24; /* Um pouco mais claro que o fundo */
+            z-index: 6; /* Fica acima do scroll horizontal */
+            border-right: 2px solid #666;
+            font-weight: bold;
+            text-align: left;
+            min-width: 120px;
+        }
+        /* Canto superior esquerdo (Cruzamento Header/Coluna) */
+        thead th:first-child {
+            z-index: 7;
+            background-color: #0e1117;
+        }
+
+        /* Modo Claro */
+        @media (prefers-color-scheme: light) {
+            .table-container { border: 1px solid #ddd; }
+            th, td { border: 1px solid #ddd; }
+            thead th { background-color: #f0f2f6; color: black; }
+            table td:first-child, table th:first-child { background-color: #ffffff; }
+            thead th:first-child { background-color: #f0f2f6; }
+        }
+
+        /* LINK BOTÃO */
+        .custom-link-btn {
+            display: block; width: 100%; padding: 5px; text-align: center;
+            border: 1px solid #1f77b4; border-radius: 4px;
+            font-size: 12px; margin-bottom: 10px; text-decoration: none; color: #1f77b4;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -139,7 +153,6 @@ def listar_abas_dim():
     client = conectar_google_sheets()
     sh = client.open_by_url(URL_PLANILHA)
     todas_abas = [ws.title for ws in sh.worksheets()]
-    # Filtra apenas abas DIM
     abas_dim = sorted([aba for aba in todas_abas if aba.startswith("DIM")])
     return abas_dim
 
@@ -168,7 +181,6 @@ def carregar_dados_aba(nome_aba):
         for col in cabecalho_bruto:
             col_str = str(col).strip().upper()
             if col_str == "NOMES": col_str = "NOME"
-            
             if col_str in contagem_cols:
                 contagem_cols[col_str] += 1
                 novo_nome = f"{col_str}_fim"
@@ -180,16 +192,12 @@ def carregar_dados_aba(nome_aba):
         linhas = dados[indice_cabecalho + 1:]   
         df = pd.DataFrame(linhas, columns=cabecalho_tratado)
         df = df.loc[:, df.columns != '']
-        
         if 'ILHA' in df.columns: df = df[df['ILHA'].astype(str).str.strip() != '']
         if 'NOME' in df.columns: df = df[df['NOME'].astype(str).str.strip() != '']
-
         if nome_aba == 'Mensal': df = df.iloc[:, :39] 
-        else: pass 
 
         return df, worksheet
-    except Exception as e:
-        return None, None
+    except Exception: return None, None
 
 # --- KPIS ---
 def calcular_kpis_mensal_detalhado(df_mensal, data_escolhida):
@@ -211,9 +219,10 @@ def calcular_resumo_dia_dim(df_dim):
     def juntar_linha(row): return "".join([str(val).upper() for val in row])
     resumo = df_dim[cols_horarios].apply(juntar_linha, axis=1)
     escalados_chat = resumo.str.contains('CHAT').sum()
-    tem_trabalho = resumo.str.contains('CHAT|EMAIL|E-MAIL|P|TREINO|1:1|1X1|FINANCEIRO|REEMBOLSOS|BACKOFFICE')
     tem_folga = resumo.str.contains('F')
+    # Simplifiquei a lógica para ganhar performance
     eh_sup_emerg = df_dim['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
+    tem_trabalho = resumo.str.contains('CHAT|EMAIL|E-MAIL|P|TREINO|1:1|FINANCEIRO')
     folga_filtrada = ((tem_folga) & (~tem_trabalho) & (eh_sup_emerg)).sum()
     return {"Trabalhando": escalados_chat, "Folga": folga_filtrada}
 
@@ -226,8 +235,7 @@ def analisar_gargalos_dim(df_dim):
                 if 9 <= hora <= 22: cols_horarios.append(c)
             except: pass
     if not cols_horarios: return None
-    menor_chat_valor = 9999; menor_chat_hora = "-"
-    maior_pausa_valor = -1; maior_pausa_hora = "-"
+    menor_chat_valor = 9999; menor_chat_hora = "-"; maior_pausa_valor = -1; maior_pausa_hora = "-"
     for hora in cols_horarios:
         coluna_limpa = df_dim[hora].astype(str).str.upper().str.strip()
         qtd_chat = coluna_limpa.eq('CHAT').sum()
@@ -237,180 +245,151 @@ def analisar_gargalos_dim(df_dim):
     return {"min_chat_hora": menor_chat_hora, "min_chat_valor": menor_chat_valor, "max_pausa_hora": maior_pausa_hora, "max_pausa_valor": maior_pausa_valor}
 
 def filtrar_e_ordenar_dim(df, modo):
-    df_filtrado = df.copy()
-    cols_horarios = [c for c in df.columns if ':' in c]
-    if 'ENTRADA' in df_filtrado.columns:
-        df_filtrado['SORT_TEMP'] = pd.to_datetime(df_filtrado['ENTRADA'], format='%H:%M', errors='coerce')
-    else: df_filtrado['SORT_TEMP'] = pd.NaT
+    df_f = df.copy()
+    cols_h = [c for c in df.columns if ':' in c]
+    if 'ENTRADA' in df_f.columns:
+        df_f['SORT_TEMP'] = pd.to_datetime(df_f['ENTRADA'], format='%H:%M', errors='coerce')
+    else: df_f['SORT_TEMP'] = pd.NaT
 
     if modo == "💬 Apenas Chat":
-        mask = df_filtrado[cols_horarios].apply(lambda row: row.astype(str).str.upper().str.contains('CHAT').any(), axis=1)
-        df_filtrado = df_filtrado[mask]
-        df_filtrado = df_filtrado.sort_values(by='SORT_TEMP', na_position='last')
+        mask = df_f[cols_h].apply(lambda row: row.astype(str).str.upper().str.contains('CHAT').any(), axis=1)
+        df_f = df_f[mask].sort_values(by='SORT_TEMP', na_position='last')
     elif modo == "🚫 Apenas Folgas":
         def is_pure_folga(row):
             s = "".join([str(val).upper() for val in row])
-            has_f = 'F' in s
-            has_work = any(x in s for x in ['CHAT', 'EMAIL', 'E-MAIL', 'P', '1:1', 'TREINO', 'FINANCEIRO'])
-            return has_f and not has_work
-        mask = df_filtrado[cols_horarios].apply(is_pure_folga, axis=1)
-        df_filtrado = df_filtrado[mask]
-        df_filtrado = df_filtrado.sort_values(by='SORT_TEMP', na_position='last')
+            return 'F' in s and not any(x in s for x in ['CHAT', 'P', 'TREINO'])
+        mask = df_f[cols_h].apply(is_pure_folga, axis=1)
+        df_f = df_f[mask].sort_values(by='SORT_TEMP', na_position='last')
 
-    df_filtrado = df_filtrado.drop(columns=['SORT_TEMP'])
-    return df_filtrado
+    return df_f.drop(columns=['SORT_TEMP'])
 
-# --- ESTILOS VISUAIS ---
-def colorir_mensal(val):
-    val = str(val).upper().strip() if isinstance(val, str) else str(val)
-    if val == 'T': return 'background-color: #c9daf8; color: black' 
-    elif val == 'F': return 'background-color: #93c47d; color: black'
-    elif val == 'AF': return 'background-color: #f4cccc; color: black'
-    return ''
+# --- ESTILIZAÇÃO (Retorna HTML para a nova tabela) ---
+def renderizar_tabela_html(df, modo_cores='diario'):
+    # Função interna para aplicar cores
+    def get_color(val):
+        val = str(val).upper().strip()
+        if modo_cores == 'mensal':
+            if val == 'T': return 'background-color: #c9daf8; color: black'
+            elif val == 'F': return 'background-color: #93c47d; color: black'
+            elif val == 'AF': return 'background-color: #f4cccc; color: black'
+        else: # diario
+            if val == 'F': return 'background-color: #002060; color: white'
+            elif 'CHAT' in val: return 'background-color: #d9ead3; color: black'
+            elif 'PAUSA' in val or val == 'P': return 'background-color: #fce5cd; color: black'
+            elif 'EMAIL' in val or 'E-MAIL' in val: return 'background-color: #bfe1f6; color: black'
+            elif 'FINANCEIRO' in val: return 'background-color: #11734b; color: white'
+            elif 'BACKOFFICE' in val: return 'background-color: #5a3286; color: white'
+        return ''
 
-def colorir_diario(val):
-    val = str(val).upper().strip() if isinstance(val, str) else str(val)
-    if val == 'F': return 'background-color: #002060; color: white'
-    elif 'CHAT' in val: return 'background-color: #d9ead3; color: black'
-    elif val == 'P' or 'PAUSA' in val: return 'background-color: #fce5cd; color: black'
-    elif 'FINANCEIRO' in val: return 'background-color: #11734b; color: white'
-    elif 'E-MAIL' in val or 'EMAIL' in val: return 'background-color: #bfe1f6; color: black'
-    elif 'REEMBOLSOS' in val: return 'background-color: #d4edbc; color: black'
-    elif 'BACKOFFICE' in val: return 'background-color: #5a3286; color: white'
-    return ''
+    # Converte para Styler e aplica CSS
+    styler = df.style.map(get_color)
+    
+    # Gera HTML
+    html = styler.to_html()
+    
+    # Envolve em uma div com classe para scroll e sticky
+    return f'<div class="table-container">{html}</div>'
 
 # ================= MAIN APP =================
 
 df_global, _ = carregar_dados_aba('Mensal')
 
-# --- SIDEBAR (Filtros Compactos) ---
+# --- SIDEBAR ---
 with st.sidebar:
-    st.image("logo_turbi.png", width=120) 
+    st.image("logo_turbi.png", width=110) 
     st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
     st.divider()
     
-    st.markdown("##### 🔍 Filtros") # Título menor
-    
+    st.markdown("##### 🔍 Filtros")
     if df_global is not None:
         opcoes_lider = sorted(df_global['LIDER'].unique().tolist()) if 'LIDER' in df_global.columns else []
         opcoes_ilha = sorted(df_global['ILHA'].unique().tolist()) if 'ILHA' in df_global.columns else []
-    else:
-        opcoes_lider = []; opcoes_ilha = []
+    else: opcoes_lider = []; opcoes_ilha = []
 
     sel_lider = st.multiselect("Líder", options=opcoes_lider, default=[])
     sel_ilha = st.multiselect("Ilha", options=opcoes_ilha, default=[])
     busca_nome = st.text_input("Buscar Nome")
 
-    # Rodapé fixo na sidebar
-    st.markdown('<div class="sidebar-footer-container">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
+    # RODAPÉ FIXO CORRIGIDO (Largura travada na sidebar)
+    st.markdown('<div class="sidebar-footer-fixed">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
 
-# --- CABEÇALHO ---
-st.markdown("### 🚙 Sistema de Escalas Turbi")
+# --- CABEÇALHO HÍBRIDO (Título Esquerda + Busca Direita) ---
+# Isso resolve o problema de espaço vertical
+c_title, c_spacer, c_search = st.columns([2, 1, 1.5])
+with c_title:
+    st.markdown("### 🚙 Sistema de Escalas Turbi")
+with c_search:
+    hoje_display = datetime.now().strftime("%d/%m")
+    texto_busca = st.text_input("Buscar Dia", value=hoje_display, label_visibility="collapsed", placeholder="Dia/Mês")
+    st.caption("Digite dia/mês (Ex: 04/12)")
 
-aba_mensal, aba_diaria = st.tabs(["📅 Mensal", "⏱️ Diária"])
+aba_mensal, aba_diaria = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária"])
 
 # ================= ABA MENSAL =================
 with aba_mensal:
-    df_mensal = df_global
-    if df_mensal is not None:
+    if df_global is not None:
+        df_mensal = df_global
         colunas_datas = [c for c in df_mensal.columns if '/' in c]
-        hoje_str = datetime.now().strftime("%d/%m")
-        # Default para data atual
-        index_padrao = colunas_datas.index(hoje_str) if hoje_str in colunas_datas else 0
-
-        c1, c2, c3, c4, c5 = st.columns(5)
-        with c1:
-            st.markdown("**Dia:**")
-            data_kpi_selecionada = st.selectbox("Data", colunas_datas, index=index_padrao, label_visibility="collapsed")
         
-        kpis = calcular_kpis_mensal_detalhado(df_mensal, data_kpi_selecionada)
+        # Lógica de Busca também funciona aqui
+        dia_para_mostrar = texto_busca if texto_busca in colunas_datas else colunas_datas[0]
         
-        with c2: st.metric("✅ No Chat", kpis["NoChat"])
-        with c3: st.metric("🛋️ Folgas", kpis["Folga"])
-        with c4: st.metric("🎧 Suporte", kpis["Suporte"])
-        with c5: st.metric("🚨 Emergência", kpis["Emergencia"])
+        kpis = calcular_kpis_mensal_detalhado(df_mensal, dia_para_mostrar)
+        
+        kc1, kc2, kc3, kc4 = st.columns(4)
+        with kc1: st.metric("✅ No Chat", kpis["NoChat"])
+        with kc2: st.metric("🛋️ Folgas", kpis["Folga"])
+        with kc3: st.metric("🎧 Suporte", kpis["Suporte"])
+        with kc4: st.metric("🚨 Emergência", kpis["Emergencia"])
 
-        st.markdown("---")
-
+        # Filtros
         df_f = df_mensal.copy()
         if sel_lider: df_f = df_f[df_f['LIDER'].isin(sel_lider)]
         if sel_ilha: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
         if busca_nome: df_f = df_f[df_f['NOME'].str.contains(busca_nome, case=False)]
 
-        cols_para_remover = ['EMAIL', 'E-MAIL', 'ADMISSÃO', 'ILHA', 'Z']
-        cols_visuais = [c for c in df_f.columns if c.upper().strip() not in cols_para_remover]
+        cols_clean = [c for c in df_f.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ADMISSÃO', 'ILHA', 'Z']]
         
-        styler = df_f[cols_visuais].style.map(colorir_mensal)
-        st.dataframe(styler, use_container_width=True, height=650, hide_index=True)
+        # RENDERIZAÇÃO HTML (Para Sticky Column funcionar se quiser no mensal também)
+        html_tabela = renderizar_tabela_html(df_f[cols_clean], 'mensal')
+        st.markdown(html_tabela, unsafe_allow_html=True)
 
 # ================= ABA DIÁRIA =================
 with aba_diaria:
     abas = listar_abas_dim()
     
     if not abas:
-        st.warning("Nenhuma aba DIM encontrada.")
+        st.warning("Sem dados.")
     else:
-        # --- LÓGICA INTELIGENTE DE DATA ---
-        hoje = datetime.now().strftime("%d/%m") # Ex: 04/12
+        # Busca Aba Inteligente
+        aba_selecionada = next((aba for aba in abas if texto_busca in aba), abas[0])
         
-        c_input, c_kpi1, c_kpi2, c_kpi3, c_kpi4 = st.columns([1, 1, 1, 1, 1]) # 1ª coluna igual as outras
-        
-        with c_input:
-            st.markdown("**Buscar Dia:**")
-            # Input de texto para a pessoa digitar "04/12"
-            texto_busca = st.text_input("Ex: 04/12", value=hoje, label_visibility="collapsed")
-            st.caption("Digite dia/mês (Ex: 04/12)")
-
-        # Lógica: Tenta achar a aba que contenha o texto digitado
-        aba_selecionada = None
-        for aba in abas:
-            if texto_busca in aba:
-                aba_selecionada = aba
-                break
-        
-        # Se não achou (ou input vazio), pega a primeira aba disponível como fallback
-        if aba_selecionada is None:
-            aba_selecionada = abas[0]
-            if texto_busca != hoje: # Só avisa se o usuário tentou buscar algo
-                st.toast(f"Dia {texto_busca} não encontrado!", icon="❌")
-
-        # Mostra qual aba foi carregada
-        # st.success(f"Visualizando: **{aba_selecionada}**")
-
         df_dim, ws_dim = carregar_dados_aba(aba_selecionada)
         
         if df_dim is not None:
             analise = analisar_gargalos_dim(df_dim)
             resumo_dia = calcular_resumo_dia_dim(df_dim)
             
-            with c_kpi1: st.metric("👥 No Chat", resumo_dia["Trabalhando"])
-            with c_kpi2: st.metric("🛋️ Folgas", resumo_dia["Folga"])
-            
+            kc1, kc2, kc3, kc4 = st.columns(4)
+            with kc1: st.metric("👥 No Chat", resumo_dia["Trabalhando"])
+            with kc2: st.metric("🛋️ Folgas", resumo_dia["Folga"])
             if analise:
-                with c_kpi3: st.metric("⚠️ -Chat", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
-                with c_kpi4: st.metric("☕ +Pausa", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
+                with kc3: st.metric("⚠️ -Chat", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
+                with kc4: st.metric("☕ +Pausa", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
             
-            st.divider()
-
+            # Filtros e Modos
             df_dim_f = df_dim.copy()
             if sel_lider: df_dim_f = df_dim_f[df_dim_f['LIDER'].isin(sel_lider)]
             if sel_ilha: df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
             if busca_nome: df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
             
-            tipo = st.radio("Modo:", ["▦ Grade Completa", "💬 Apenas Chat", "🚫 Apenas Folgas"], horizontal=True, label_visibility="collapsed")
+            tipo = st.radio("Modo:", ["▦ Grade", "💬 Chat", "🚫 Folgas"], horizontal=True, label_visibility="collapsed")
 
-            if tipo == "▦ Grade Completa":
-                df_exibicao = df_dim_f
-            else:
-                df_exibicao = filtrar_e_ordenar_dim(df_dim_f, tipo)
+            if tipo == "▦ Grade": df_exibicao = df_dim_f
+            else: df_exibicao = filtrar_e_ordenar_dim(df_dim_f, "💬 Apenas Chat" if "Chat" in tipo else "🚫 Apenas Folgas")
             
-            cols_para_remover_dim = ['EMAIL', 'E-MAIL', 'ILHA', 'Z']
-            cols_v = [c for c in df_exibicao.columns if c.upper().strip() not in cols_para_remover_dim]
+            cols_v = [c for c in df_exibicao.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ILHA', 'Z']]
             
-            if tipo != "▦ Grade Completa":
-                st.caption(f"Mostrando **{len(df_exibicao)}** analistas ordenados por horário de entrada.")
-            
-            styler_dim = df_exibicao[cols_v].style.map(colorir_diario)
-            
-            # Altura ajustada: aumentei um pouco pois compactamos o topo
-            st.dataframe(styler_dim, use_container_width=True, height=580, hide_index=True)
+            # RENDERIZAÇÃO HTML COM CSS STICKY
+            html_tabela_dim = renderizar_tabela_html(df_exibicao[cols_v], 'diario')
+            st.markdown(html_tabela_dim, unsafe_allow_html=True)
