@@ -12,37 +12,33 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS: SEGURANÇA E LEITURA ---
+# --- CSS: LAYOUT RESPONSIVO E COMPACTO ---
 st.markdown("""
     <style>
-        /* 1. TOPO DA PÁGINA (VOLTAMOS AO SEGURO) */
-        /* Dei bastante espaço (4rem) para nada cortar o título ou o input de data */
+        /* 1. LAYOUT GERAL */
         .block-container {
-            padding-top: 4rem !important; 
-            padding-bottom: 1rem;
+            padding-top: 3.5rem !important; /* Aumentado para não cortar o topo */
+            padding-bottom: 0rem;
             padding-left: 1rem;
             padding-right: 1rem;
         }
         
-        /* 2. TABELA INTELIGENTE (ADAPTA AO MONITOR/NOTEBOOK) */
+        /* Remove a rolagem da página principal (foco total na tabela) */
+        section[data-testid="stSidebar"] + section {
+            overflow: hidden !important;
+        }
+        
+        /* 2. TABELA COM ALTURA INTELIGENTE (O Grande Truque) */
         .table-container {
-            /* Ocupa a altura da tela menos o espaço do cabeçalho */
-            /* Se estiver cortando embaixo, aumente o valor de 280px para 300px */
-            height: calc(100vh - 280px); 
+            /* Calcula: Altura da tela - espaço do topo (KPIs + Abas) */
+            height: calc(100vh - 210px); 
             overflow-y: auto;
             overflow-x: auto;
             display: block;
             border: 1px solid #444;
             border-radius: 4px;
-            background-color: #0e1117;
         }
         
-        /* Esconde a barra de rolagem GERAL da página para forçar o uso da tabela */
-        section[data-testid="stSidebar"] + section {
-            overflow: hidden !important;
-        }
-
-        /* 3. ESTILOS DA TABELA */
         table {
             width: 100%;
             border-collapse: separate; 
@@ -50,23 +46,25 @@ st.markdown("""
             font-family: sans-serif;
             font-size: 11px;
         }
+        
         th, td {
-            padding: 5px 8px;
+            padding: 4px 6px; /* Células mais compactas */
             text-align: center;
             border-bottom: 1px solid #444;
             border-right: 1px solid #444;
             white-space: nowrap;
         }
         
-        /* CABEÇALHO FIXO */
+        /* CABEÇALHO DA TABELA FIXO */
         thead th {
             position: sticky;
             top: 0;
             background-color: #0e1117; 
             color: white;
-            z-index: 10;
+            z-index: 5;
             border-bottom: 2px solid #666;
             height: 35px;
+            font-size: 11px;
         }
 
         /* PRIMEIRA COLUNA FIXA (NOME) */
@@ -74,30 +72,31 @@ st.markdown("""
             position: sticky;
             left: 0;
             background-color: #1c1e24; 
-            z-index: 11; 
+            z-index: 6; 
             border-right: 2px solid #666; 
             font-weight: bold;
             text-align: left;
-            min-width: 150px;
+            min-width: 140px;
         }
+        
         thead th:first-child {
-            z-index: 12;
+            z-index: 7;
             background-color: #0e1117;
         }
 
-        /* MODO CLARO */
+        /* Modo Claro */
         @media (prefers-color-scheme: light) {
-            .table-container { border: 1px solid #ddd; background-color: #fff; }
+            .table-container { border: 1px solid #ddd; }
             th, td { border-bottom: 1px solid #ddd; border-right: 1px solid #ddd; }
             thead th { background-color: #f0f2f6; color: black; border-bottom: 2px solid #ccc; }
             table td:first-child, table th:first-child { background-color: #ffffff; border-right: 2px solid #ccc;}
             thead th:first-child { background-color: #f0f2f6; }
         }
 
-        /* 4. KPIS */
+        /* 3. KPIS SUPER COMPACTOS */
         [data-testid="metric-container"] {
             padding: 4px 8px;
-            height: 55px;
+            height: 50px; /* Bem fininho */
             border-radius: 6px;
             border: 1px solid #333;
             background-color: #1c1e24;
@@ -105,43 +104,33 @@ st.markdown("""
         }
         [data-testid="stMetricLabel"] { font-size: 10px !important; margin-bottom: 0 !important; }
         [data-testid="stMetricValue"] { font-size: 18px !important; }
+
         @media (prefers-color-scheme: light) {
             [data-testid="metric-container"] { background-color: #f8f9fa; border: 1px solid #ddd; }
         }
+        
+        /* TÍTULOS */
+        h3 { font-size: 18px !important; margin: 0 !important; padding: 0 !important;}
+        .stCaption { font-size: 10px !important; margin-top: -5px !important;}
 
-        /* 5. SIDEBAR E RODAPÉ */
-        /* Garante espaço no final da sidebar para o rodapé não cobrir o último filtro */
-        [data-testid="stSidebar"] .block-container {
-            padding-bottom: 80px !important; 
-        }
-
+        /* 4. SIDEBAR E LINK */
         .custom-link-btn {
             display: block; width: 100%; padding: 8px; text-align: center;
             border: 1px solid #1f77b4; border-radius: 4px;
-            font-size: 12px; margin-top: 10px; margin-bottom: 20px; 
+            font-size: 12px; margin-top: 20px; margin-bottom: 10px; 
             text-decoration: none; color: #1f77b4; font-weight: bold;
         }
         .custom-link-btn:hover { background-color: #1f77b4; color: white !important; }
 
-        .footer-fixed {
-            position: fixed; 
-            bottom: 0; 
-            left: 0; 
-            width: 336px; /* Largura padrão da sidebar */
-            padding: 15px; 
+        /* Rodapé */
+        .footer-simple {
+            margin-top: 10px;
+            padding-top: 10px;
             border-top: 1px solid #444;
-            background-color: #262730; 
-            color: #666; 
-            font-size: 11px; 
-            text-align: center; 
-            z-index: 100;
+            color: #666;
+            font-size: 10px;
+            text-align: center;
         }
-        @media (prefers-color-scheme: light) {
-            .footer-fixed { background-color: #f0f2f6; border-top: 1px solid #ddd; }
-        }
-
-        /* TÍTULOS */
-        h3 { font-size: 18px !important; margin: 0 !important; padding: 0 !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -288,6 +277,7 @@ def renderizar_tabela_html(df, modo_cores='diario'):
             elif 'BACKOFFICE' in val: return 'background-color: #5a3286; color: white'
         return ''
 
+    # hide(axis="index") remove os números e deixa o NOME como 1ª coluna
     styler = df.style.map(get_color).hide(axis="index")
     html = styler.to_html()
     return f'<div class="table-container">{html}</div>'
@@ -296,12 +286,10 @@ def renderizar_tabela_html(df, modo_cores='diario'):
 
 df_global, _ = carregar_dados_aba('Mensal')
 
-# --- SIDEBAR ---
+# --- SIDEBAR REORGANIZADA ---
 with st.sidebar:
     st.image("logo_turbi.png", width=110) 
-    
-    # Botão "Alteração"
-    st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
+    st.divider()
     
     st.markdown("##### 🔍 Filtros")
     if df_global is not None:
@@ -313,16 +301,18 @@ with st.sidebar:
     sel_ilha = st.multiselect("Ilha", options=opcoes_ilha, default=[])
     busca_nome = st.text_input("Buscar Nome")
 
-    # Rodapé FIXO com margem de segurança na sidebar
-    st.markdown('<div class="footer-fixed">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
+    st.divider()
 
-# --- CABEÇALHO ---
-# Layout de colunas para Título e Busca
+    # LINK NO FINAL DO MENU
+    st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
+
+    # RODAPÉ ABSOLUTO
+    st.markdown('<div class="footer-simple">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
+
+# --- CABEÇALHO COMPACTO ---
 c_title, c_spacer, c_search = st.columns([2, 0.5, 1.2])
-
 with c_title:
     st.markdown("### 🚙 Sistema de Escalas Turbi")
-
 with c_search:
     hoje_display = datetime.now().strftime("%d/%m")
     texto_busca = st.text_input("Busca", value=hoje_display, label_visibility="collapsed")
