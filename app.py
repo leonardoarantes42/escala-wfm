@@ -18,7 +18,7 @@ st.markdown("""
         /* 1. LAYOUT GERAL */
         .block-container {
             padding-top: 2.7rem !important; /* Aumentado para não cortar o topo */
-            padding-bottom: 0rem;
+            padding-bottom: -3rem;
             padding-left: 1rem;
             padding-right: 1rem;
         }
