@@ -484,29 +484,21 @@ with aba_diaria:
 
 # ================= ABA ADERÊNCIA =================
 with aba_aderencia:
-    # CSS específico desta aba para colar tudo no topo
-    st.markdown("""
-        <style>
-            /* Remove margem do título H4 */
-            h4 { margin-top: -20px !important; padding-bottom: 5px !important; }
-            /* Puxa as colunas para cima */
-            [data-testid="stHorizontalBlock"] { margin-top: -15px !important; }
-        </style>
-    """, unsafe_allow_html=True)
+    # Pequeno hack para garantir que o Streamlit não coloque padding extra na aba
+    st.markdown("<style>[data-testid='stVerticalBlock'] > [style*='flex-direction: column;'] > [data-testid='stVerticalBlock'] {gap: 0rem;}</style>", unsafe_allow_html=True)
 
     if df_global is not None:
         df_ad = gerar_dados_aderencia(df_global)
         colunas_datas = [c for c in df_global.columns if '/' in c]
-        # Usa o texto_busca que agora vem do DatePicker
         dia_selecionado = texto_busca if texto_busca in colunas_datas else colunas_datas[0]
         
         row_dia = df_ad[df_ad['Data'] == dia_selecionado].iloc[0] if not df_ad[df_ad['Data'] == dia_selecionado].empty else None
         
         if row_dia is not None:
-            # Container com scroll
+            # Container com a classe CSS que acabamos de ajustar
             st.markdown('<div class="height-aderencia">', unsafe_allow_html=True)
             
-            # Título colado nas abas
+            # Título colado
             st.markdown(f"#### Resultados para: **{dia_selecionado}**")
             
             c_graf1, c_graf2 = st.columns([1, 2])
@@ -524,10 +516,10 @@ with aba_aderencia:
                 
                 fig_pizza.update_layout(
                     showlegend=True, 
-                    margin=dict(t=10, b=10, l=10, r=10), 
-                    height=240, 
+                    margin=dict(t=0, b=0, l=0, r=0), # Margens Zero
+                    height=200, 
                     paper_bgcolor='rgba(0,0,0,0)',
-                    legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5)
+                    legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
                 )
                 st.plotly_chart(fig_pizza, use_container_width=True)
                 
@@ -541,8 +533,8 @@ with aba_aderencia:
                 
                 fig_bar.update_layout(
                     barmode='stack', 
-                    margin=dict(t=10, b=10, l=10, r=10), 
-                    height=300, 
+                    margin=dict(t=10, b=0, l=0, r=0), # Margens apertadas
+                    height=280, 
                     paper_bgcolor='rgba(0,0,0,0)', 
                     plot_bgcolor='rgba(0,0,0,0)',
                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
