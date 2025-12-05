@@ -52,7 +52,7 @@ st.markdown("""
         /* Altura específica para ADERÊNCIA (Nova) */
         .height-aderencia {
             /* Ajuste a altura conforme seu gosto (200px costuma ser bom) */
-            height: calc(100vh - 100px); 
+            height: calc(100vh - 400px); 
             overflow-y: auto; 
             
             /* O SEGRED0 ESTÁ AQUI: Puxa tudo para cima */
