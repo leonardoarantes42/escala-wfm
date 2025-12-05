@@ -18,7 +18,7 @@ st.markdown("""
     <style>
         /* 1. LAYOUT GERAL */
         .block-container {
-            padding-top: 3rem !important;
+            padding-top: 3.5rem !important;
             padding-bottom: 0rem;
             padding-left: 1rem;
             padding-right: 1rem;
@@ -41,7 +41,7 @@ st.markdown("""
 
         /* Altura específica para VISÃO MENSAL */
         .height-mensal {
-            height: calc(100vh - 240px); 
+            height: calc(100vh - 235px); 
         }
 
         /* Altura específica para VISÃO DIÁRIA */
@@ -51,7 +51,7 @@ st.markdown("""
         
         /* Altura específica para ADERÊNCIA (Nova) */
         .height-aderencia {
-            height: calc(100vh - 120px); 
+            height: calc(100vh - 100px); 
             overflow-y: auto; /* Permite rolar os gráficos */
         }
         
