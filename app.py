@@ -250,18 +250,24 @@ def calcular_picos_vales_mensal(df_mensal):
     return {"max_dia": max_dia, "max_val": max_val, "min_dia": min_dia, "min_val": min_val}
 
 def gerar_dados_aderencia(df_mensal):
-    """Prepara os dados para os gráficos de Planejado vs Realizado"""
+    """Prepara os dados para os gráficos (Apenas Suporte/Emergência)"""
     cols_data = [c for c in df_mensal.columns if '/' in c]
     dados_lista = []
     
+    # --- NOVO: Filtrar apenas Suporte e Emergência ---
+    if 'ILHA' in df_mensal.columns:
+        mask = df_mensal['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
+        df_proc = df_mensal[mask]
+    else:
+        df_proc = df_mensal # Segurança
+    
     for dia in cols_data:
-        counts = df_mensal[dia].astype(str).str.upper().str.strip().value_counts()
+        counts = df_proc[dia].astype(str).str.upper().str.strip().value_counts()
         qtd_t = counts.get("T", 0)
         qtd_af = counts.get("AF", 0)
         qtd_to = counts.get("TO", 0)
         
         planejado = qtd_t + qtd_af + qtd_to
-        realizado = qtd_t
         
         dados_lista.append({
             "Data": dia,
@@ -411,15 +417,15 @@ with aba_mensal:
         
         # 6 Colunas para caber os novos indicadores
         k1, k2, k3, k4, k5, k6 = st.columns(6)
-        with k1: st.metric("✅ Escalados", kpis["NoChat"])
+        with k1: st.metric("✅ Escalados (S&P/Emergência)", kpis["NoChat"])
         with k2: st.metric("🛋️ Folgas", kpis["Folga"])
         with k3: st.metric("🎧 Suporte", kpis["Suporte"])
         with k4: st.metric("🚨 Emergência", kpis["Emergencia"])
         
         # NOVOS KPIS DE PICO/VALE
         if picos:
-            with k5: st.metric("📈 Dia Pico", f"{picos['max_dia']}", f"{picos['max_val']} pessoas")
-            with k6: st.metric("📉 Dia Vale", f"{picos['min_dia']}", f"{picos['min_val']} pessoas", delta_color="inverse")
+            with k5: st.metric("📈 Dia Pico(S&P/Emergência)", f"{picos['max_dia']}", f"{picos['max_val']} pessoas")
+            with k6: st.metric("📉 Dia Vale(S&P/Emergência)", f"{picos['min_dia']}", f"{picos['min_val']} pessoas", delta_color="inverse")
 
         df_f = df_mensal.copy()
         if sel_lider: df_f = df_f[df_f['LIDER'].isin(sel_lider)]
@@ -469,10 +475,8 @@ with aba_diaria:
             st.markdown(html_tabela_dim, unsafe_allow_html=True)
 
 # ================= ABA ADERÊNCIA (NOVA) =================
+# ================= ABA ADERÊNCIA (NOVA) =================
 with aba_aderencia:
-    # Pequeno ajuste CSS local para subir o título H4
-    st.markdown("<style>h4 {margin-top: -20px !important; padding-top: 0px !important;}</style>", unsafe_allow_html=True)
-
     if df_global is not None:
         df_ad = gerar_dados_aderencia(df_global)
         colunas_datas = [c for c in df_global.columns if '/' in c]
@@ -481,9 +485,14 @@ with aba_aderencia:
         row_dia = df_ad[df_ad['Data'] == dia_selecionado].iloc[0] if not df_ad[df_ad['Data'] == dia_selecionado].empty else None
         
         if row_dia is not None:
-            st.markdown('<div class="height-aderencia">', unsafe_allow_html=True)
-            
-            st.markdown(f"#### Resultados para: **{dia_selecionado}**")
+            # Container principal com margem negativa no topo para colar nas abas
+            st.markdown(f"""
+                <div class="height-aderencia" style="margin-top: -20px;">
+                    <h4 style="margin: 0; padding: 0; color: #fafafa; font-size: 18px;">
+                        Resultados para: <b>{dia_selecionado}</b>
+                    </h4>
+                </div>
+            """, unsafe_allow_html=True)
             
             c_graf1, c_graf2 = st.columns([1, 2])
             
@@ -498,33 +507,31 @@ with aba_aderencia:
                                    color='Status',
                                    color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
                 
-                # --- AJUSTE: Margens zeradas para colar no topo ---
                 fig_pizza.update_layout(
                     showlegend=True, 
-                    margin=dict(t=20, b=10, l=10, r=10), # Margens apertadas
+                    margin=dict(t=10, b=10, l=10, r=10), # Margens mínimas
                     height=220, 
                     paper_bgcolor='rgba(0,0,0,0)',
-                    legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5) # Legenda embaixo
+                    legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
                 )
                 st.plotly_chart(fig_pizza, use_container_width=True)
                 
                 aderencia_pct = (row_dia['Realizado (T)'] / row_dia['Planejado'] * 100) if row_dia['Planejado'] > 0 else 0
-                st.metric("Aderência do Dia", f"{aderencia_pct:.1f}%", f"Planejado: {row_dia['Planejado']}")
+                st.metric("Aderência do Dia (S&P/Emergência)", f"{aderencia_pct:.1f}%", f"Planejado: {row_dia['Planejado']}")
 
             with c_graf2:
-                st.markdown("#### Visão do Mês")
+                # Título do gráfico como HTML para controlar margem
+                st.markdown('<h4 style="margin: 0; padding: 0; font-size: 16px;">Visão do Mês</h4>', unsafe_allow_html=True)
+                
                 fig_bar = px.bar(df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'],
                                  color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
                 
-                # --- AJUSTE: Margens zeradas ---
                 fig_bar.update_layout(
                     barmode='stack', 
-                    margin=dict(t=20, b=10, l=10, r=10), # Margens apertadas
+                    margin=dict(t=10, b=10, l=10, r=10), 
                     height=280, 
                     paper_bgcolor='rgba(0,0,0,0)', 
                     plot_bgcolor='rgba(0,0,0,0)',
                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                 )
                 st.plotly_chart(fig_bar, use_container_width=True)
-            
-            st.markdown('</div>', unsafe_allow_html=True)
