@@ -41,7 +41,7 @@ st.markdown("""
 
         /* Altura específica para VISÃO MENSAL */
         .height-mensal {
-            height: calc(100vh - 250px); 
+            height: calc(100vh - 280px); 
         }
 
         /* Altura específica para VISÃO DIÁRIA */
@@ -390,7 +390,6 @@ with st.sidebar:
     # RODAPÉ ABSOLUTO
     st.markdown('<div class="footer-simple">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
 
-# --- CABEÇALHO COMPACTO ---
 # --- CABEÇALHO COMPACTO COM DATEPICKER ---
 c_title, c_spacer, c_search = st.columns([2, 0.5, 1.2])
 with c_title:
