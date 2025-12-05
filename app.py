@@ -51,8 +51,14 @@ st.markdown("""
         
         /* Altura específica para ADERÊNCIA (Nova) */
         .height-aderencia {
-            height: calc(100vh - 100px); 
-            overflow-y: auto; /* Permite rolar os gráficos */
+            /* Ajuste a altura conforme seu gosto (200px costuma ser bom) */
+            height: calc(100vh - 200px); 
+            overflow-y: auto; 
+            
+            /* O SEGRED0 ESTÁ AQUI: Puxa tudo para cima */
+            position: relative;
+            top: -30px; /* Sobe 30 pixels */
+            margin-bottom: -30px; /* Compensa lá embaixo */
         }
         
         table {
