@@ -386,7 +386,7 @@ with c_search:
     # Texto de busca substituível por DatePicker se quiser no futuro, 
     # mas mantendo texto_busca como solicitado para compatibilidade
     texto_busca = st.text_input("Busca", value=hoje_display, label_visibility="collapsed")
-    st.caption("Digite dia/mês (Ex: 04/12) para filtrar")
+    st.caption("Digite dia/mês (Ex: 04/12) para filtrar os dados abaixo")
 
 # 3 ABAS AGORA
 aba_mensal, aba_diaria, aba_aderencia = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária", "📊 Aderência"])
