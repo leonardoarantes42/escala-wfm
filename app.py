@@ -41,7 +41,7 @@ st.markdown("""
 
         /* Altura específica para VISÃO MENSAL */
         .height-mensal {
-            height: calc(100vh - 250px); 
+            height: calc(100vh - 260px); 
         }
 
         /* Altura específica para VISÃO DIÁRIA */
