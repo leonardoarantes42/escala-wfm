@@ -203,7 +203,7 @@ def carregar_dados_aba(nome_aba):
             if col_str == "NOMES": col_str = "NOME"
             if col_str in contagem_cols:
                 contagem_cols[col_str] += 1
-                novo_nome = f"{col_str}_"
+                novo_nome = f"{col_str} "
                 cabecalho_tratado.append(novo_nome)
             else:
                 if col_str != "": contagem_cols[col_str] = 1
