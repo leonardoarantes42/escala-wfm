@@ -3,6 +3,7 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
+import plotly.express as px # Nova importação para os gráficos
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
@@ -17,20 +18,19 @@ st.markdown("""
     <style>
         /* 1. LAYOUT GERAL */
         .block-container {
-            padding-top: 2.7rem !important; /* Aumentado para não cortar o topo */
+            padding-top: 2.7rem !important;
             padding-bottom: 0rem;
             padding-left: 1rem;
             padding-right: 1rem;
         }
         
-        /* Remove a rolagem da página principal (foco total na tabela) */
+        /* Remove a rolagem da página principal */
         section[data-testid="stSidebar"] + section {
             overflow: hidden !important;
         }
         
         /* 2. CONFIGURAÇÃO DA TABELA (Base) */
         .table-container {
-            /* Removemos o height fixo daqui */
             overflow-y: auto;
             overflow-x: auto;
             display: block;
@@ -40,15 +40,19 @@ st.markdown("""
         }
 
         /* Altura específica para VISÃO MENSAL */
-        /* Como tem menos coisas em cima, descontamos menos espaço (tabela maior) */
         .height-mensal {
             height: calc(100vh - 250px); 
         }
 
         /* Altura específica para VISÃO DIÁRIA */
-        /* Como tem os botões em cima, descontamos mais espaço (tabela menor) */
         .height-diaria {
             height: calc(100vh - 300px); 
+        }
+        
+        /* Altura específica para ADERÊNCIA (Nova) */
+        .height-aderencia {
+            height: calc(100vh - 220px); 
+            overflow-y: auto; /* Permite rolar os gráficos */
         }
         
         table {
@@ -60,7 +64,7 @@ st.markdown("""
         }
         
         th, td {
-            padding: 4px 6px; /* Células mais compactas */
+            padding: 4px 6px;
             text-align: center;
             border-bottom: 1px solid #444;
             border-right: 1px solid #444;
@@ -108,7 +112,7 @@ st.markdown("""
         /* 3. KPIS SUPER COMPACTOS */
         [data-testid="metric-container"] {
             padding: 4px 8px;
-            height: 50px; /* Bem fininho */
+            height: 60px; /* Aumentei levemente para caber titulos maiores */
             border-radius: 6px;
             border: 1px solid #333;
             background-color: #1c1e24;
@@ -130,7 +134,7 @@ st.markdown("""
             display: block; width: 100%; padding: 8px; text-align: center;
             border: 1px solid #1f77b4; border-radius: 4px;
             font-size: 12px;
-            margin-top: 0px; /* <--- Alterado para 0px para colar na linha */
+            margin-top: 0px; 
             margin-bottom: 10px;
             text-decoration: none; color: #1f77b4; font-weight: bold;
         }
@@ -145,14 +149,9 @@ st.markdown("""
             font-size: 10px;
             text-align: center;
         }
-        /* 6. AJUSTE DE ESPAÇAMENTO: Puxar as abas para cima */
-        [data-testid="stTabs"] {
-            margin-top: -40px !important; /* Aumente o número negativo se quiser subir mais */
-        }
-        /* 7. REDUZ ESPAÇO ACIMA DO BOTÃO DE OPÇÕES (Grade/Chat/Folgas) */
-        [data-testid="stRadio"] {
-            margin-top: -30px !important; /* Puxa os botões para cima */
-        }
+        /* 6. AJUSTE DE ESPAÇAMENTO */
+        [data-testid="stTabs"] { margin-top: -40px !important; }
+        [data-testid="stRadio"] { margin-top: -30px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -219,7 +218,55 @@ def carregar_dados_aba(nome_aba):
         return df, worksheet
     except Exception: return None, None
 
-# --- KPIS ---
+# --- NOVAS FUNÇÕES PARA GRÁFICOS E PICO/VALE ---
+
+def calcular_picos_vales_mensal(df_mensal):
+    """Varre todas as colunas de data e descobre o dia com mais e menos 'T'"""
+    cols_data = [c for c in df_mensal.columns if '/' in c]
+    if not cols_data: return None
+    
+    max_val = -1; max_dia = "-"
+    min_val = 9999; min_dia = "-"
+    
+    for dia in cols_data:
+        # Conta quantos 'T' existem na coluna
+        qtd_t = df_mensal[dia].astype(str).str.upper().str.strip().value_counts().get("T", 0)
+        
+        if qtd_t > max_val:
+            max_val = qtd_t
+            max_dia = dia
+        
+        if qtd_t < min_val:
+            min_val = qtd_t
+            min_dia = dia
+            
+    return {"max_dia": max_dia, "max_val": max_val, "min_dia": min_dia, "min_val": min_val}
+
+def gerar_dados_aderencia(df_mensal):
+    """Prepara os dados para os gráficos de Planejado vs Realizado"""
+    cols_data = [c for c in df_mensal.columns if '/' in c]
+    dados_lista = []
+    
+    for dia in cols_data:
+        counts = df_mensal[dia].astype(str).str.upper().str.strip().value_counts()
+        qtd_t = counts.get("T", 0)
+        qtd_af = counts.get("AF", 0)
+        qtd_to = counts.get("TO", 0)
+        
+        planejado = qtd_t + qtd_af + qtd_to
+        realizado = qtd_t
+        
+        dados_lista.append({
+            "Data": dia,
+            "Realizado (T)": qtd_t,
+            "Afastado (AF)": qtd_af,
+            "Turnover (TO)": qtd_to,
+            "Planejado": planejado
+        })
+        
+    return pd.DataFrame(dados_lista)
+
+# --- KPIS EXISTENTES ---
 def calcular_kpis_mensal_detalhado(df_mensal, data_escolhida):
     metrics = {"NoChat": 0, "Folga": 0, "Suporte": 0, "Emergencia": 0}
     if data_escolhida in df_mensal.columns:
@@ -283,7 +330,6 @@ def filtrar_e_ordenar_dim(df, modo):
     return df_f.drop(columns=['SORT_TEMP'])
 
 # --- ESTILIZAÇÃO HTML ---
-# Adicionei o parâmetro 'classe_altura'
 def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria'):
     def get_color(val):
         val = str(val).upper().strip()
@@ -302,8 +348,6 @@ def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria
 
     styler = df.style.map(get_color).hide(axis="index")
     html = styler.to_html()
-    
-    # AQUI ESTÁ A MÁGICA: Injetamos as duas classes (a base + a de altura)
     return f'<div class="table-container {classe_altura}">{html}</div>'
 
 # ================= MAIN APP =================
@@ -339,10 +383,13 @@ with c_title:
     st.markdown("### 🚙 Sistema de Escalas Turbi")
 with c_search:
     hoje_display = datetime.now().strftime("%d/%m")
+    # Texto de busca substituível por DatePicker se quiser no futuro, 
+    # mas mantendo texto_busca como solicitado para compatibilidade
     texto_busca = st.text_input("Busca", value=hoje_display, label_visibility="collapsed")
-    st.caption("Digite dia/mês (Ex: 04/12) para alterar os dados abaixo ")
+    st.caption("Digite dia/mês (Ex: 04/12) para filtrar")
 
-aba_mensal, aba_diaria = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária"])
+# 3 ABAS AGORA
+aba_mensal, aba_diaria, aba_aderencia = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária", "📊 Aderência"])
 
 # ================= ABA MENSAL =================
 with aba_mensal:
@@ -353,12 +400,19 @@ with aba_mensal:
         dia_para_mostrar = texto_busca if texto_busca in colunas_datas else colunas_datas[0]
         
         kpis = calcular_kpis_mensal_detalhado(df_mensal, dia_para_mostrar)
+        picos = calcular_picos_vales_mensal(df_mensal) # Novo cálculo
         
-        kc1, kc2, kc3, kc4 = st.columns(4)
-        with kc1: st.metric("✅ Escalados (S&P/Emerg)", kpis["NoChat"])
-        with kc2: st.metric("🛋️ Folgas", kpis["Folga"])
-        with kc3: st.metric("🎧 Escalados(Suporte)", kpis["Suporte"])
-        with kc4: st.metric("🚨 Escalados(Emergência)", kpis["Emergencia"])
+        # 6 Colunas para caber os novos indicadores
+        k1, k2, k3, k4, k5, k6 = st.columns(6)
+        with k1: st.metric("✅ Escalados", kpis["NoChat"])
+        with k2: st.metric("🛋️ Folgas", kpis["Folga"])
+        with k3: st.metric("🎧 Suporte", kpis["Suporte"])
+        with k4: st.metric("🚨 Emergência", kpis["Emergencia"])
+        
+        # NOVOS KPIS DE PICO/VALE
+        if picos:
+            with k5: st.metric("📈 Dia Pico", f"{picos['max_dia']}", f"{picos['max_val']} pessoas")
+            with k6: st.metric("📉 Dia Vale", f"{picos['min_dia']}", f"{picos['min_val']} pessoas", delta_color="inverse")
 
         df_f = df_mensal.copy()
         if sel_lider: df_f = df_f[df_f['LIDER'].isin(sel_lider)]
@@ -371,14 +425,12 @@ with aba_mensal:
         st.markdown(html_tabela, unsafe_allow_html=True)
 
 # ================= ABA DIÁRIA =================
-# ================= ABA DIÁRIA =================
 with aba_diaria:
     abas = listar_abas_dim()
     
     if not abas:
         st.warning("Sem dados.")
     else:
-        # Lógica para encontrar a aba baseada no texto da busca
         aba_selecionada = next((aba for aba in abas if texto_busca in aba), abas[0])
         
         df_dim, ws_dim = carregar_dados_aba(aba_selecionada)
@@ -394,13 +446,11 @@ with aba_diaria:
                 with kc3: st.metric("⚠️ Menos Chats", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
                 with kc4: st.metric("☕ Mais Pausas", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
             
-            # Filtros
             df_dim_f = df_dim.copy()
             if sel_lider: df_dim_f = df_dim_f[df_dim_f['LIDER'].isin(sel_lider)]
             if sel_ilha: df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
             if busca_nome: df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
             
-            # Botões de Modo
             tipo = st.radio("Modo:", ["▦ Grade", "💬 Apenas Chat", "🚫Apenas Folgas"], horizontal=True, label_visibility="collapsed")
 
             if tipo == "▦ Grade": df_exibicao = df_dim_f
@@ -408,7 +458,56 @@ with aba_diaria:
             
             cols_v = [c for c in df_exibicao.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ILHA', 'Z']]
             
-            # --- CORREÇÃO: Renderiza APENAS a tabela diária ---
             html_tabela_dim = renderizar_tabela_html(df_exibicao[cols_v], modo_cores='diario', classe_altura='height-diaria')
             st.markdown(html_tabela_dim, unsafe_allow_html=True)
 
+# ================= ABA ADERÊNCIA (NOVA) =================
+with aba_aderencia:
+    if df_global is not None:
+        # Prepara os dados
+        df_ad = gerar_dados_aderencia(df_global)
+        
+        # Filtra pelo dia selecionado no topo
+        colunas_datas = [c for c in df_global.columns if '/' in c]
+        dia_selecionado = texto_busca if texto_busca in colunas_datas else colunas_datas[0]
+        
+        # Dados do dia
+        row_dia = df_ad[df_ad['Data'] == dia_selecionado].iloc[0] if not df_ad[df_ad['Data'] == dia_selecionado].empty else None
+        
+        if row_dia is not None:
+            # Container Scrollável para os gráficos
+            st.markdown('<div class="height-aderencia">', unsafe_allow_html=True)
+            
+            st.markdown(f"#### Resultados para: **{dia_selecionado}**")
+            
+            # Gráfico de Rosca (Donut) - Dia Específico
+            c_graf1, c_graf2 = st.columns([1, 2])
+            
+            with c_graf1:
+                # Cria DataFrame pequeno para o gráfico de pizza
+                df_pizza = pd.DataFrame({
+                    'Status': ['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'],
+                    'Quantidade': [row_dia['Realizado (T)'], row_dia['Afastado (AF)'], row_dia['Turnover (TO)']]
+                })
+                # Filtra zeros para não sujar o gráfico
+                df_pizza = df_pizza[df_pizza['Quantidade'] > 0]
+                
+                fig_pizza = px.pie(df_pizza, values='Quantidade', names='Status', hole=0.5, 
+                                   color='Status',
+                                   color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
+                fig_pizza.update_layout(showlegend=True, margin=dict(t=0, b=0, l=0, r=0), height=250, paper_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig_pizza, use_container_width=True)
+                
+                # Exibe métrica de aderência no centro (simulado)
+                aderencia_pct = (row_dia['Realizado (T)'] / row_dia['Planejado'] * 100) if row_dia['Planejado'] > 0 else 0
+                st.metric("Aderência do Dia", f"{aderencia_pct:.1f}%", f"Planejado: {row_dia['Planejado']}")
+
+            with c_graf2:
+                st.markdown("#### Visão do Mês (Planejado vs Realizado)")
+                # Gráfico de Barras Empilhadas
+                fig_bar = px.bar(df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'],
+                                 color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
+                fig_bar.update_layout(barmode='stack', margin=dict(t=20, b=0, l=0, r=0), height=300, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig_bar, use_container_width=True)
+            
+            st.markdown('</div>', unsafe_allow_html=True)
