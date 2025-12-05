@@ -46,7 +46,7 @@ st.markdown("""
 
         /* Altura específica para VISÃO DIÁRIA */
         .height-diaria {
-            height: calc(100vh - 300px); 
+            height: calc(100vh - 290px); 
         }
         
         /* Altura específica para ADERÊNCIA (Nova) */
