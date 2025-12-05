@@ -391,15 +391,18 @@ with st.sidebar:
     st.markdown('<div class="footer-simple">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
 
 # --- CABEÇALHO COMPACTO ---
+# --- CABEÇALHO COMPACTO COM DATEPICKER ---
 c_title, c_spacer, c_search = st.columns([2, 0.5, 1.2])
 with c_title:
     st.markdown("### 🚙 Sistema de Escalas Turbi")
 with c_search:
-    hoje_display = datetime.now().strftime("%d/%m")
-    # Texto de busca substituível por DatePicker se quiser no futuro, 
-    # mas mantendo texto_busca como solicitado para compatibilidade
-    texto_busca = st.text_input("Busca", value=hoje_display, label_visibility="collapsed")
-    st.caption("Digite dia/mês (Ex: 04/12) para filtrar os dados abaixo")
+    # Agora é um seletor de data real
+    data_selecionada = st.date_input("Busca", value=datetime.now(), format="DD/MM/YYYY", label_visibility="collapsed")
+    
+    # Converte a data do calendário para o formato texto "04/12" que sua planilha usa
+    texto_busca = data_selecionada.strftime("%d/%m")
+    
+    st.caption(f"Filtrando dados de: {texto_busca}")
 
 # 3 ABAS AGORA
 aba_mensal, aba_diaria, aba_aderencia = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária", "📊 Aderência"])
@@ -474,25 +477,32 @@ with aba_diaria:
             html_tabela_dim = renderizar_tabela_html(df_exibicao[cols_v], modo_cores='diario', classe_altura='height-diaria')
             st.markdown(html_tabela_dim, unsafe_allow_html=True)
 
-# ================= ABA ADERÊNCIA (NOVA) =================
-# ================= ABA ADERÊNCIA (NOVA) =================
+# ================= ABA ADERÊNCIA =================
 with aba_aderencia:
+    # CSS específico desta aba para colar tudo no topo
+    st.markdown("""
+        <style>
+            /* Remove margem do título H4 */
+            h4 { margin-top: -20px !important; padding-bottom: 5px !important; }
+            /* Puxa as colunas para cima */
+            [data-testid="stHorizontalBlock"] { margin-top: -15px !important; }
+        </style>
+    """, unsafe_allow_html=True)
+
     if df_global is not None:
         df_ad = gerar_dados_aderencia(df_global)
         colunas_datas = [c for c in df_global.columns if '/' in c]
+        # Usa o texto_busca que agora vem do DatePicker
         dia_selecionado = texto_busca if texto_busca in colunas_datas else colunas_datas[0]
         
         row_dia = df_ad[df_ad['Data'] == dia_selecionado].iloc[0] if not df_ad[df_ad['Data'] == dia_selecionado].empty else None
         
         if row_dia is not None:
-            # Container principal com margem negativa no topo para colar nas abas
-            st.markdown(f"""
-                <div class="height-aderencia" style="margin-top: -20px;">
-                    <h4 style="margin: 0; padding: 0; color: #fafafa; font-size: 18px;">
-                        Resultados para: <b>{dia_selecionado}</b>
-                    </h4>
-                </div>
-            """, unsafe_allow_html=True)
+            # Container com scroll
+            st.markdown('<div class="height-aderencia">', unsafe_allow_html=True)
+            
+            # Título colado nas abas
+            st.markdown(f"#### Resultados para: **{dia_selecionado}**")
             
             c_graf1, c_graf2 = st.columns([1, 2])
             
@@ -509,29 +519,29 @@ with aba_aderencia:
                 
                 fig_pizza.update_layout(
                     showlegend=True, 
-                    margin=dict(t=10, b=10, l=10, r=10), # Margens mínimas
-                    height=220, 
+                    margin=dict(t=10, b=10, l=10, r=10), 
+                    height=240, 
                     paper_bgcolor='rgba(0,0,0,0)',
-                    legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
+                    legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5)
                 )
                 st.plotly_chart(fig_pizza, use_container_width=True)
                 
                 aderencia_pct = (row_dia['Realizado (T)'] / row_dia['Planejado'] * 100) if row_dia['Planejado'] > 0 else 0
-                st.metric("Aderência do Dia (S&P/Emergência)", f"{aderencia_pct:.1f}%", f"Planejado: {row_dia['Planejado']}")
+                st.metric("Aderência do Dia", f"{aderencia_pct:.1f}%", f"Planejado: {row_dia['Planejado']}")
 
             with c_graf2:
-                # Título do gráfico como HTML para controlar margem
-                st.markdown('<h4 style="margin: 0; padding: 0; font-size: 16px;">Visão do Mês</h4>', unsafe_allow_html=True)
-                
+                st.markdown("#### Visão do Mês")
                 fig_bar = px.bar(df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'],
                                  color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
                 
                 fig_bar.update_layout(
                     barmode='stack', 
                     margin=dict(t=10, b=10, l=10, r=10), 
-                    height=280, 
+                    height=300, 
                     paper_bgcolor='rgba(0,0,0,0)', 
                     plot_bgcolor='rgba(0,0,0,0)',
                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                 )
                 st.plotly_chart(fig_bar, use_container_width=True)
+            
+            st.markdown('</div>', unsafe_allow_html=True)
