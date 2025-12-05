@@ -221,16 +221,23 @@ def carregar_dados_aba(nome_aba):
 # --- NOVAS FUNÇÕES PARA GRÁFICOS E PICO/VALE ---
 
 def calcular_picos_vales_mensal(df_mensal):
-    """Varre todas as colunas de data e descobre o dia com mais e menos 'T'"""
+    """Varre colunas de data e descobre dia com mais/menos 'T' (Apenas Sup/Emerg)"""
     cols_data = [c for c in df_mensal.columns if '/' in c]
     if not cols_data: return None
+    
+    # --- NOVO: Filtrar apenas Suporte e Emergência antes de contar ---
+    if 'ILHA' in df_mensal.columns:
+        mask = df_mensal['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
+        df_filtrado = df_mensal[mask]
+    else:
+        df_filtrado = df_mensal # Segurança caso não tenha coluna ILHA
     
     max_val = -1; max_dia = "-"
     min_val = 9999; min_dia = "-"
     
     for dia in cols_data:
-        # Conta quantos 'T' existem na coluna
-        qtd_t = df_mensal[dia].astype(str).str.upper().str.strip().value_counts().get("T", 0)
+        # Conta 'T' usando o DataFrame filtrado
+        qtd_t = df_filtrado[dia].astype(str).str.upper().str.strip().value_counts().get("T", 0)
         
         if qtd_t > max_val:
             max_val = qtd_t
@@ -463,51 +470,64 @@ with aba_diaria:
 
 # ================= ABA ADERÊNCIA (NOVA) =================
 with aba_aderencia:
+    # Pequeno ajuste CSS local para subir o título H4
+    st.markdown("<style>h4 {margin-top: -20px !important; padding-top: 0px !important;}</style>", unsafe_allow_html=True)
+
     if df_global is not None:
-        # Prepara os dados
         df_ad = gerar_dados_aderencia(df_global)
-        
-        # Filtra pelo dia selecionado no topo
         colunas_datas = [c for c in df_global.columns if '/' in c]
         dia_selecionado = texto_busca if texto_busca in colunas_datas else colunas_datas[0]
         
-        # Dados do dia
         row_dia = df_ad[df_ad['Data'] == dia_selecionado].iloc[0] if not df_ad[df_ad['Data'] == dia_selecionado].empty else None
         
         if row_dia is not None:
-            # Container Scrollável para os gráficos
             st.markdown('<div class="height-aderencia">', unsafe_allow_html=True)
             
             st.markdown(f"#### Resultados para: **{dia_selecionado}**")
             
-            # Gráfico de Rosca (Donut) - Dia Específico
             c_graf1, c_graf2 = st.columns([1, 2])
             
             with c_graf1:
-                # Cria DataFrame pequeno para o gráfico de pizza
                 df_pizza = pd.DataFrame({
                     'Status': ['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'],
                     'Quantidade': [row_dia['Realizado (T)'], row_dia['Afastado (AF)'], row_dia['Turnover (TO)']]
                 })
-                # Filtra zeros para não sujar o gráfico
                 df_pizza = df_pizza[df_pizza['Quantidade'] > 0]
                 
-                fig_pizza = px.pie(df_pizza, values='Quantidade', names='Status', hole=0.5, 
+                fig_pizza = px.pie(df_pizza, values='Quantidade', names='Status', hole=0.6, 
                                    color='Status',
                                    color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
-                fig_pizza.update_layout(showlegend=True, margin=dict(t=0, b=0, l=0, r=0), height=250, paper_bgcolor='rgba(0,0,0,0)')
+                
+                # --- AJUSTE: Margens zeradas para colar no topo ---
+                fig_pizza.update_layout(
+                    showlegend=True, 
+                    margin=dict(t=20, b=10, l=10, r=10), # Margens apertadas
+                    height=220, 
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5) # Legenda embaixo
+                )
                 st.plotly_chart(fig_pizza, use_container_width=True)
                 
-                # Exibe métrica de aderência no centro (simulado)
                 aderencia_pct = (row_dia['Realizado (T)'] / row_dia['Planejado'] * 100) if row_dia['Planejado'] > 0 else 0
                 st.metric("Aderência do Dia", f"{aderencia_pct:.1f}%", f"Planejado: {row_dia['Planejado']}")
 
             with c_graf2:
-                st.markdown("#### Visão do Mês (Planejado vs Realizado)")
-                # Gráfico de Barras Empilhadas
+                st.markdown("#### Visão do Mês")
                 fig_bar = px.bar(df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'],
                                  color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
-                fig_bar.update_layout(barmode='stack', margin=dict(t=20, b=0, l=0, r=0), height=300, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                
+                # --- AJUSTE: Margens zeradas ---
+                fig_bar.update_layout(
+                    barmode='stack', 
+                    margin=dict(t=20, b=10, l=10, r=10), # Margens apertadas
+                    height=280, 
+                    paper_bgcolor='rgba(0,0,0,0)', 
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                )
+                st.plotly_chart(fig_bar, use_container_width=True)
+            
+            st.markdown('</div>', unsafe_allow_html=True)
                 st.plotly_chart(fig_bar, use_container_width=True)
             
             st.markdown('</div>', unsafe_allow_html=True)
