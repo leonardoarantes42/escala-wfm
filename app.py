@@ -419,8 +419,8 @@ with aba_mensal:
         k1, k2, k3, k4, k5, k6 = st.columns(6)
         with k1: st.metric("✅ Escalados (S&P/Emergência)", kpis["NoChat"])
         with k2: st.metric("🛋️ Folgas", kpis["Folga"])
-        with k3: st.metric("🎧 Suporte", kpis["Suporte"])
-        with k4: st.metric("🚨 Emergência", kpis["Emergencia"])
+        with k3: st.metric("🎧 Suporte (escalados)", kpis["Suporte"])
+        with k4: st.metric("🚨 Emergência (escalados)", kpis["Emergencia"])
         
         # NOVOS KPIS DE PICO/VALE
         if picos:
