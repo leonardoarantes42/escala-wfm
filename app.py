@@ -41,12 +41,12 @@ st.markdown("""
 
         /* Altura específica para VISÃO MENSAL */
         .height-mensal {
-            height: calc(100vh - 260px); 
+            height: calc(100vh - 280px); 
         }
 
         /* Altura específica para VISÃO DIÁRIA */
         .height-diaria {
-            height: calc(100vh - 290px); 
+            height: calc(100vh - 300px); 
         }
         
         /* Altura específica para ADERÊNCIA (Nova) */
