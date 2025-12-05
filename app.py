@@ -18,7 +18,7 @@ st.markdown("""
     <style>
         /* 1. LAYOUT GERAL */
         .block-container {
-            padding-top: 2.8rem !important;
+            padding-top: 3rem !important;
             padding-bottom: 0rem;
             padding-left: 1rem;
             padding-right: 1rem;
@@ -41,7 +41,7 @@ st.markdown("""
 
         /* Altura específica para VISÃO MENSAL */
         .height-mensal {
-            height: calc(100vh - 220px); 
+            height: calc(100vh - 240px); 
         }
 
         /* Altura específica para VISÃO DIÁRIA */
