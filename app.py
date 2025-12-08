@@ -3,15 +3,67 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
-import plotly.express as px # Nova importação para os gráficos
+import plotly.express as px
+import streamlit_authenticator as stauth
 
-# --- CONFIGURAÇÃO DA PÁGINA ---
+# --- CONFIGURAÇÃO DA PÁGINA (Deve ser a primeira linha) ---
 st.set_page_config(
     page_title="Escalas Turbi", 
     layout="wide", 
     page_icon="logo_turbi.png", 
     initial_sidebar_state="expanded"
 )
+
+# ==========================================
+# 🔐 SISTEMA DE AUTENTICAÇÃO E SEGURANÇA
+# ==========================================
+
+# 1. Carregar Configurações do secrets.toml
+users_dict = st.secrets["credentials"]
+usernames = users_dict["usernames"]
+names = users_dict["names"]
+passwords = users_dict["passwords"]
+emails = users_dict["emails"]
+access_levels = users_dict["access_levels"]
+
+# 2. Montar Dicionário para o Authenticator
+credentials = {
+    "usernames": {
+        usernames[i]: {
+            "name": names[i],
+            "password": passwords[i],
+            "email": emails[i],
+            "access_level": access_levels[i] # Guardamos o nível aqui
+        } for i in range(len(usernames))
+    }
+}
+
+# 3. Inicializar Autenticador
+authenticator = stauth.Authenticate(
+    credentials,
+    st.secrets["cookie"]["name"],
+    st.secrets["cookie"]["key"],
+    st.secrets["cookie"]["expiry_days"]
+)
+
+# 4. Renderizar Tela de Login
+name, authentication_status, username = authenticator.login("Login Escalas Turbi", "main")
+
+# 5. Lógica de Bloqueio
+if authentication_status is False:
+    st.error("Usuário ou senha incorretos")
+    st.stop()
+elif authentication_status is None:
+    st.warning("Por favor, faça login para acessar.")
+    st.stop()
+
+# --- SE CHEGOU AQUI, O USUÁRIO ESTÁ LOGADO ---
+# Recupera o nível de acesso do usuário atual
+user_access_level = credentials["usernames"][username].get("access_level", "viewer")
+
+# ==========================================
+# 🎨 INÍCIO DO APP (CSS E LAYOUT)
+# ==========================================
 
 # --- CSS: LAYOUT RESPONSIVO E COMPACTO ---
 st.markdown("""
@@ -49,16 +101,13 @@ st.markdown("""
             height: calc(100vh - 310px); 
         }
         
-        /* Altura específica para ADERÊNCIA (Nova) */
+        /* Altura específica para ADERÊNCIA */
         .height-aderencia {
-            /* Ajuste a altura conforme seu gosto (200px costuma ser bom) */
-            height: calc(100vh - 1000px); 
+            height: calc(100vh - 200px); 
             overflow-y: auto; 
-            
-            /* O SEGRED0 ESTÁ AQUI: Puxa tudo para cima */
             position: relative;
-            top: -30px; /* Sobe 30 pixels */
-            margin-bottom: -30px; /* Compensa lá embaixo */
+            top: -30px;
+            margin-bottom: -30px;
         }
         
         table {
@@ -118,7 +167,7 @@ st.markdown("""
         /* 3. KPIS SUPER COMPACTOS */
         [data-testid="metric-container"] {
             padding: 4px 8px;
-            height: 60px; /* Aumentei levemente para caber titulos maiores */
+            height: 60px;
             border-radius: 6px;
             border: 1px solid #333;
             background-color: #1c1e24;
@@ -224,68 +273,49 @@ def carregar_dados_aba(nome_aba):
         return df, worksheet
     except Exception: return None, None
 
-# --- NOVAS FUNÇÕES PARA GRÁFICOS E PICO/VALE ---
-
+# --- FUNÇÕES GRÁFICOS ---
 def calcular_picos_vales_mensal(df_mensal):
-    """Varre colunas de data e descobre dia com mais/menos 'T' (Apenas Sup/Emerg)"""
     cols_data = [c for c in df_mensal.columns if '/' in c]
     if not cols_data: return None
     
-    # --- NOVO: Filtrar apenas Suporte e Emergência antes de contar ---
     if 'ILHA' in df_mensal.columns:
         mask = df_mensal['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
         df_filtrado = df_mensal[mask]
     else:
-        df_filtrado = df_mensal # Segurança caso não tenha coluna ILHA
+        df_filtrado = df_mensal
     
     max_val = -1; max_dia = "-"
     min_val = 9999; min_dia = "-"
     
     for dia in cols_data:
-        # Conta 'T' usando o DataFrame filtrado
         qtd_t = df_filtrado[dia].astype(str).str.upper().str.strip().value_counts().get("T", 0)
-        
-        if qtd_t > max_val:
-            max_val = qtd_t
-            max_dia = dia
-        
-        if qtd_t < min_val:
-            min_val = qtd_t
-            min_dia = dia
+        if qtd_t > max_val: max_val = qtd_t; max_dia = dia
+        if qtd_t < min_val: min_val = qtd_t; min_dia = dia
             
     return {"max_dia": max_dia, "max_val": max_val, "min_dia": min_dia, "min_val": min_val}
 
 def gerar_dados_aderencia(df_mensal):
-    """Prepara os dados para os gráficos (Apenas Suporte/Emergência)"""
     cols_data = [c for c in df_mensal.columns if '/' in c]
     dados_lista = []
     
-    # --- NOVO: Filtrar apenas Suporte e Emergência ---
     if 'ILHA' in df_mensal.columns:
         mask = df_mensal['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
         df_proc = df_mensal[mask]
     else:
-        df_proc = df_mensal # Segurança
+        df_proc = df_mensal 
     
     for dia in cols_data:
         counts = df_proc[dia].astype(str).str.upper().str.strip().value_counts()
         qtd_t = counts.get("T", 0)
         qtd_af = counts.get("AF", 0)
         qtd_to = counts.get("TO", 0)
-        
         planejado = qtd_t + qtd_af + qtd_to
-        
         dados_lista.append({
-            "Data": dia,
-            "Realizado (T)": qtd_t,
-            "Afastado (AF)": qtd_af,
-            "Turnover (TO)": qtd_to,
-            "Planejado": planejado
+            "Data": dia, "Realizado (T)": qtd_t, "Afastado (AF)": qtd_af, "Turnover (TO)": qtd_to, "Planejado": planejado
         })
-        
     return pd.DataFrame(dados_lista)
 
-# --- KPIS EXISTENTES ---
+# --- KPIS ---
 def calcular_kpis_mensal_detalhado(df_mensal, data_escolhida):
     metrics = {"NoChat": 0, "Folga": 0, "Suporte": 0, "Emergencia": 0}
     if data_escolhida in df_mensal.columns:
@@ -373,10 +403,16 @@ def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria
 
 df_global, _ = carregar_dados_aba('Mensal')
 
-# --- SIDEBAR REORGANIZADA ---
+# --- SIDEBAR REORGANIZADA (Agora com Logout) ---
 with st.sidebar:
+    # Botão de Logout no topo ou junto com o perfil
+    authenticator.logout("Sair", "sidebar")
+    
     st.image("logo_turbi.png", width=180) 
     st.divider()
+    
+    # Mensagem de Boas vindas
+    st.markdown(f"Olá, **{name}**!")
     
     st.markdown("#### 🔍 Filtros")
     if df_global is not None:
@@ -390,47 +426,42 @@ with st.sidebar:
 
     st.divider()
 
-    # LINK NO FINAL DO MENU
     st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
-
-    # RODAPÉ ABSOLUTO
     st.markdown('<div class="footer-simple">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
 
-# --- CABEÇALHO COMPACTO COM DATEPICKER ---
+# --- CABEÇALHO COMPACTO ---
 c_title, c_spacer, c_search = st.columns([2, 0.5, 1.2])
 with c_title:
     st.markdown("### 🚙 Sistema de Escalas Turbi")
 with c_search:
-    # Agora é um seletor de data real
     data_selecionada = st.date_input("Busca", value=datetime.now(), format="DD/MM/YYYY", label_visibility="collapsed")
-    
-    # Converte a data do calendário para o formato texto "04/12" que sua planilha usa
     texto_busca = data_selecionada.strftime("%d/%m")
-    
     st.caption(f"Filtrando dados de: {texto_busca}")
 
-# 3 ABAS AGORA
-aba_mensal, aba_diaria, aba_aderencia = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária", "📊 Aderência"])
+# --- LÓGICA DE ABAS COM PERMISSÃO ---
+if user_access_level == "admin":
+    aba_mensal, aba_diaria, aba_aderencia = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária", "📊 Aderência"])
+    mostrar_aderencia = True
+else:
+    aba_mensal, aba_diaria = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária"])
+    mostrar_aderencia = False
 
 # ================= ABA MENSAL =================
 with aba_mensal:
     if df_global is not None:
         df_mensal = df_global
         colunas_datas = [c for c in df_mensal.columns if '/' in c]
-        
         dia_para_mostrar = texto_busca if texto_busca in colunas_datas else colunas_datas[0]
         
         kpis = calcular_kpis_mensal_detalhado(df_mensal, dia_para_mostrar)
-        picos = calcular_picos_vales_mensal(df_mensal) # Novo cálculo
+        picos = calcular_picos_vales_mensal(df_mensal)
         
-        # 6 Colunas para caber os novos indicadores
         k1, k2, k3, k4, k5, k6 = st.columns(6)
         with k1: st.metric("✅ Escalados (S&P/Emergência)", kpis["NoChat"])
         with k2: st.metric("🛋️ Folgas", kpis["Folga"])
         with k3: st.metric("🎧 Suporte (escalados)", kpis["Suporte"])
         with k4: st.metric("🚨 Emergência (escalados)", kpis["Emergencia"])
         
-        # NOVOS KPIS DE PICO/VALE
         if picos:
             with k5: st.metric("📈 Dia Pico(S&P/Emergência)", f"{picos['max_dia']}", f"{picos['max_val']} pessoas")
             with k6: st.metric("📉 Dia Vale(S&P/Emergência)", f"{picos['min_dia']}", f"{picos['min_val']} pessoas", delta_color="inverse")
@@ -448,12 +479,10 @@ with aba_mensal:
 # ================= ABA DIÁRIA =================
 with aba_diaria:
     abas = listar_abas_dim()
-    
     if not abas:
         st.warning("Sem dados.")
     else:
         aba_selecionada = next((aba for aba in abas if texto_busca in aba), abas[0])
-        
         df_dim, ws_dim = carregar_dados_aba(aba_selecionada)
         
         if df_dim is not None:
@@ -482,63 +511,60 @@ with aba_diaria:
             html_tabela_dim = renderizar_tabela_html(df_exibicao[cols_v], modo_cores='diario', classe_altura='height-diaria')
             st.markdown(html_tabela_dim, unsafe_allow_html=True)
 
-# ================= ABA ADERÊNCIA =================
-with aba_aderencia:
-    # Pequeno hack para garantir que o Streamlit não coloque padding extra na aba
-    st.markdown("<style>[data-testid='stVerticalBlock'] > [style*='flex-direction: column;'] > [data-testid='stVerticalBlock'] {gap: 0rem;}</style>", unsafe_allow_html=True)
+# ================= ABA ADERÊNCIA (SÓ ADMIN) =================
+if mostrar_aderencia:
+    with aba_aderencia:
+        st.markdown("<style>[data-testid='stVerticalBlock'] > [style*='flex-direction: column;'] > [data-testid='stVerticalBlock'] {gap: 0rem;}</style>", unsafe_allow_html=True)
 
-    if df_global is not None:
-        df_ad = gerar_dados_aderencia(df_global)
-        colunas_datas = [c for c in df_global.columns if '/' in c]
-        dia_selecionado = texto_busca if texto_busca in colunas_datas else colunas_datas[0]
-        
-        row_dia = df_ad[df_ad['Data'] == dia_selecionado].iloc[0] if not df_ad[df_ad['Data'] == dia_selecionado].empty else None
-        
-        if row_dia is not None:
-            # Container com a classe CSS que acabamos de ajustar
-            st.markdown('<div class="height-aderencia">', unsafe_allow_html=True)
+        if df_global is not None:
+            df_ad = gerar_dados_aderencia(df_global)
+            colunas_datas = [c for c in df_global.columns if '/' in c]
+            dia_selecionado = texto_busca if texto_busca in colunas_datas else colunas_datas[0]
             
-            # Título colado
-            st.markdown(f"#### Resultados para: **{dia_selecionado}**")
+            row_dia = df_ad[df_ad['Data'] == dia_selecionado].iloc[0] if not df_ad[df_ad['Data'] == dia_selecionado].empty else None
             
-            c_graf1, c_graf2 = st.columns([1, 2])
-            
-            with c_graf1:
-                df_pizza = pd.DataFrame({
-                    'Status': ['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'],
-                    'Quantidade': [row_dia['Realizado (T)'], row_dia['Afastado (AF)'], row_dia['Turnover (TO)']]
-                })
-                df_pizza = df_pizza[df_pizza['Quantidade'] > 0]
+            if row_dia is not None:
+                st.markdown('<div class="height-aderencia">', unsafe_allow_html=True)
+                st.markdown(f"#### Resultados para: **{dia_selecionado}**")
                 
-                fig_pizza = px.pie(df_pizza, values='Quantidade', names='Status', hole=0.6, 
-                                   color='Status',
-                                   color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
+                c_graf1, c_graf2 = st.columns([1, 2])
                 
-                fig_pizza.update_layout(
-                    showlegend=True, 
-                    margin=dict(t=0, b=0, l=0, r=0), # Margens Zero
-                    height=200, 
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
-                )
-                st.plotly_chart(fig_pizza, use_container_width=True)
-                
-                aderencia_pct = (row_dia['Realizado (T)'] / row_dia['Planejado'] * 100) if row_dia['Planejado'] > 0 else 0
-                st.metric("Aderência do Dia", f"{aderencia_pct:.1f}%", f"Planejado: {row_dia['Planejado']}")
+                with c_graf1:
+                    df_pizza = pd.DataFrame({
+                        'Status': ['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'],
+                        'Quantidade': [row_dia['Realizado (T)'], row_dia['Afastado (AF)'], row_dia['Turnover (TO)']]
+                    })
+                    df_pizza = df_pizza[df_pizza['Quantidade'] > 0]
+                    
+                    fig_pizza = px.pie(df_pizza, values='Quantidade', names='Status', hole=0.6, 
+                                       color='Status',
+                                       color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
+                    
+                    fig_pizza.update_layout(
+                        showlegend=True, 
+                        margin=dict(t=0, b=0, l=0, r=0),
+                        height=200, 
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
+                    )
+                    st.plotly_chart(fig_pizza, use_container_width=True)
+                    
+                    aderencia_pct = (row_dia['Realizado (T)'] / row_dia['Planejado'] * 100) if row_dia['Planejado'] > 0 else 0
+                    st.metric("Aderência do Dia", f"{aderencia_pct:.1f}%", f"Planejado: {row_dia['Planejado']}")
 
-            with c_graf2:
-                st.markdown("#### Visão do Mês")
-                fig_bar = px.bar(df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'],
-                                 color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
+                with c_graf2:
+                    st.markdown("#### Visão do Mês")
+                    fig_bar = px.bar(df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'],
+                                     color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
+                    
+                    fig_bar.update_layout(
+                        barmode='stack', 
+                        margin=dict(t=10, b=0, l=0, r=0), 
+                        height=280, 
+                        paper_bgcolor='rgba(0,0,0,0)', 
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                    )
+                    st.plotly_chart(fig_bar, use_container_width=True)
                 
-                fig_bar.update_layout(
-                    barmode='stack', 
-                    margin=dict(t=10, b=0, l=0, r=0), # Margens apertadas
-                    height=280, 
-                    paper_bgcolor='rgba(0,0,0,0)', 
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-                )
-                st.plotly_chart(fig_bar, use_container_width=True)
-            
-            st.markdown('</div>', unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
