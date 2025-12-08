@@ -98,7 +98,6 @@ if not st.session_state.get("logado", False):
 # st.session_state['nome'] -> Nome da pessoa
 # st.session_state['roles'] -> Lista de cargos (ex: ['admin'])
 # 3. Cria a tela de login
-authenticator.login('main')
 
 # 4. Controle de Acesso
 if st.session_state["authentication_status"] is False:
