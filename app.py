@@ -48,7 +48,7 @@ authenticator = stauth.Authenticate(
 
 # 4. Renderizar Tela de Login (CORRIGIDO AQUI)
 # Removemos o título personalizado para evitar o erro de versão
-name, authentication_status, username = authenticator.login(location="main")
+name, authentication_status, username = authenticator.login("main")
 
 # 5. Lógica de Bloqueio
 if authentication_status is False:
