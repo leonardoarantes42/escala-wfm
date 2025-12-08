@@ -405,7 +405,6 @@ df_global, _ = carregar_dados_aba('Mensal')
 
 # --- SIDEBAR REORGANIZADA ---
 with st.sidebar:
-with st.sidebar:
     # --- NOVO: BOTÃO DE SAIR ---
     authenticator.logout(f"Sair ({st.session_state['name']})", "sidebar")
     st.divider()
