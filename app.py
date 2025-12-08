@@ -26,18 +26,29 @@ def get_config_editavel():
     # Converte para dicionário Python puro se necessário e faz cópia profunda
     return {"usernames": copy.deepcopy(dict(config_bruta["usernames"]))}
 
-try:
-    # Carrega credenciais destravadas
-    credenciais_liberadas = get_config_editavel()
+# --- SISTEMA DE LOGIN ---
 
-    # 2. Configura o autenticador com PARÂMETROS EXPLÍCITOS
+# 1. Montagem MANUAL do dicionário de credenciais
+# Isso evita o erro de recursão e o erro de "somente leitura"
+credenciais_seguras = {"usernames": {}}
+
+# Copia os dados do secrets para o nosso dicionário seguro
+for username, dados in st.secrets["credentials"]["usernames"].items():
+    credenciais_seguras["usernames"][username] = {
+        "name": dados["name"],
+        "password": dados["password"],
+        "roles": dados.get("roles", []) # Pega a role ou lista vazia se não tiver
+    }
+
+try:
+    # 2. Configura o autenticador
     authenticator = stauth.Authenticate(
-        credentials=credenciais_liberadas,      # Passa a cópia editável
-        cookie_name='turbi_login_final_v5',     # Nome novo para limpar tudo
-        key='chave_xpt_super_secreta_turbi',    # Chave fixa
-        cookie_expiry_days=30,                  # Validade
+        credentials=credenciais_seguras,       # Usa o dicionário manual
+        cookie_name='turbi_acesso_final_v7',   # Mudei o nome para limpar cookies velhos
+        key='chave_super_fixa_turbi_wfm',      # Chave estática
+        cookie_expiry_days=30,                 # 30 dias (número inteiro)
         preauthorized=[],
-        auto_hash=False                         # Senhas já vêm hashadas
+        auto_hash=False                        # Importante: Senhas já criptografadas
     )
 except Exception as e:
     st.error(f"Erro na configuração: {e}")
