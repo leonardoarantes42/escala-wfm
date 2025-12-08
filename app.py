@@ -16,10 +16,11 @@ st.set_page_config(
 )
 
 # --- SISTEMA DE LOGIN ---
-# Carrega as configurações dos secrets
-config = st.secrets
+# 1. Carrega os secrets convertendo para um dicionário editável (A CORREÇÃO É ESTA LINHA)
+config = st.secrets.to_dict()
 
 try:
+    # 2. Configura o autenticador usando o dicionário cópia
     authenticator = stauth.Authenticate(
         config['credentials'],
         config['cookie']['name'],
@@ -27,19 +28,19 @@ try:
         config['cookie']['expiry_days']
     )
 except Exception as e:
-    st.error(f"Erro na configuração dos Secrets: {e}")
+    st.error(f"Erro na configuração: {e}")
     st.stop()
 
-# Cria a tela de login
+# 3. Cria a tela de login
 authenticator.login()
 
-# Verifica o status
+# 4. Controle de Acesso
 if st.session_state["authentication_status"] is False:
     st.error('Usuário ou senha incorretos')
-    st.stop() # Para tudo aqui
+    st.stop()
 elif st.session_state["authentication_status"] is None:
     st.warning('Por favor, faça o login')
-    st.stop() # Para tudo aqui
+    st.stop()
 
 # Se passar daqui, o usuário está logado!
 
