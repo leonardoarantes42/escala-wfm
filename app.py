@@ -46,8 +46,8 @@ authenticator = stauth.Authenticate(
     st.secrets["cookie"]["expiry_days"]
 )
 
-# 4. Renderizar Tela de Login (CORRIGIDO AQUI)
-# Removemos o título personalizado para evitar o erro de versão
+# 4. Renderizar Tela de Login (CORRIGIDO)
+# Passamos apenas "main". Se quiser um título, use st.markdown antes.
 name, authentication_status, username = authenticator.login("main")
 
 # 5. Lógica de Bloqueio
@@ -55,6 +55,8 @@ if authentication_status is False:
     st.error("Usuário ou senha incorretos")
     st.stop()
 elif authentication_status is None:
+    # Título manual já que a função não aceita mais
+    st.markdown("<h2 style='text-align: center;'>Login Escalas Turbi</h2>", unsafe_allow_html=True)
     st.warning("Por favor, faça login para acessar.")
     st.stop()
 
@@ -355,8 +357,8 @@ df_global, _ = carregar_dados_aba('Mensal')
 
 # --- SIDEBAR REORGANIZADA (Agora com Logout) ---
 with st.sidebar:
-    # Botão de Logout (CORRIGIDO TAMBÉM)
-    authenticator.logout(location="sidebar")
+    # Botão de Logout simples
+    authenticator.logout("Sair", "sidebar")
     
     st.image("logo_turbi.png", width=180) 
     st.divider()
