@@ -15,23 +15,25 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- SISTEMA DE LOGIN ---
-# 1. Carrega os secrets convertendo para um dicionário editável (A CORREÇÃO É ESTA LINHA)
+# --- SISTEMA DE LOGIN CORRIGIDO ---
+# 1. Carrega apenas as credenciais do TOML
 config = st.secrets.to_dict()
 
+# 2. Configura o autenticador (Configuração do Cookie FIXA no código)
+# Isso evita erros de leitura do arquivo secrets
 try:
-    # 2. Configura o autenticador usando o dicionário cópia
     authenticator = stauth.Authenticate(
-        config['credentials'],
-        config['cookie']['name'],
-        config['cookie']['key'],
-        config['cookie']['expiry_days']
+        config['credentials'],         # Pega usuários do Secrets (Isso mantém a segurança)
+        'turbi_cookie_fixo_v3',        # Nome do cookie (Mudei o nome para forçar reset)
+        'chave_xpt_super_secreta_turbi', # Chave de assinatura
+        30,                            # <--- O SEGREDO: O número 30 sem aspas (Inteiro)
+        preauthorized=[]               # Corrige bug de versões recentes
     )
 except Exception as e:
     st.error(f"Erro na configuração: {e}")
     st.stop()
 
-# 3. Cria a tela de login (COM O AJUSTE 'main' AQUI)
+# 3. Cria a tela de login
 authenticator.login('main')
 
 # 4. Controle de Acesso
