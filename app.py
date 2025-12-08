@@ -17,23 +17,36 @@ st.set_page_config(
 
 config = st.secrets.to_dict()
 
+import copy
+
+# 1. Função para "destravar" os dados dos secrets
+# O st.secrets é bloqueado para escrita. Isso cria uma cópia 100% editável.
+def get_config_editavel():
+    config_bruta = st.secrets["credentials"]
+    # Converte para dicionário Python puro se necessário e faz cópia profunda
+    return {"usernames": copy.deepcopy(dict(config_bruta["usernames"]))}
+
 try:
+    # Carrega credenciais destravadas
+    credenciais_liberadas = get_config_editavel()
+
+    # 2. Configura o autenticador com PARÂMETROS EXPLÍCITOS
     authenticator = stauth.Authenticate(
-        config['credentials'],        
-        'turbi_cookie_v4',             # Mudei o nome para limpar o cache antigo
-        'chave_super_secreta_turbi',   
-        30,                            
+        credentials=credenciais_liberadas,      # Passa a cópia editável
+        cookie_name='turbi_login_final_v5',     # Nome novo para limpar tudo
+        key='chave_xpt_super_secreta_turbi',    # Chave fixa
+        cookie_expiry_days=30,                  # Validade
         preauthorized=[],
-        auto_hash=False                # <--- O PULO DO GATO: Impede re-criptografia
+        auto_hash=False                         # Senhas já vêm hashadas
     )
 except Exception as e:
     st.error(f"Erro na configuração: {e}")
     st.stop()
 
-# Cria o login
+# 3. Cria a tela de login
 authenticator.login('main')
 
-# Verifica status
+# 4. Controle de Acesso
 if st.session_state["authentication_status"] is False:
     st.error('Usuário ou senha incorretos')
     st.stop()
