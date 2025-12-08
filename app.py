@@ -31,8 +31,8 @@ except Exception as e:
     st.error(f"Erro na configuração: {e}")
     st.stop()
 
-# 3. Cria a tela de login
-authenticator.login()
+# 3. Cria a tela de login (COM O AJUSTE 'main' AQUI)
+authenticator.login('main')
 
 # 4. Controle de Acesso
 if st.session_state["authentication_status"] is False:
