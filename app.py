@@ -6,7 +6,7 @@ from datetime import datetime
 import plotly.express as px
 import streamlit_authenticator as stauth
 
-# --- CONFIGURAÇÃO DA PÁGINA (Deve ser a primeira linha) ---
+# --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
     page_title="Escalas Turbi", 
     layout="wide", 
@@ -33,7 +33,7 @@ credentials = {
             "name": names[i],
             "password": passwords[i],
             "email": emails[i],
-            "access_level": access_levels[i] # Guardamos o nível aqui
+            "access_level": access_levels[i]
         } for i in range(len(usernames))
     }
 }
@@ -46,8 +46,9 @@ authenticator = stauth.Authenticate(
     st.secrets["cookie"]["expiry_days"]
 )
 
-# 4. Renderizar Tela de Login
-name, authentication_status, username = authenticator.login("Login Escalas Turbi", "main")
+# 4. Renderizar Tela de Login (CORRIGIDO AQUI)
+# Removemos o título personalizado para evitar o erro de versão
+name, authentication_status, username = authenticator.login(location="main")
 
 # 5. Lógica de Bloqueio
 if authentication_status is False:
@@ -58,7 +59,6 @@ elif authentication_status is None:
     st.stop()
 
 # --- SE CHEGOU AQUI, O USUÁRIO ESTÁ LOGADO ---
-# Recupera o nível de acesso do usuário atual
 user_access_level = credentials["usernames"][username].get("access_level", "viewer")
 
 # ==========================================
@@ -91,17 +91,9 @@ st.markdown("""
             background-color: #0e1117;
         }
 
-        /* Altura específica para VISÃO MENSAL */
-        .height-mensal {
-            height: calc(100vh - 290px); 
-        }
-
-        /* Altura específica para VISÃO DIÁRIA */
-        .height-diaria {
-            height: calc(100vh - 310px); 
-        }
-        
-        /* Altura específica para ADERÊNCIA */
+        /* Alturas Específicas */
+        .height-mensal { height: calc(100vh - 290px); }
+        .height-diaria { height: calc(100vh - 310px); }
         .height-aderencia {
             height: calc(100vh - 200px); 
             overflow-y: auto; 
@@ -110,52 +102,22 @@ st.markdown("""
             margin-bottom: -30px;
         }
         
-        table {
-            width: 100%;
-            border-collapse: separate; 
-            border-spacing: 0;
-            font-family: sans-serif;
-            font-size: 11px;
-        }
-        
-        th, td {
-            padding: 4px 6px;
-            text-align: center;
-            border-bottom: 1px solid #444;
-            border-right: 1px solid #444;
-            white-space: nowrap;
-        }
+        table { width: 100%; border-collapse: separate; border-spacing: 0; font-family: sans-serif; font-size: 11px; }
+        th, td { padding: 4px 6px; text-align: center; border-bottom: 1px solid #444; border-right: 1px solid #444; white-space: nowrap; }
         
         /* CABEÇALHO DA TABELA FIXO */
         thead th {
-            position: sticky;
-            top: 0;
-            background-color: #0e1117; 
-            color: white;
-            z-index: 5;
-            border-bottom: 2px solid #666;
-            height: 35px;
-            font-size: 11px;
+            position: sticky; top: 0; background-color: #0e1117; color: white; z-index: 5;
+            border-bottom: 2px solid #666; height: 35px; font-size: 11px;
         }
 
         /* PRIMEIRA COLUNA FIXA (NOME) */
         table td:first-child, table th:first-child {
-            position: sticky;
-            left: 0;
-            background-color: #1c1e24; 
-            z-index: 6; 
-            border-right: 2px solid #666; 
-            font-weight: bold;
-            text-align: left;
-            min-width: 140px;
+            position: sticky; left: 0; background-color: #1c1e24; z-index: 6;
+            border-right: 2px solid #666; font-weight: bold; text-align: left; min-width: 140px;
         }
-        
-        thead th:first-child {
-            z-index: 7;
-            background-color: #0e1117;
-        }
+        thead th:first-child { z-index: 7; background-color: #0e1117; }
 
-        /* Modo Claro */
         @media (prefers-color-scheme: light) {
             .table-container { border: 1px solid #ddd; }
             th, td { border-bottom: 1px solid #ddd; border-right: 1px solid #ddd; }
@@ -166,12 +128,8 @@ st.markdown("""
 
         /* 3. KPIS SUPER COMPACTOS */
         [data-testid="metric-container"] {
-            padding: 4px 8px;
-            height: 60px;
-            border-radius: 6px;
-            border: 1px solid #333;
-            background-color: #1c1e24;
-            justify-content: center !important;
+            padding: 4px 8px; height: 60px; border-radius: 6px; border: 1px solid #333;
+            background-color: #1c1e24; justify-content: center !important;
         }
         [data-testid="stMetricLabel"] { font-size: 10px !important; margin-bottom: 0 !important; }
         [data-testid="stMetricValue"] { font-size: 18px !important; }
@@ -180,29 +138,21 @@ st.markdown("""
             [data-testid="metric-container"] { background-color: #f8f9fa; border: 1px solid #ddd; }
         }
         
-        /* TÍTULOS */
+        /* TÍTULOS E TEXTOS */
         h3 { font-size: 26px !important; margin: 0 !important; padding: 0 !important;}
         .stCaption { font-size: 10px !important; margin-top: -5px !important;}
 
         /* 4. SIDEBAR E LINK */
         .custom-link-btn {
             display: block; width: 100%; padding: 8px; text-align: center;
-            border: 1px solid #1f77b4; border-radius: 4px;
-            font-size: 12px;
-            margin-top: 0px; 
-            margin-bottom: 10px;
-            text-decoration: none; color: #1f77b4; font-weight: bold;
+            border: 1px solid #1f77b4; border-radius: 4px; font-size: 12px;
+            margin-top: 0px; margin-bottom: 10px; text-decoration: none; color: #1f77b4; font-weight: bold;
         }
         .custom-link-btn:hover { background-color: #1f77b4; color: white !important; }
         
-        /* Rodapé */
         .footer-simple {
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid #444;
-            color: #666;
-            font-size: 10px;
-            text-align: center;
+            margin-top: 10px; padding-top: 10px; border-top: 1px solid #444;
+            color: #666; font-size: 10px; text-align: center;
         }
         /* 6. AJUSTE DE ESPAÇAMENTO */
         [data-testid="stTabs"] { margin-top: -40px !important; }
@@ -405,8 +355,8 @@ df_global, _ = carregar_dados_aba('Mensal')
 
 # --- SIDEBAR REORGANIZADA (Agora com Logout) ---
 with st.sidebar:
-    # Botão de Logout no topo ou junto com o perfil
-    authenticator.logout("Sair", "sidebar")
+    # Botão de Logout (CORRIGIDO TAMBÉM)
+    authenticator.logout(location="sidebar")
     
     st.image("logo_turbi.png", width=180) 
     st.divider()
