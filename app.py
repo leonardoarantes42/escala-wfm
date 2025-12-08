@@ -4,8 +4,8 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 import plotly.express as px
-import yaml
-import streamlit_authenticator as stauth
+import bcrypt  # <--- IMPORTANTE: Vamos usar esse cara direto agora
+import time
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
@@ -26,34 +26,77 @@ def get_config_editavel():
     # Converte para dicionário Python puro se necessário e faz cópia profunda
     return {"usernames": copy.deepcopy(dict(config_bruta["usernames"]))}
 
-# --- SISTEMA DE LOGIN ---
+# ================= SISTEMA DE LOGIN "TANK" (VIA URL) =================
 
-# 1. Montagem MANUAL do dicionário de credenciais
-# Isso evita o erro de recursão e o erro de "somente leitura"
-credenciais_seguras = {"usernames": {}}
+# Função para validar senha (compara o que foi digitado com o Hash do secrets)
+def validar_senha(usuario, senha_digitada):
+    try:
+        dados_user = st.secrets["credentials"]["usernames"].get(usuario)
+        if not dados_user:
+            return False, None
+        
+        # Pega o hash salvo no secrets
+        hash_salvo = dados_user["password"]
+        
+        # Verifica se a senha bate (usando bcrypt)
+        # Nota: encode converte texto para bytes, necessário para o bcrypt
+        if bcrypt.checkpw(senha_digitada.encode('utf-8'), hash_salvo.encode('utf-8')):
+            return True, dados_user
+        return False, None
+    except Exception as e:
+        st.error(f"Erro ao validar: {e}")
+        return False, None
 
-# Copia os dados do secrets para o nosso dicionário seguro
-for username, dados in st.secrets["credentials"]["usernames"].items():
-    credenciais_seguras["usernames"][username] = {
-        "name": dados["name"],
-        "password": dados["password"],
-        "roles": dados.get("roles", []) # Pega a role ou lista vazia se não tiver
-    }
+# 1. Tenta recuperar login da URL (Isso salva o F5!)
+params = st.query_params
+usuario_url = params.get("u")
+hash_url = params.get("k")
 
-try:
-    # 2. Configura o autenticador
-    authenticator = stauth.Authenticate(
-        credentials=credenciais_seguras,       # Usa o dicionário manual
-        cookie_name='turbi_acesso_final_v7',   # Mudei o nome para limpar cookies velhos
-        key='chave_super_fixa_turbi_wfm',      # Chave estática
-        cookie_expiry_days=30,                 # 30 dias (número inteiro)
-        preauthorized=[],
-        auto_hash=False                        # Importante: Senhas já criptografadas
-    )
-except Exception as e:
-    st.error(f"Erro na configuração: {e}")
-    st.stop()
+# Se tiver dados na URL, verificamos se são válidos no Secrets
+if usuario_url and hash_url:
+    user_data = st.secrets["credentials"]["usernames"].get(usuario_url)
+    if user_data and user_data["password"] == hash_url:
+        st.session_state["logado"] = True
+        st.session_state["usuario"] = usuario_url
+        st.session_state["nome"] = user_data["name"]
+        st.session_state["roles"] = user_data.get("roles", ["viewer"])
 
+# 2. Verifica se está logado na Sessão
+if not st.session_state.get("logado", False):
+    # --- TELA DE LOGIN ---
+    c_login1, c_login2, c_login3 = st.columns([1, 2, 1])
+    with c_login2:
+        st.markdown("### 🔒 Acesso Turbi WFM")
+        input_user = st.text_input("E-mail (Login)", placeholder="ex: joao.silva@turbi.com.br")
+        input_pass = st.text_input("Senha", type="password")
+        btn_entrar = st.button("Entrar", type="primary", use_container_width=True)
+
+        if btn_entrar:
+            valido, dados = validar_senha(input_user.strip(), input_pass)
+            if valido:
+                # SUCESSO!
+                st.session_state["logado"] = True
+                st.session_state["usuario"] = input_user
+                st.session_state["nome"] = dados["name"]
+                st.session_state["roles"] = dados.get("roles", ["viewer"])
+                
+                # GRAVA NA URL (Isso é o que segura o F5)
+                st.query_params["u"] = input_user
+                st.query_params["k"] = dados["password"] # Usa o hash como token
+                
+                st.success("Logado com sucesso!")
+                time.sleep(0.5)
+                st.rerun()
+            else:
+                st.error("Usuário ou senha incorretos.")
+    
+    st.stop() # Para o código aqui se não estiver logado
+
+# ================= FIM DO LOGIN =================
+# Se chegou aqui, o usuário está logado!
+# As variáveis úteis são: 
+# st.session_state['nome'] -> Nome da pessoa
+# st.session_state['roles'] -> Lista de cargos (ex: ['admin'])
 # 3. Cria a tela de login
 authenticator.login('main')
 
@@ -439,8 +482,19 @@ df_global, _ = carregar_dados_aba('Mensal')
 
 # --- SIDEBAR REORGANIZADA ---
 with st.sidebar:
-    # --- NOVO: BOTÃO DE SAIR ---
-    authenticator.logout(f"Sair ({st.session_state['name']})", "sidebar")
+    # --- BOTÃO DE SAIR MANUAL ---
+    st.write(f"👤 **{st.session_state['nome']}**")
+    if st.button("Sair / Logout", type="secondary"):
+        # 1. Limpa a sessão
+        st.session_state["logado"] = False
+        st.session_state["roles"] = []
+        
+        # 2. Limpa a URL (Tira o token)
+        st.query_params.clear()
+        
+        # 3. Recarrega para voltar pro login
+        st.rerun()
+        
     st.divider()
     
     st.markdown("#### 🔍 Filtros")
