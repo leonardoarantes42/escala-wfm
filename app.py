@@ -441,8 +441,26 @@ with c_search:
     
     st.caption(f"Filtrando dados de: {texto_busca}")
 
-# 3 ABAS AGORA
-aba_mensal, aba_diaria, aba_aderencia = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária", "📊 Aderência"])
+# ================= LÓGICA DE ABAS INTELIGENTE =================
+
+# 1. Verifica se é Admin (O Authenticator salva isso no session_state)
+roles = st.session_state.get('roles') # Pega a lista de cargos
+eh_admin = False
+if roles and 'admin' in roles:
+    eh_admin = True
+
+# 2. Cria as abas dependendo do cargo
+if eh_admin:
+    # Se for admin, cria 3 abas
+    lista_abas = ["📅 Visão Mensal", "⏱️ Visão Diária", "📊 Aderência"]
+    abas = st.tabs(lista_abas)
+    aba_mensal, aba_diaria, aba_aderencia = abas[0], abas[1], abas[2]
+else:
+    # Se for viewer, cria só 2 abas
+    lista_abas = ["📅 Visão Mensal", "⏱️ Visão Diária"]
+    abas = st.tabs(lista_abas)
+    aba_mensal, aba_diaria = abas[0], abas[1]
+    aba_aderencia = None # Define como vazio para não dar erro se chamado
 
 # ================= ABA MENSAL =================
 with aba_mensal:
@@ -514,63 +532,66 @@ with aba_diaria:
             html_tabela_dim = renderizar_tabela_html(df_exibicao[cols_v], modo_cores='diario', classe_altura='height-diaria')
             st.markdown(html_tabela_dim, unsafe_allow_html=True)
 
-# ================= ABA ADERÊNCIA =================
-with aba_aderencia:
-    # Pequeno hack para garantir que o Streamlit não coloque padding extra na aba
-    st.markdown("<style>[data-testid='stVerticalBlock'] > [style*='flex-direction: column;'] > [data-testid='stVerticalBlock'] {gap: 0rem;}</style>", unsafe_allow_html=True)
-
-    if df_global is not None:
-        df_ad = gerar_dados_aderencia(df_global)
-        colunas_datas = [c for c in df_global.columns if '/' in c]
-        dia_selecionado = texto_busca if texto_busca in colunas_datas else colunas_datas[0]
+# ================= ABA ADERÊNCIA (SÓ ADMIN) =================
+if eh_admin and aba_aderencia:
+    with aba_aderencia:
+        # NOTA: Tudo aqui dentro tem que estar "empurrado" para a direita
         
-        row_dia = df_ad[df_ad['Data'] == dia_selecionado].iloc[0] if not df_ad[df_ad['Data'] == dia_selecionado].empty else None
-        
-        if row_dia is not None:
-            # Container com a classe CSS que acabamos de ajustar
-            st.markdown('<div class="height-aderencia">', unsafe_allow_html=True)
-            
-            # Título colado
-            st.markdown(f"#### Resultados para: **{dia_selecionado}**")
-            
-            c_graf1, c_graf2 = st.columns([1, 2])
-            
-            with c_graf1:
-                df_pizza = pd.DataFrame({
-                    'Status': ['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'],
-                    'Quantidade': [row_dia['Realizado (T)'], row_dia['Afastado (AF)'], row_dia['Turnover (TO)']]
-                })
-                df_pizza = df_pizza[df_pizza['Quantidade'] > 0]
-                
-                fig_pizza = px.pie(df_pizza, values='Quantidade', names='Status', hole=0.6, 
-                                   color='Status',
-                                   color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
-                
-                fig_pizza.update_layout(
-                    showlegend=True, 
-                    margin=dict(t=0, b=0, l=0, r=0), # Margens Zero
-                    height=200, 
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
-                )
-                st.plotly_chart(fig_pizza, use_container_width=True)
-                
-                aderencia_pct = (row_dia['Realizado (T)'] / row_dia['Planejado'] * 100) if row_dia['Planejado'] > 0 else 0
-                st.metric("Aderência do Dia", f"{aderencia_pct:.1f}%", f"Planejado: {row_dia['Planejado']}")
+        # Pequeno hack para garantir que o Streamlit não coloque padding extra na aba
+        st.markdown("<style>[data-testid='stVerticalBlock'] > [style*='flex-direction: column;'] > [data-testid='stVerticalBlock'] {gap: 0rem;}</style>", unsafe_allow_html=True)
 
-            with c_graf2:
-                st.markdown("#### Visão do Mês")
-                fig_bar = px.bar(df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'],
-                                 color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
-                
-                fig_bar.update_layout(
-                    barmode='stack', 
-                    margin=dict(t=10, b=0, l=0, r=0), # Margens apertadas
-                    height=280, 
-                    paper_bgcolor='rgba(0,0,0,0)', 
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-                )
-                st.plotly_chart(fig_bar, use_container_width=True)
+        if df_global is not None:
+            df_ad = gerar_dados_aderencia(df_global)
+            colunas_datas = [c for c in df_global.columns if '/' in c]
+            dia_selecionado = texto_busca if texto_busca in colunas_datas else colunas_datas[0]
             
-            st.markdown('</div>', unsafe_allow_html=True)
+            row_dia = df_ad[df_ad['Data'] == dia_selecionado].iloc[0] if not df_ad[df_ad['Data'] == dia_selecionado].empty else None
+            
+            if row_dia is not None:
+                # Container com a classe CSS que acabamos de ajustar
+                st.markdown('<div class="height-aderencia">', unsafe_allow_html=True)
+                
+                # Título colado
+                st.markdown(f"#### Resultados para: **{dia_selecionado}**")
+                
+                c_graf1, c_graf2 = st.columns([1, 2])
+                
+                with c_graf1:
+                    df_pizza = pd.DataFrame({
+                        'Status': ['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'],
+                        'Quantidade': [row_dia['Realizado (T)'], row_dia['Afastado (AF)'], row_dia['Turnover (TO)']]
+                    })
+                    df_pizza = df_pizza[df_pizza['Quantidade'] > 0]
+                    
+                    fig_pizza = px.pie(df_pizza, values='Quantidade', names='Status', hole=0.6, 
+                                    color='Status',
+                                    color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
+                    
+                    fig_pizza.update_layout(
+                        showlegend=True, 
+                        margin=dict(t=0, b=0, l=0, r=0), 
+                        height=200, 
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
+                    )
+                    st.plotly_chart(fig_pizza, use_container_width=True)
+                    
+                    aderencia_pct = (row_dia['Realizado (T)'] / row_dia['Planejado'] * 100) if row_dia['Planejado'] > 0 else 0
+                    st.metric("Aderência do Dia", f"{aderencia_pct:.1f}%", f"Planejado: {row_dia['Planejado']}")
+
+                with c_graf2:
+                    st.markdown("#### Visão do Mês")
+                    fig_bar = px.bar(df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'],
+                                    color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
+                    
+                    fig_bar.update_layout(
+                        barmode='stack', 
+                        margin=dict(t=10, b=0, l=0, r=0), 
+                        height=280, 
+                        paper_bgcolor='rgba(0,0,0,0)', 
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                    )
+                    st.plotly_chart(fig_bar, use_container_width=True)
+                
+                st.markdown('</div>', unsafe_allow_html=True)
