@@ -3,7 +3,9 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
-import plotly.express as px # Nova importação para os gráficos
+import plotly.express as px
+import yaml
+import streamlit_authenticator as stauth
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
@@ -12,6 +14,34 @@ st.set_page_config(
     page_icon="logo_turbi.png", 
     initial_sidebar_state="expanded"
 )
+
+# --- SISTEMA DE LOGIN ---
+# Carrega as configurações dos secrets
+config = st.secrets
+
+try:
+    authenticator = stauth.Authenticate(
+        config['credentials'],
+        config['cookie']['name'],
+        config['cookie']['key'],
+        config['cookie']['expiry_days']
+    )
+except Exception as e:
+    st.error(f"Erro na configuração dos Secrets: {e}")
+    st.stop()
+
+# Cria a tela de login
+authenticator.login()
+
+# Verifica o status
+if st.session_state["authentication_status"] is False:
+    st.error('Usuário ou senha incorretos')
+    st.stop() # Para tudo aqui
+elif st.session_state["authentication_status"] is None:
+    st.warning('Por favor, faça o login')
+    st.stop() # Para tudo aqui
+
+# Se passar daqui, o usuário está logado!
 
 # --- CSS: LAYOUT RESPONSIVO E COMPACTO ---
 st.markdown("""
@@ -375,7 +405,9 @@ df_global, _ = carregar_dados_aba('Mensal')
 
 # --- SIDEBAR REORGANIZADA ---
 with st.sidebar:
-    st.image("logo_turbi.png", width=180) 
+with st.sidebar:
+    # --- NOVO: BOTÃO DE SAIR ---
+    authenticator.logout(f"Sair ({st.session_state['name']})", "sidebar")
     st.divider()
     
     st.markdown("#### 🔍 Filtros")
