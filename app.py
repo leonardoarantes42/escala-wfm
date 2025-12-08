@@ -3,7 +3,7 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
-import plotly.express as px 
+import plotly.express as px # Nova importação para os gráficos
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
@@ -40,36 +40,73 @@ st.markdown("""
         }
 
         /* Altura específica para VISÃO MENSAL */
-        .height-mensal { height: calc(100vh - 290px); }
+        .height-mensal {
+            height: calc(100vh - 290px); 
+        }
 
         /* Altura específica para VISÃO DIÁRIA */
-        .height-diaria { height: calc(100vh - 310px); }
-        
-        /* Altura específica para ADERÊNCIA */
-        .height-aderencia {
-            height: calc(100vh - 200px); 
-            overflow-y: auto; 
-            position: relative;
-            top: -30px;
-            margin-bottom: -30px;
+        .height-diaria {
+            height: calc(100vh - 310px); 
         }
         
-        table { width: 100%; border-collapse: separate; border-spacing: 0; font-family: sans-serif; font-size: 11px; }
-        th, td { padding: 4px 6px; text-align: center; border-bottom: 1px solid #444; border-right: 1px solid #444; white-space: nowrap; }
+        /* Altura específica para ADERÊNCIA (Nova) */
+        .height-aderencia {
+            /* Ajuste a altura conforme seu gosto (200px costuma ser bom) */
+            height: calc(100vh - 1000px); 
+            overflow-y: auto; 
+            
+            /* O SEGRED0 ESTÁ AQUI: Puxa tudo para cima */
+            position: relative;
+            top: -30px; /* Sobe 30 pixels */
+            margin-bottom: -30px; /* Compensa lá embaixo */
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: separate; 
+            border-spacing: 0;
+            font-family: sans-serif;
+            font-size: 11px;
+        }
+        
+        th, td {
+            padding: 4px 6px;
+            text-align: center;
+            border-bottom: 1px solid #444;
+            border-right: 1px solid #444;
+            white-space: nowrap;
+        }
         
         /* CABEÇALHO DA TABELA FIXO */
         thead th {
-            position: sticky; top: 0; background-color: #0e1117; color: white; z-index: 5;
-            border-bottom: 2px solid #666; height: 35px; font-size: 11px;
+            position: sticky;
+            top: 0;
+            background-color: #0e1117; 
+            color: white;
+            z-index: 5;
+            border-bottom: 2px solid #666;
+            height: 35px;
+            font-size: 11px;
         }
 
         /* PRIMEIRA COLUNA FIXA (NOME) */
         table td:first-child, table th:first-child {
-            position: sticky; left: 0; background-color: #1c1e24; z-index: 6;
-            border-right: 2px solid #666; font-weight: bold; text-align: left; min-width: 140px;
+            position: sticky;
+            left: 0;
+            background-color: #1c1e24; 
+            z-index: 6; 
+            border-right: 2px solid #666; 
+            font-weight: bold;
+            text-align: left;
+            min-width: 140px;
         }
-        thead th:first-child { z-index: 7; background-color: #0e1117; }
+        
+        thead th:first-child {
+            z-index: 7;
+            background-color: #0e1117;
+        }
 
+        /* Modo Claro */
         @media (prefers-color-scheme: light) {
             .table-container { border: 1px solid #ddd; }
             th, td { border-bottom: 1px solid #ddd; border-right: 1px solid #ddd; }
@@ -80,8 +117,12 @@ st.markdown("""
 
         /* 3. KPIS SUPER COMPACTOS */
         [data-testid="metric-container"] {
-            padding: 4px 8px; height: 60px; border-radius: 6px; border: 1px solid #333;
-            background-color: #1c1e24; justify-content: center !important;
+            padding: 4px 8px;
+            height: 60px; /* Aumentei levemente para caber titulos maiores */
+            border-radius: 6px;
+            border: 1px solid #333;
+            background-color: #1c1e24;
+            justify-content: center !important;
         }
         [data-testid="stMetricLabel"] { font-size: 10px !important; margin-bottom: 0 !important; }
         [data-testid="stMetricValue"] { font-size: 18px !important; }
@@ -90,31 +131,33 @@ st.markdown("""
             [data-testid="metric-container"] { background-color: #f8f9fa; border: 1px solid #ddd; }
         }
         
-        /* TÍTULOS E TEXTOS */
+        /* TÍTULOS */
         h3 { font-size: 26px !important; margin: 0 !important; padding: 0 !important;}
         .stCaption { font-size: 10px !important; margin-top: -5px !important;}
 
         /* 4. SIDEBAR E LINK */
         .custom-link-btn {
             display: block; width: 100%; padding: 8px; text-align: center;
-            border: 1px solid #1f77b4; border-radius: 4px; font-size: 12px;
-            margin-top: 0px; margin-bottom: 10px; text-decoration: none; color: #1f77b4; font-weight: bold;
+            border: 1px solid #1f77b4; border-radius: 4px;
+            font-size: 12px;
+            margin-top: 0px; 
+            margin-bottom: 10px;
+            text-decoration: none; color: #1f77b4; font-weight: bold;
         }
         .custom-link-btn:hover { background-color: #1f77b4; color: white !important; }
         
+        /* Rodapé */
         .footer-simple {
-            margin-top: 10px; padding-top: 10px; border-top: 1px solid #444;
-            color: #666; font-size: 10px; text-align: center;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #444;
+            color: #666;
+            font-size: 10px;
+            text-align: center;
         }
         /* 6. AJUSTE DE ESPAÇAMENTO */
         [data-testid="stTabs"] { margin-top: -40px !important; }
         [data-testid="stRadio"] { margin-top: -30px !important; }
-        
-        /* CENTRALIZAR LOGO NA SIDEBAR */
-        [data-testid="stSidebar"] [data-testid="stImage"] {
-            display: flex;
-            justify-content: center;
-        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -181,49 +224,68 @@ def carregar_dados_aba(nome_aba):
         return df, worksheet
     except Exception: return None, None
 
-# --- FUNÇÕES GRÁFICOS ---
+# --- NOVAS FUNÇÕES PARA GRÁFICOS E PICO/VALE ---
+
 def calcular_picos_vales_mensal(df_mensal):
+    """Varre colunas de data e descobre dia com mais/menos 'T' (Apenas Sup/Emerg)"""
     cols_data = [c for c in df_mensal.columns if '/' in c]
     if not cols_data: return None
     
+    # --- NOVO: Filtrar apenas Suporte e Emergência antes de contar ---
     if 'ILHA' in df_mensal.columns:
         mask = df_mensal['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
         df_filtrado = df_mensal[mask]
     else:
-        df_filtrado = df_mensal
+        df_filtrado = df_mensal # Segurança caso não tenha coluna ILHA
     
     max_val = -1; max_dia = "-"
     min_val = 9999; min_dia = "-"
     
     for dia in cols_data:
+        # Conta 'T' usando o DataFrame filtrado
         qtd_t = df_filtrado[dia].astype(str).str.upper().str.strip().value_counts().get("T", 0)
-        if qtd_t > max_val: max_val = qtd_t; max_dia = dia
-        if qtd_t < min_val: min_val = qtd_t; min_dia = dia
+        
+        if qtd_t > max_val:
+            max_val = qtd_t
+            max_dia = dia
+        
+        if qtd_t < min_val:
+            min_val = qtd_t
+            min_dia = dia
             
     return {"max_dia": max_dia, "max_val": max_val, "min_dia": min_dia, "min_val": min_val}
 
 def gerar_dados_aderencia(df_mensal):
+    """Prepara os dados para os gráficos (Apenas Suporte/Emergência)"""
     cols_data = [c for c in df_mensal.columns if '/' in c]
     dados_lista = []
     
+    # --- NOVO: Filtrar apenas Suporte e Emergência ---
     if 'ILHA' in df_mensal.columns:
         mask = df_mensal['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
         df_proc = df_mensal[mask]
     else:
-        df_proc = df_mensal 
+        df_proc = df_mensal # Segurança
     
     for dia in cols_data:
         counts = df_proc[dia].astype(str).str.upper().str.strip().value_counts()
         qtd_t = counts.get("T", 0)
         qtd_af = counts.get("AF", 0)
         qtd_to = counts.get("TO", 0)
+        
         planejado = qtd_t + qtd_af + qtd_to
+        
         dados_lista.append({
-            "Data": dia, "Realizado (T)": qtd_t, "Afastado (AF)": qtd_af, "Turnover (TO)": qtd_to, "Planejado": planejado
+            "Data": dia,
+            "Realizado (T)": qtd_t,
+            "Afastado (AF)": qtd_af,
+            "Turnover (TO)": qtd_to,
+            "Planejado": planejado
         })
+        
     return pd.DataFrame(dados_lista)
 
-# --- KPIS ---
+# --- KPIS EXISTENTES ---
 def calcular_kpis_mensal_detalhado(df_mensal, data_escolhida):
     metrics = {"NoChat": 0, "Folga": 0, "Suporte": 0, "Emergencia": 0}
     if data_escolhida in df_mensal.columns:
@@ -328,19 +390,26 @@ with st.sidebar:
 
     st.divider()
 
+    # LINK NO FINAL DO MENU
     st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
+
+    # RODAPÉ ABSOLUTO
     st.markdown('<div class="footer-simple">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
 
-# --- CABEÇALHO COMPACTO ---
+# --- CABEÇALHO COMPACTO COM DATEPICKER ---
 c_title, c_spacer, c_search = st.columns([2, 0.5, 1.2])
 with c_title:
     st.markdown("### 🚙 Sistema de Escalas Turbi")
 with c_search:
+    # Agora é um seletor de data real
     data_selecionada = st.date_input("Busca", value=datetime.now(), format="DD/MM/YYYY", label_visibility="collapsed")
+    
+    # Converte a data do calendário para o formato texto "04/12" que sua planilha usa
     texto_busca = data_selecionada.strftime("%d/%m")
+    
     st.caption(f"Filtrando dados de: {texto_busca}")
 
-# --- ABAS (Sem login por enquanto, todas visíveis) ---
+# 3 ABAS AGORA
 aba_mensal, aba_diaria, aba_aderencia = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária", "📊 Aderência"])
 
 # ================= ABA MENSAL =================
@@ -348,17 +417,20 @@ with aba_mensal:
     if df_global is not None:
         df_mensal = df_global
         colunas_datas = [c for c in df_mensal.columns if '/' in c]
+        
         dia_para_mostrar = texto_busca if texto_busca in colunas_datas else colunas_datas[0]
         
         kpis = calcular_kpis_mensal_detalhado(df_mensal, dia_para_mostrar)
-        picos = calcular_picos_vales_mensal(df_mensal)
+        picos = calcular_picos_vales_mensal(df_mensal) # Novo cálculo
         
+        # 6 Colunas para caber os novos indicadores
         k1, k2, k3, k4, k5, k6 = st.columns(6)
         with k1: st.metric("✅ Escalados (S&P/Emergência)", kpis["NoChat"])
         with k2: st.metric("🛋️ Folgas", kpis["Folga"])
         with k3: st.metric("🎧 Suporte (escalados)", kpis["Suporte"])
         with k4: st.metric("🚨 Emergência (escalados)", kpis["Emergencia"])
         
+        # NOVOS KPIS DE PICO/VALE
         if picos:
             with k5: st.metric("📈 Dia Pico(S&P/Emergência)", f"{picos['max_dia']}", f"{picos['max_val']} pessoas")
             with k6: st.metric("📉 Dia Vale(S&P/Emergência)", f"{picos['min_dia']}", f"{picos['min_val']} pessoas", delta_color="inverse")
@@ -376,10 +448,12 @@ with aba_mensal:
 # ================= ABA DIÁRIA =================
 with aba_diaria:
     abas = listar_abas_dim()
+    
     if not abas:
         st.warning("Sem dados.")
     else:
         aba_selecionada = next((aba for aba in abas if texto_busca in aba), abas[0])
+        
         df_dim, ws_dim = carregar_dados_aba(aba_selecionada)
         
         if df_dim is not None:
@@ -410,6 +484,7 @@ with aba_diaria:
 
 # ================= ABA ADERÊNCIA =================
 with aba_aderencia:
+    # Pequeno hack para garantir que o Streamlit não coloque padding extra na aba
     st.markdown("<style>[data-testid='stVerticalBlock'] > [style*='flex-direction: column;'] > [data-testid='stVerticalBlock'] {gap: 0rem;}</style>", unsafe_allow_html=True)
 
     if df_global is not None:
@@ -420,7 +495,10 @@ with aba_aderencia:
         row_dia = df_ad[df_ad['Data'] == dia_selecionado].iloc[0] if not df_ad[df_ad['Data'] == dia_selecionado].empty else None
         
         if row_dia is not None:
+            # Container com a classe CSS que acabamos de ajustar
             st.markdown('<div class="height-aderencia">', unsafe_allow_html=True)
+            
+            # Título colado
             st.markdown(f"#### Resultados para: **{dia_selecionado}**")
             
             c_graf1, c_graf2 = st.columns([1, 2])
@@ -438,7 +516,7 @@ with aba_aderencia:
                 
                 fig_pizza.update_layout(
                     showlegend=True, 
-                    margin=dict(t=0, b=0, l=0, r=0),
+                    margin=dict(t=0, b=0, l=0, r=0), # Margens Zero
                     height=200, 
                     paper_bgcolor='rgba(0,0,0,0)',
                     legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
@@ -455,7 +533,7 @@ with aba_aderencia:
                 
                 fig_bar.update_layout(
                     barmode='stack', 
-                    margin=dict(t=10, b=0, l=0, r=0), 
+                    margin=dict(t=10, b=0, l=0, r=0), # Margens apertadas
                     height=280, 
                     paper_bgcolor='rgba(0,0,0,0)', 
                     plot_bgcolor='rgba(0,0,0,0)',
