@@ -242,7 +242,7 @@ if "u" in params and "k" in params:
 if not st.session_state.get("logado", False):
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
-        st.markdown("### 🔒 Acesso Turbi WFM")
+        st.markdown("### 🔒 Acesso Sistema de Escalas Turbi")
         i_user = st.text_input("E-mail", placeholder="ex: nome@turbi.com.br")
         i_pass = st.text_input("Senha", type="password")
         if st.button("Entrar", type="primary", use_container_width=True):
