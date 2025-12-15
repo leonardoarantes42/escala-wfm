@@ -340,79 +340,88 @@ with aba_diaria:
 if eh_admin and aba_aderencia:
     with aba_aderencia:
         st.markdown("<style>[data-testid='stVerticalBlock'] > [style*='flex-direction: column;'] > [data-testid='stVerticalBlock'] {gap: 0rem;}</style>", unsafe_allow_html=True)
+        
         if df_global is not None:
             df_ad = gerar_dados_aderencia(df_global)
             cols_d = [c for c in df_global.columns if '/' in c]
             d_sel = texto_busca if texto_busca in cols_d else cols_d[0]
+            
+            # Pega a linha correspondente ao dia selecionado
             row = df_ad[df_ad['Data'] == d_sel].iloc[0] if not df_ad[df_ad['Data'] == d_sel].empty else None
+            
             if row is not None:
                 st.markdown('<div class="height-aderencia">', unsafe_allow_html=True)
                 st.markdown(f"#### Resultados para: **{d_sel}**")
+                
                 cg1, cg2 = st.columns([1, 2])
+                
+                # --- COLUNA 1: PIE CHART ---
                 with cg1:
-                df_p = pd.DataFrame({
-                    'Status': ['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], 
-                    'Qtd': [row['Realizado (T)'], row['Afastado (AF)'], row['Turnover (TO)']]
-                })
-                df_p = df_p[df_p['Qtd'] > 0]
-                
-                fig_p = px.pie(
-                    df_p, 
-                    values='Qtd', 
-                    names='Status', 
-                    hole=0.6, 
-                    color='Status', 
-                    color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'}
-                )
-                
-                # ALTERAÇÃO AQUI: Labels mais limpas e tooltip informativo
-                fig_p.update_traces(
-                    textposition='inside', 
-                    textinfo='value+percent',  # Mostra Valor e Porcentagem
-                    hovertemplate='%{label}: %{value} (%{percent})'
-                )
-                
-                fig_p.update_layout(
-                    showlegend=True, 
-                    margin=dict(t=0, b=0, l=0, r=0), 
-                    height=200, 
-                    paper_bgcolor='rgba(0,0,0,0)', 
-                    legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
-                )
-                st.plotly_chart(fig_p, use_container_width=True)
-                
-                pct = (row['Realizado (T)']/row['Planejado']*100) if row['Planejado'] > 0 else 0
-                st.metric("Aderência do Dia", f"{pct:.1f}%", f"Planejado: {row['Planejado']}")
+                    df_p = pd.DataFrame({
+                        'Status': ['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], 
+                        'Qtd': [row['Realizado (T)'], row['Afastado (AF)'], row['Turnover (TO)']]
+                    })
+                    df_p = df_p[df_p['Qtd'] > 0]
+                    
+                    fig_p = px.pie(
+                        df_p, 
+                        values='Qtd', 
+                        names='Status', 
+                        hole=0.6, 
+                        color='Status', 
+                        color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'}
+                    )
+                    
+                    # MELHORIA VISUAL: Labels internos com Valor e Porcentagem
+                    fig_p.update_traces(
+                        textposition='inside', 
+                        textinfo='value+percent',
+                        hovertemplate='%{label}: %{value} (%{percent})'
+                    )
 
-            # --- COLUNA 2: GRÁFICO DE BARRAS (STACKED) ---
-            with cg2:
-                st.markdown("#### Visão do Mês")
+                    fig_p.update_layout(
+                        showlegend=True, 
+                        margin=dict(t=0, b=0, l=0, r=0), 
+                        height=200, 
+                        paper_bgcolor='rgba(0,0,0,0)', 
+                        legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
+                    )
+                    st.plotly_chart(fig_p, use_container_width=True)
+                    
+                    pct = (row['Realizado (T)']/row['Planejado']*100) if row['Planejado'] > 0 else 0
+                    st.metric("Aderência do Dia", f"{pct:.1f}%", f"Planejado: {row['Planejado']}")
+
+                # --- COLUNA 2: BAR CHART ---
+                with cg2:
+                    st.markdown("#### Visão do Mês")
+                    
+                    # MELHORIA VISUAL: text_auto para mostrar números nas barras
+                    fig_b = px.bar(
+                        df_ad, 
+                        x='Data', 
+                        y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], 
+                        text_auto='.0f', # Mostra o número inteiro
+                        color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'}
+                    )
+                    
+                    # Ajuste da fonte dentro da barra
+                    fig_b.update_traces(
+                        textfont_size=12, 
+                        textangle=0, 
+                        textposition="inside", 
+                        cliponaxis=False
+                    )
+
+                    fig_b.update_layout(
+                        barmode='stack', 
+                        margin=dict(t=10, b=0, l=0, r=0), 
+                        height=280, 
+                        paper_bgcolor='rgba(0,0,0,0)', 
+                        plot_bgcolor='rgba(0,0,0,0)', 
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                        xaxis_title=None, # Limpa rótulo X
+                        yaxis_title=None  # Limpa rótulo Y
+                    )
+                    st.plotly_chart(fig_b, use_container_width=True)
                 
-                # ALTERAÇÃO AQUI: Adicionado text_auto=True para mostrar números
-                fig_b = px.bar(
-                    df_ad, 
-                    x='Data', 
-                    y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], 
-                    text_auto='.0f',  # Formata para não mostrar casas decimais (ex: 20 em vez de 20.0)
-                    color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'}
-                )
-                
-                # Personalização fina dos textos nas barras
-                fig_b.update_traces(
-                    textfont_size=12, 
-                    textangle=0, 
-                    textposition="inside", 
-                    cliponaxis=False
-                )
-                
-                fig_b.update_layout(
-                    barmode='stack', 
-                    margin=dict(t=10, b=0, l=0, r=0), 
-                    height=280, 
-                    paper_bgcolor='rgba(0,0,0,0)', 
-                    plot_bgcolor='rgba(0,0,0,0)', 
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                    xaxis_title=None, # Remove rótulo "Data" para limpar visual
-                    yaxis_title=None  # Remove rótulo "value" para limpar visual
-                )
-                st.plotly_chart(fig_b, use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
