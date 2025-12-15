@@ -6,6 +6,7 @@ from datetime import datetime
 import plotly.express as px
 import bcrypt
 import time
+import uuid
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
@@ -215,30 +216,76 @@ def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria
         return ''
     return f'<div class="table-container {classe_altura}">{df.style.map(get_color).hide(axis="index").to_html()}</div>'
 
-# ================= SISTEMA DE LOGIN (TANK/URL) =================
+# ================= SISTEMA DE LOGIN SEGURO =================
+
+# 1. Gerenciador de Sessões Ativas (Singleton)
+# Isso cria um dicionário global na memória do servidor
+@st.cache_resource
+def get_session_manager():
+    return {}
 
 def validar_senha(usuario, senha_digitada):
     try:
         dados_user = st.secrets["credentials"]["usernames"].get(usuario)
         if not dados_user: return False, None
-        if bcrypt.checkpw(senha_digitada.encode('utf-8'), dados_user["password"].encode('utf-8')):
+        
+        # Verifica a senha
+        senha_correta = False
+        if dados_user["password"] == senha_digitada: # Verifica texto puro (se for o caso do link)
+             senha_correta = True
+        elif bcrypt.checkpw(senha_digitada.encode('utf-8'), dados_user["password"].encode('utf-8')):
+             senha_correta = True
+             
+        if senha_correta:
             return True, dados_user
         return False, None
     except Exception: return False, None
 
-# 1. Recupera login da URL
-params = st.query_params
-if "u" in params and "k" in params:
-    u_url = params["u"]
-    k_url = params["k"]
-    user_data = st.secrets["credentials"]["usernames"].get(u_url)
-    if user_data and user_data["password"] == k_url:
-        st.session_state["logado"] = True
-        st.session_state["usuario"] = u_url
-        st.session_state["nome"] = user_data["name"]
-        st.session_state["roles"] = user_data.get("roles", ["viewer"])
+def impor_sessao_unica(email):
+    """
+    Garante que se alguém logar com este e-mail em outro lugar,
+    a sessão atual será desconectada.
+    """
+    manager = get_session_manager()
+    
+    # Se o usuário ainda não tem um ID de sessão local, cria um
+    if "session_id" not in st.session_state:
+        st.session_state["session_id"] = str(uuid.uuid4())
+        # Registra esse ID como o "oficial" para este email no servidor
+        manager[email] = st.session_state["session_id"]
+    
+    # Verifica se o ID oficial no servidor ainda é o meu
+    # Se mudou, significa que alguém logou em outro lugar
+    if manager.get(email) != st.session_state["session_id"]:
+        st.warning("⚠️ Sua conta foi acessada em outro dispositivo/aba. Você foi desconectado.")
+        time.sleep(3)
+        st.session_state.clear()
+        st.rerun()
+    
+    # Atualiza o manager para garantir que eu sou o dono da sessão (reforço)
+    manager[email] = st.session_state["session_id"]
 
-# 2. Tela de Login se não logado
+# --- LÓGICA DE ENTRADA ---
+
+# 1. Tenta recuperar login da URL
+params = st.query_params
+usuario_url = params.get("u")
+senha_url = params.get("k")
+
+if usuario_url and senha_url:
+    val, dados = validar_senha(usuario_url, senha_url)
+    if val:
+        st.session_state["logado"] = True
+        st.session_state["usuario"] = usuario_url
+        st.session_state["nome"] = dados["name"]
+        st.session_state["roles"] = dados.get("roles", ["viewer"])
+        
+        # TRUQUE DE SEGURANÇA: Limpa a URL imediatamente
+        # O usuário vê a URL limpa. Se ele copiar e colar, não leva a senha junto.
+        st.query_params.clear() 
+        st.rerun()
+
+# 2. Tela de Login Manual
 if not st.session_state.get("logado", False):
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
@@ -248,12 +295,19 @@ if not st.session_state.get("logado", False):
         if st.button("Entrar", type="primary", use_container_width=True):
             val, dados = validar_senha(i_user.strip(), i_pass)
             if val:
-                st.session_state.update({"logado": True, "usuario": i_user, "nome": dados["name"], "roles": dados.get("roles", ["viewer"])})
-                st.query_params["u"] = i_user
-                st.query_params["k"] = dados["password"]
+                st.session_state.update({
+                    "logado": True, 
+                    "usuario": i_user.strip(), 
+                    "nome": dados["name"], 
+                    "roles": dados.get("roles", ["viewer"])
+                })
                 st.rerun()
             else: st.error("Acesso negado.")
     st.stop()
+
+# 3. Executa a verificação de sessão única (O Guardião)
+# Se chegou aqui, está logado. Vamos garantir que é o único.
+impor_sessao_unica(st.session_state["usuario"])
 
 # ================= APP PRINCIPAL =================
 
