@@ -97,12 +97,13 @@ def normalizar_texto(texto):
     return ''.join(c for c in unicodedata.normalize('NFD', str(texto))
                   if unicodedata.category(c) != 'Mn').upper().strip()
 
+# Mantenha os imports e a função normalizar_texto como estavam...
+
 def carregar_dados_aba(nome_aba):
     client = conectar_google_sheets()
     try:
         sh = client.open_by_url(URL_PLANILHA)
         
-        # Tenta abrir a aba
         try:
             worksheet = sh.worksheet(nome_aba)
         except gspread.WorksheetNotFound:
@@ -110,7 +111,7 @@ def carregar_dados_aba(nome_aba):
             
         dados = worksheet.get_all_values()
         
-        # 1. Localizar Cabeçalho (Mantendo a busca inteligente com acentos)
+        # 1. Localizar Cabeçalho
         indice_cabecalho = -1
         cabecalho_bruto = []
         
@@ -141,14 +142,18 @@ def carregar_dados_aba(nome_aba):
         df = pd.DataFrame(linhas, columns=cabecalho_tratado)
         df = df.loc[:, df.columns != ''] 
         
-        # 3. FILTRAGEM ESTRITA (REGRA DA ILHA)
+        # 3. FILTRAGEM (Regra da ILHA)
         if 'NOME' in df.columns: 
              df = df[df['NOME'].astype(str).str.strip() != '']
 
-        # AQUI VOLTA A REGRA: Se não tiver ILHA preenchida, remove a linha.
         if 'ILHA' in df.columns: 
             df = df[df['ILHA'].astype(str).str.strip() != '']
-            
+
+        # Garante que o filtro funcione mesmo se tiver espaço no Sheets
+        for col in df.columns:
+            if df[col].dtype == 'object':
+                df[col] = df[col].astype(str).str.strip()
+
         if len(df.columns) > 35: 
             df = df.iloc[:, :40] 
             
@@ -353,21 +358,32 @@ df_global, _ = carregar_dados_aba('Mensal')
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.write(f"👤 **{st.session_state['nome']}**")
+    st.write(f"👤 **{st.session_state.get('nome', 'Visitante')}**")
     if st.button("Sair / Logout", type="secondary"):
         st.session_state.clear(); st.query_params.clear(); st.rerun()
     st.divider()
-    st.image("logo_turbi.png", width=180) 
-    st.divider()
+    
+    # Se tiver logo, mantenha. Se não, comente.
+    # st.image("logo_turbi.png", width=180) 
+    
     st.markdown("#### 🔍 Filtros")
-    opcoes_lider = sorted(df_global['LIDER'].unique().tolist()) if df_global is not None and 'LIDER' in df_global.columns else []
-    opcoes_ilha = sorted(df_global['ILHA'].unique().tolist()) if df_global is not None and 'ILHA' in df_global.columns else []
+    
+    # Carrega opções baseadas no DataFrame Global (Mensal)
+    opcoes_lider = []
+    opcoes_ilha = []
+    
+    if df_global is not None:
+        if 'LIDER' in df_global.columns:
+            opcoes_lider = sorted(df_global['LIDER'].unique().tolist())
+        if 'ILHA' in df_global.columns:
+            opcoes_ilha = sorted(df_global['ILHA'].unique().tolist())
+            
     sel_lider = st.multiselect("Líder", options=opcoes_lider)
     sel_ilha = st.multiselect("Ilha", options=opcoes_ilha)
+    
     busca_nome = st.text_input("Buscar Nome")
     st.divider()
     st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
-    st.markdown('<div class="footer-simple">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
 
 # --- HEADER ---
 c_title, _, c_search = st.columns([2, 0.5, 1.2])
@@ -435,25 +451,49 @@ with aba_mensal:
             st.warning("Não encontrei colunas de data nesta aba.")
 with aba_diaria:
     abas_dim = listar_abas_dim()
-    if not abas_dim: st.warning("Sem dados.")
+    if not abas_dim: 
+        st.warning("Nenhuma aba de dimensão (DIM) encontrada.")
     else:
+        # Tenta achar a aba do dia filtrado, senão pega a primeira disponível
         aba_sel = next((a for a in abas_dim if texto_busca in a), abas_dim[0])
+        
+        # Mostra qual aba está sendo exibida
+        st.caption(f"Exibindo dados da aba: **{aba_sel}**")
+        
         df_dim, _ = carregar_dados_aba(aba_sel)
+        
         if df_dim is not None:
+            # Cálculos de gargalos
             analise = analisar_gargalos_dim(df_dim)
             resumo = calcular_resumo_dia_dim(df_dim)
+            
             kc1, kc2, kc3, kc4 = st.columns(4)
             with kc1: st.metric("👥 No Chat", resumo["Trabalhando"])
             with kc2: st.metric("🛋️ Folgas", resumo["Folga"])
             if analise:
                 with kc3: st.metric("⚠️ Menos Chats", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
                 with kc4: st.metric("☕ Mais Pausas", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
+            
+            # --- APLICAÇÃO DOS FILTROS (AQUI ESTAVA O PROBLEMA) ---
             df_dim_f = df_dim.copy()
-            if sel_lider: df_dim_f = df_dim_f[df_dim_f['LIDER'].isin(sel_lider)]
-            if sel_ilha: df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
-            if busca_nome: df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
+            
+            # Filtro de Líder (Verifica se a coluna existe antes de filtrar)
+            if sel_lider and 'LIDER' in df_dim_f.columns:
+                df_dim_f = df_dim_f[df_dim_f['LIDER'].isin(sel_lider)]
+                
+            # Filtro de Ilha
+            if sel_ilha and 'ILHA' in df_dim_f.columns:
+                df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
+                
+            # Busca por Nome
+            if busca_nome and 'NOME' in df_dim_f.columns:
+                df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
+            
+            # Seletor de Modo de Visualização
             tipo = st.radio("Modo:", ["▦ Grade", "💬 Apenas Chat", "🚫 Apenas Folgas"], horizontal=True, label_visibility="collapsed")
+            
             df_exibicao = df_dim_f if tipo == "▦ Grade" else filtrar_e_ordenar_dim(df_dim_f, tipo)
+            
             cols_v = [c for c in df_exibicao.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ILHA', 'Z']]
             st.markdown(renderizar_tabela_html(df_exibicao[cols_v], 'diario', 'height-diaria'), unsafe_allow_html=True)
 
