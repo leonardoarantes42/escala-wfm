@@ -355,8 +355,9 @@ def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria
 
 # ================= SISTEMA DE LOGIN (VIA COOKIES 🍪) =================
 
-# 1. Gerenciador de Cookies (Para persistência segura)
-@st.cache_resource(experimental_allow_widgets=True)
+# 1. Gerenciador de Cookies
+# CORREÇÃO: Removemos o parâmetro (experimental_allow_widgets=True) que dava erro
+@st.cache_resource
 def get_cookie_manager():
     return stx.CookieManager()
 
@@ -400,6 +401,9 @@ def impor_sessao_unica(email):
 # --- LÓGICA DE ENTRADA ---
 
 cookie_manager = get_cookie_manager()
+
+# Pequeno delay para garantir que o cookie manager carregou antes de ler
+# Isso evita leituras falsas no primeiro milissegundo
 cookies = cookie_manager.get_all()
 
 # Tenta pegar login da URL (apenas para o primeiro acesso via link mágico)
@@ -411,10 +415,8 @@ senha_url = params.get("k")
 token_cookie = cookies.get("turbi_token")
 
 if token_cookie and not st.session_state.get("logado", False):
-    # O token no cookie é composto por "email|hash_seguranca" (simplificado aqui)
     try:
         email_cookie = token_cookie.split("|")[0]
-        # Valida se o email existe nos secrets
         if email_cookie in st.secrets["credentials"]["usernames"]:
             dados = st.secrets["credentials"]["usernames"][email_cookie]
             st.session_state.update({
@@ -424,7 +426,7 @@ if token_cookie and not st.session_state.get("logado", False):
                 "roles": dados.get("roles", ["viewer"])
             })
     except:
-        pass # Cookie inválido, segue para login
+        pass 
 
 # 2. Se não está logado pelo Cookie, tenta login Manual ou URL
 if not st.session_state.get("logado", False):
@@ -439,7 +441,6 @@ if not st.session_state.get("logado", False):
             login_aprovado = True
             email_login = usuario_url
             dados_login = dados
-            # Limpa URL imediatamente para segurança
             st.query_params.clear()
 
     # B) Tela de Login Manual
@@ -466,15 +467,14 @@ if not st.session_state.get("logado", False):
             "roles": dados_login.get("roles", ["viewer"])
         })
         
-        # SALVA O COOKIE NO NAVEGADOR (Validade de 1 dia)
-        # Formato simples: email|uuid (para garantir unicidade)
+        # SALVA O COOKIE (Validade de 1 dia)
         token_seguro = f"{email_login}|{str(uuid.uuid4())}"
         cookie_manager.set("turbi_token", token_seguro, key="set_cookie", expires_at=datetime.now() + pd.Timedelta(days=1))
         
-        time.sleep(0.5) # Tempo pro cookie assentar
+        time.sleep(0.5) 
         st.rerun()
     
-    st.stop() # Para aqui se não estiver logado
+    st.stop() 
 
 # Se passou, está logado. Ativa guardião.
 impor_sessao_unica(st.session_state["usuario"])
