@@ -102,7 +102,7 @@ def carregar_dados_aba(nome_aba):
     try:
         sh = client.open_by_url(URL_PLANILHA)
         
-        # Tenta abrir a aba específica
+        # Tenta abrir a aba
         try:
             worksheet = sh.worksheet(nome_aba)
         except gspread.WorksheetNotFound:
@@ -110,13 +110,12 @@ def carregar_dados_aba(nome_aba):
             
         dados = worksheet.get_all_values()
         
-        # 1. Localizar Cabeçalho (Procura nas primeiras 15 linhas)
+        # 1. Localizar Cabeçalho (Mantendo a busca inteligente com acentos)
         indice_cabecalho = -1
         cabecalho_bruto = []
         
         for i, linha in enumerate(dados[:15]):
             linha_norm = [normalizar_texto(col) for col in linha]
-            # Procura NOME e LIDER/HORARIO na mesma linha
             if ("NOME" in linha_norm or "NOMES" in linha_norm) and ("LIDER" in linha_norm or "HORARIO" in linha_norm):
                 indice_cabecalho = i
                 cabecalho_bruto = linha 
@@ -142,19 +141,14 @@ def carregar_dados_aba(nome_aba):
         df = pd.DataFrame(linhas, columns=cabecalho_tratado)
         df = df.loc[:, df.columns != ''] 
         
-        # 3. FILTRAGEM INTELIGENTE (AQUI ESTAVA O PROBLEMA DO DIVISOR)
+        # 3. FILTRAGEM ESTRITA (REGRA DA ILHA)
         if 'NOME' in df.columns: 
-            # Mantém qualquer linha que tenha algo escrito no NOME
-            df = df[df['NOME'].astype(str).str.strip() != '']
-            
-            # (Removi o filtro de LIDER para os divisores aparecerem)
+             df = df[df['NOME'].astype(str).str.strip() != '']
 
+        # AQUI VOLTA A REGRA: Se não tiver ILHA preenchida, remove a linha.
         if 'ILHA' in df.columns: 
-            # Só filtra ILHA se não for um divisor (divisores costumam ter ilha vazia)
-            # Logica: Se tem ILHA preenchida OU é um divisor de seção conhecido
-            pass 
+            df = df[df['ILHA'].astype(str).str.strip() != '']
             
-        # Se for visão mensal, corta colunas extras
         if len(df.columns) > 35: 
             df = df.iloc[:, :40] 
             
@@ -398,43 +392,47 @@ MAPA_MESES = {
 }
 
 with aba_mensal:
-    # Pega o número do mês da data selecionada no filtro (ex: 16/12 -> 12)
+    # 1. Carregamento Dinâmico (Mês correto)
     mes_num = data_sel.month
     nome_aba_oficial = MAPA_MESES.get(mes_num)
     
     df_global, _ = carregar_dados_aba(nome_aba_oficial)
 
     if df_global is None:
-        st.warning(f"⚠️ A aba **{nome_aba_oficial}** não foi encontrada na planilha.")
-        st.info("Dica: Verifique se a aba existe ou selecione outra data.")
+        st.warning(f"⚠️ A aba **{nome_aba_oficial}** não foi encontrada.")
+        # ... (seu código de mensagem de erro do Drive continua aqui)
     else:
-        # Lógica de exibição normal
         colunas_datas = [c for c in df_global.columns if '/' in c]
-        # Tenta achar a data exata, senão pega a primeira
         dia_show = texto_busca if texto_busca in colunas_datas else (colunas_datas[0] if colunas_datas else None)
         
         if dia_show:
+            # Cálculos
             kpis = calcular_kpis_mensal_detalhado(df_global, dia_show)
-            # ... (Seus KPIs aqui - pode manter o código antigo dos KPIs)
+            picos = calcular_picos_vales_mensal(df_global) # <--- VOLTOU AQUI
             
-            k1, k2, k3, k4 = st.columns(4)
+            # Layout com 6 colunas para caber os Picos
+            k1, k2, k3, k4, k5, k6 = st.columns(6)
+            
             with k1: st.metric("✅ Escalados", kpis["NoChat"])
             with k2: st.metric("🛋️ Folgas", kpis["Folga"])
             with k3: st.metric("🎧 Suporte", kpis["Suporte"])
             with k4: st.metric("🚨 Emergência", kpis["Emergencia"])
+            
+            # Exibição dos KPIs de Pico/Vale
+            if picos:
+                with k5: st.metric("📈 Pico", f"{picos['max_dia']}", f"{picos['max_val']}")
+                with k6: st.metric("📉 Vale", f"{picos['min_dia']}", f"{picos['min_val']}", delta_color="inverse")
 
+            # Tabela
             df_f = df_global.copy()
-            # Filtros
             if sel_lider: df_f = df_f[df_f['LIDER'].isin(sel_lider)]
             if sel_ilha and 'ILHA' in df_f.columns: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
             if busca_nome: df_f = df_f[df_f['NOME'].str.contains(busca_nome, case=False)]
             
-            # Limpa colunas técnicas
             cols_clean = [c for c in df_f.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ADMISSÃO', 'ILHA', 'Z']]
             st.markdown(renderizar_tabela_html(df_f[cols_clean], 'mensal', 'height-mensal'), unsafe_allow_html=True)
         else:
-            st.warning("Não encontrei colunas de data (DD/MM) nesta aba.")
-
+            st.warning("Não encontrei colunas de data nesta aba.")
 with aba_diaria:
     abas_dim = listar_abas_dim()
     if not abas_dim: st.warning("Sem dados.")
