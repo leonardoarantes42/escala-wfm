@@ -97,8 +97,6 @@ def normalizar_texto(texto):
     return ''.join(c for c in unicodedata.normalize('NFD', str(texto))
                   if unicodedata.category(c) != 'Mn').upper().strip()
 
-# Mantenha os imports e a função normalizar_texto como estavam...
-
 def carregar_dados_aba(nome_aba):
     client = conectar_google_sheets()
     try:
@@ -117,7 +115,14 @@ def carregar_dados_aba(nome_aba):
         
         for i, linha in enumerate(dados[:15]):
             linha_norm = [normalizar_texto(col) for col in linha]
-            if ("NOME" in linha_norm or "NOMES" in linha_norm) and ("LIDER" in linha_norm or "HORARIO" in linha_norm):
+            
+            # MELHORIA AQUI: Detecção mais robusta do cabeçalho
+            # Aceita "LIDER" exato ou "HORARIO" contido em "HORARIO ENTRADA"
+            tem_nome = "NOME" in linha_norm or "NOMES" in linha_norm
+            tem_lider = "LIDER" in linha_norm
+            tem_horario = any("HORARIO" in col for col in linha_norm)
+            
+            if tem_nome and (tem_lider or tem_horario):
                 indice_cabecalho = i
                 cabecalho_bruto = linha 
                 break
@@ -149,7 +154,7 @@ def carregar_dados_aba(nome_aba):
         if 'ILHA' in df.columns: 
             df = df[df['ILHA'].astype(str).str.strip() != '']
 
-        # Garante que o filtro funcione mesmo se tiver espaço no Sheets
+        # 4. LIMPEZA DE DADOS
         for col in df.columns:
             if df[col].dtype == 'object':
                 df[col] = df[col].astype(str).str.strip()
@@ -240,7 +245,6 @@ def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria
         val_str = str(val).upper().strip()
         
         # REGRAS PARA O DIVISOR VISUAL
-        # Se o texto for um título de seção conhecido, pinta de preto
         if val_str in ['FINANCEIRO', 'E-MAIL', 'FINANCEIRO ASSINCRONO', 'ANALISTAS JR TRABALHANDO NO DIA']:
             return 'background-color: #000000; color: white; font-weight: bold;'
             
@@ -253,7 +257,7 @@ def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria
             elif 'CHAT' in val_str: return 'background-color: #d9ead3; color: black'
             elif 'PAUSA' in val_str or val_str == 'P': return 'background-color: #fce5cd; color: black'
             elif 'EMAIL' in val_str: return 'background-color: #bfe1f6; color: black'
-            elif 'FINANCEIRO' in val_str: return 'background-color: #11734b; color: white' # Verde do status
+            elif 'FINANCEIRO' in val_str: return 'background-color: #11734b; color: white'
             
         return ''
         
@@ -262,7 +266,6 @@ def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria
 # ================= SISTEMA DE LOGIN SEGURO =================
 
 # 1. Gerenciador de Sessões Ativas (Singleton)
-# Isso cria um dicionário global na memória do servidor
 @st.cache_resource
 def get_session_manager():
     return {}
@@ -274,7 +277,7 @@ def validar_senha(usuario, senha_digitada):
         
         # Verifica a senha
         senha_correta = False
-        if dados_user["password"] == senha_digitada: # Verifica texto puro (se for o caso do link)
+        if dados_user["password"] == senha_digitada: 
              senha_correta = True
         elif bcrypt.checkpw(senha_digitada.encode('utf-8'), dados_user["password"].encode('utf-8')):
              senha_correta = True
@@ -285,32 +288,21 @@ def validar_senha(usuario, senha_digitada):
     except Exception: return False, None
 
 def impor_sessao_unica(email):
-    """
-    Garante que se alguém logar com este e-mail em outro lugar,
-    a sessão atual será desconectada.
-    """
     manager = get_session_manager()
     
-    # Se o usuário ainda não tem um ID de sessão local, cria um
     if "session_id" not in st.session_state:
         st.session_state["session_id"] = str(uuid.uuid4())
-        # Registra esse ID como o "oficial" para este email no servidor
         manager[email] = st.session_state["session_id"]
     
-    # Verifica se o ID oficial no servidor ainda é o meu
-    # Se mudou, significa que alguém logou em outro lugar
     if manager.get(email) != st.session_state["session_id"]:
         st.warning("⚠️ Sua conta foi acessada em outro dispositivo/aba. Você foi desconectado.")
         time.sleep(3)
         st.session_state.clear()
         st.rerun()
     
-    # Atualiza o manager para garantir que eu sou o dono da sessão (reforço)
     manager[email] = st.session_state["session_id"]
 
 # --- LÓGICA DE ENTRADA ---
-
-# 1. Tenta recuperar login da URL
 params = st.query_params
 usuario_url = params.get("u")
 senha_url = params.get("k")
@@ -322,13 +314,9 @@ if usuario_url and senha_url:
         st.session_state["usuario"] = usuario_url
         st.session_state["nome"] = dados["name"]
         st.session_state["roles"] = dados.get("roles", ["viewer"])
-        
-        # TRUQUE DE SEGURANÇA: Limpa a URL imediatamente
-        # O usuário vê a URL limpa. Se ele copiar e colar, não leva a senha junto.
         st.query_params.clear() 
         st.rerun()
 
-# 2. Tela de Login Manual
 if not st.session_state.get("logado", False):
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
@@ -348,13 +336,11 @@ if not st.session_state.get("logado", False):
             else: st.error("Acesso negado.")
     st.stop()
 
-# 3. Executa a verificação de sessão única (O Guardião)
-# Se chegou aqui, está logado. Vamos garantir que é o único.
 impor_sessao_unica(st.session_state["usuario"])
 
 # ================= APP PRINCIPAL =================
 
-df_global, _ = carregar_dados_aba('Mensal')
+df_global, _ = carregar_dados_aba('Mensal') # Será substituído dinamicamente na aba Mensal, mas mantemos aqui para a Sidebar carregar opções
 
 # --- SIDEBAR ---
 with st.sidebar:
@@ -363,12 +349,11 @@ with st.sidebar:
         st.session_state.clear(); st.query_params.clear(); st.rerun()
     st.divider()
     
-    # Se tiver logo, mantenha. Se não, comente.
-    # st.image("logo_turbi.png", width=180) 
+    # LOGO VOLTOU AQUI (Descomentado)
+    st.image("logo_turbi.png", width=180) 
     
     st.markdown("#### 🔍 Filtros")
     
-    # Carrega opções baseadas no DataFrame Global (Mensal)
     opcoes_lider = []
     opcoes_ilha = []
     
@@ -384,6 +369,7 @@ with st.sidebar:
     busca_nome = st.text_input("Buscar Nome")
     st.divider()
     st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
+    st.markdown('<div class="footer-simple">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
 
 # --- HEADER ---
 c_title, _, c_search = st.columns([2, 0.5, 1.2])
@@ -400,7 +386,6 @@ aba_mensal, aba_diaria = abas[0], abas[1]
 aba_aderencia = abas[2] if eh_admin else None
 
 # --- CONTEÚDO ABAS ---
-# Mapeamento manual para garantir os nomes exatos da sua planilha
 MAPA_MESES = {
     1: "JANEIRO", 2: "FEVEREIRO", 3: "MARÇO", 4: "ABRIL",
     5: "MAIO", 6: "JUNHO", 7: "JULHO", 8: "AGOSTO",
@@ -416,17 +401,23 @@ with aba_mensal:
 
     if df_global is None:
         st.warning(f"⚠️ A aba **{nome_aba_oficial}** não foi encontrada.")
-        # ... (seu código de mensagem de erro do Drive continua aqui)
+        st.markdown(f"""
+            <div style="background-color: #1e1e1e; padding: 15px; border-radius: 5px; border-left: 5px solid #ffbd45;">
+                <p>Para poupar recursos, mantemos apenas os meses ativos nesta planilha.</p>
+                <p>O histórico completo pode ser acessado no Drive:</p>
+                <a href="https://drive.google.com/drive/folders/1WeIKaV6OvFOsNHdWhCirOx-zZogwdyPd?usp=drive_link" target="_blank" class="custom-link-btn" style="width: 200px;">
+                    📂 Acessar Histórico (Drive)
+                </a>
+            </div>
+        """, unsafe_allow_html=True)
     else:
         colunas_datas = [c for c in df_global.columns if '/' in c]
         dia_show = texto_busca if texto_busca in colunas_datas else (colunas_datas[0] if colunas_datas else None)
         
         if dia_show:
-            # Cálculos
             kpis = calcular_kpis_mensal_detalhado(df_global, dia_show)
-            picos = calcular_picos_vales_mensal(df_global) # <--- VOLTOU AQUI
+            picos = calcular_picos_vales_mensal(df_global)
             
-            # Layout com 6 colunas para caber os Picos
             k1, k2, k3, k4, k5, k6 = st.columns(6)
             
             with k1: st.metric("✅ Escalados", kpis["NoChat"])
@@ -434,12 +425,10 @@ with aba_mensal:
             with k3: st.metric("🎧 Suporte", kpis["Suporte"])
             with k4: st.metric("🚨 Emergência", kpis["Emergencia"])
             
-            # Exibição dos KPIs de Pico/Vale
             if picos:
                 with k5: st.metric("📈 Pico", f"{picos['max_dia']}", f"{picos['max_val']}")
                 with k6: st.metric("📉 Vale", f"{picos['min_dia']}", f"{picos['min_val']}", delta_color="inverse")
 
-            # Tabela
             df_f = df_global.copy()
             if sel_lider: df_f = df_f[df_f['LIDER'].isin(sel_lider)]
             if sel_ilha and 'ILHA' in df_f.columns: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
@@ -449,21 +438,18 @@ with aba_mensal:
             st.markdown(renderizar_tabela_html(df_f[cols_clean], 'mensal', 'height-mensal'), unsafe_allow_html=True)
         else:
             st.warning("Não encontrei colunas de data nesta aba.")
+
 with aba_diaria:
     abas_dim = listar_abas_dim()
     if not abas_dim: 
         st.warning("Nenhuma aba de dimensão (DIM) encontrada.")
     else:
-        # Tenta achar a aba do dia filtrado, senão pega a primeira disponível
         aba_sel = next((a for a in abas_dim if texto_busca in a), abas_dim[0])
-        
-        # Mostra qual aba está sendo exibida
         st.caption(f"Exibindo dados da aba: **{aba_sel}**")
         
         df_dim, _ = carregar_dados_aba(aba_sel)
         
         if df_dim is not None:
-            # Cálculos de gargalos
             analise = analisar_gargalos_dim(df_dim)
             resumo = calcular_resumo_dia_dim(df_dim)
             
@@ -474,22 +460,17 @@ with aba_diaria:
                 with kc3: st.metric("⚠️ Menos Chats", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
                 with kc4: st.metric("☕ Mais Pausas", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
             
-            # --- APLICAÇÃO DOS FILTROS (AQUI ESTAVA O PROBLEMA) ---
             df_dim_f = df_dim.copy()
             
-            # Filtro de Líder (Verifica se a coluna existe antes de filtrar)
             if sel_lider and 'LIDER' in df_dim_f.columns:
                 df_dim_f = df_dim_f[df_dim_f['LIDER'].isin(sel_lider)]
                 
-            # Filtro de Ilha
             if sel_ilha and 'ILHA' in df_dim_f.columns:
                 df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
                 
-            # Busca por Nome
             if busca_nome and 'NOME' in df_dim_f.columns:
                 df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
             
-            # Seletor de Modo de Visualização
             tipo = st.radio("Modo:", ["▦ Grade", "💬 Apenas Chat", "🚫 Apenas Folgas"], horizontal=True, label_visibility="collapsed")
             
             df_exibicao = df_dim_f if tipo == "▦ Grade" else filtrar_e_ordenar_dim(df_dim_f, tipo)
@@ -506,7 +487,6 @@ if eh_admin and aba_aderencia:
             cols_d = [c for c in df_global.columns if '/' in c]
             d_sel = texto_busca if texto_busca in cols_d else cols_d[0]
             
-            # Pega a linha correspondente ao dia selecionado
             row = df_ad[df_ad['Data'] == d_sel].iloc[0] if not df_ad[df_ad['Data'] == d_sel].empty else None
             
             if row is not None:
@@ -515,7 +495,6 @@ if eh_admin and aba_aderencia:
                 
                 cg1, cg2 = st.columns([1, 2])
                 
-                # --- COLUNA 1: PIE CHART ---
                 with cg1:
                     df_p = pd.DataFrame({
                         'Status': ['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], 
@@ -532,7 +511,6 @@ if eh_admin and aba_aderencia:
                         color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'}
                     )
                     
-                    # MELHORIA VISUAL: Labels internos com Valor e Porcentagem
                     fig_p.update_traces(
                         textposition='inside', 
                         textinfo='value+percent',
@@ -551,20 +529,17 @@ if eh_admin and aba_aderencia:
                     pct = (row['Realizado (T)']/row['Planejado']*100) if row['Planejado'] > 0 else 0
                     st.metric("Aderência do Dia", f"{pct:.1f}%", f"Planejado: {row['Planejado']}")
 
-                # --- COLUNA 2: BAR CHART ---
                 with cg2:
                     st.markdown("#### Visão do Mês")
                     
-                    # MELHORIA VISUAL: text_auto para mostrar números nas barras
                     fig_b = px.bar(
                         df_ad, 
                         x='Data', 
                         y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], 
-                        text_auto='.0f', # Mostra o número inteiro
+                        text_auto='.0f', 
                         color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'}
                     )
                     
-                    # Ajuste da fonte dentro da barra
                     fig_b.update_traces(
                         textfont_size=12, 
                         textangle=0, 
@@ -579,8 +554,8 @@ if eh_admin and aba_aderencia:
                         paper_bgcolor='rgba(0,0,0,0)', 
                         plot_bgcolor='rgba(0,0,0,0)', 
                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                        xaxis_title=None, # Limpa rótulo X
-                        yaxis_title=None  # Limpa rótulo Y
+                        xaxis_title=None, 
+                        yaxis_title=None  
                     )
                     st.plotly_chart(fig_b, use_container_width=True)
                 
