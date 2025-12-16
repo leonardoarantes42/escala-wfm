@@ -286,7 +286,7 @@ def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria
         val_str = str(val).upper().strip()
         
         # 1. DIVISORES VISUAIS (Adicionei PLENO e STAFF aqui)
-        if val_str in ['FINANCEIRO', 'E-MAIL', 'FINANCEIRO ASSINCRONO', 'PLENO', 'STAFF']:
+        if val_str in ['FINANCEIRO', 'E-MAIL', 'FINANCEIRO ASSINCRONO', 'PLENO', 'STAFF', 'N2']:
             return 'background-color: #000000; color: white; font-weight: bold;'
             
         # 2. REGRA GERAL (Vale para Mensal e Diário)
@@ -303,7 +303,6 @@ def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria
             if val_str == 'F': return 'background-color: #002060; color: white'
             elif val_str == 'AF': return 'background-color: #f4cccc; color: black' 
             elif val_str == 'RT': return 'background-color: #e6cff2; color: black'
-            elif val_str == 'E-mail': return 'background-color: #bfe1f6; color: black'    
             
             elif 'CHAT' in val_str: return 'background-color: #d9ead3; color: black'
             elif 'PAUSA' in val_str or val_str == 'P': return 'background-color: #fce5cd; color: black'
