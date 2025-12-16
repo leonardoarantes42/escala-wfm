@@ -412,9 +412,6 @@ def impor_sessao_unica(email):
     
     manager[email] = st.session_state["session_id"]
 
-# --- LÓGICA DE ENTRADA INTELIGENTE ---
-
-cookies = cookie_manager.get_all()
 
 # Tenta pegar login da URL
 params = st.query_params
