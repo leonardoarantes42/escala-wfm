@@ -91,6 +91,11 @@ st.markdown("""
         [data-testid="stTabs"] { margin-top: -40px !important; }
         [data-testid="stRadio"] { margin-top: -30px !important; }
     </style>
+        /* 5. REMOVER STATUS DE CARREGAMENTO (NOVIDADE) */
+        /* Esconde o "Running..." do topo direito */
+        [data-testid="stStatusWidget"] {
+            visibility: hidden;
+        }
 """, unsafe_allow_html=True)
 
 # --- CONSTANTES ---
@@ -117,7 +122,7 @@ def normalizar_texto(texto):
                   if unicodedata.category(c) != 'Mn').upper().strip()
 
 # 1. FUNÇÃO PESADA (Lê a planilha mensal/diária) - Cache de 10 min
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=600, show_spinner=False)
 def carregar_dados_aba(nome_aba):
     client = conectar_google_sheets()
     try:
@@ -188,16 +193,26 @@ def carregar_dados_aba(nome_aba):
         return None, None
 
 # 2. NOVA FUNÇÃO LEVE (Lê apenas a lista de Pessoas) - Cache de 10 min
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=600, show_spinner=False)
 def carregar_lista_pessoas():
     client = conectar_google_sheets()
     try:
         sh = client.open_by_url(URL_PLANILHA)
-        # Tenta pegar a aba "Pessoas"
         try:
             ws = sh.worksheet("Pessoas")
         except:
-            return [], [] # Se não achar, retorna listas vazias
+            return [], []
+        dados = ws.get_all_records()
+        df = pd.DataFrame(dados)
+        df.columns = [str(c).upper().strip() for c in df.columns]
+        lideres = []; ilhas = []
+        col_lider = next((c for c in df.columns if 'LIDER' in c), None)
+        if col_lider: lideres = sorted([str(x).strip() for x in df[col_lider].unique() if str(x).strip() != ''])
+        col_ilha = next((c for c in df.columns if 'ILHA' in c), None)
+        if col_ilha: ilhas = sorted([str(x).strip() for x in df[col_ilha].unique() if str(x).strip() != ''])
+        return lideres, ilhas
+    except Exception as e:
+        return [], []
             
         # Pega todos os dados
         dados = ws.get_all_records()
@@ -353,13 +368,15 @@ def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria
     styler = df.style.apply(style_row, axis=1)
     return f'<div class="table-container {classe_altura}">{styler.hide(axis="index").to_html()}</div>'
 
-# ================= SISTEMA DE LOGIN (VIA COOKIES 🍪) =================
-
-# 1. Gerenciador de Cookies
-# CORREÇÃO: Removemos o @st.cache_resource daqui. 
-# O componente deve ser carregado diretamente.
+# ================= SISTEMA DE LOGIN (VIA COOKIES 🍪) ================= #
+    
 def get_cookie_manager():
-    # Adicionei uma key fixa para evitar recriação desnecessária na interface
+    # LEMBRE-SE: SEM @st.cache AQUI, como combinamos no último fix
+    return stx.CookieManager(key="turbi_cookie_manager")
+
+@st.cache_resource(show_spinner=False)
+def get_session_manager():
+    return {}
     return stx.CookieManager(key="turbi_cookie_manager")
 
 # 2. Gerenciador de Sessões Ativas (Singleton para Mata-Mata)
