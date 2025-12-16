@@ -100,8 +100,9 @@ def normalizar_texto(texto):
     """Remove acentos e deixa maiúsculo (ex: LÍDER -> LIDER)"""
     return ''.join(c for c in unicodedata.normalize('NFD', str(texto))
                   if unicodedata.category(c) != 'Mn').upper().strip()
-    
-@st.cache_data(ttl=600) 
+
+# 1. FUNÇÃO PESADA (Lê a planilha mensal/diária) - Cache de 10 min
+@st.cache_data(ttl=600)
 def carregar_dados_aba(nome_aba):
     client = conectar_google_sheets()
     try:
@@ -121,8 +122,6 @@ def carregar_dados_aba(nome_aba):
         for i, linha in enumerate(dados[:15]):
             linha_norm = [normalizar_texto(col) for col in linha]
             
-            # MELHORIA AQUI: Detecção mais robusta do cabeçalho
-            # Aceita "LIDER" exato ou "HORARIO" contido em "HORARIO ENTRADA"
             tem_nome = "NOME" in linha_norm or "NOMES" in linha_norm
             tem_lider = "LIDER" in linha_norm
             tem_horario = any("HORARIO" in col for col in linha_norm)
@@ -152,7 +151,7 @@ def carregar_dados_aba(nome_aba):
         df = pd.DataFrame(linhas, columns=cabecalho_tratado)
         df = df.loc[:, df.columns != ''] 
         
-        # 3. FILTRAGEM (Regra da ILHA)
+        # 3. FILTRAGEM
         if 'NOME' in df.columns: 
              df = df[df['NOME'].astype(str).str.strip() != '']
 
@@ -172,8 +171,9 @@ def carregar_dados_aba(nome_aba):
     except Exception as e:
         print(f"Erro: {e}")
         return None, None
-    pass
-    @st.cache_data(ttl=600)
+
+# 2. NOVA FUNÇÃO LEVE (Lê apenas a lista de Pessoas) - Cache de 10 min
+@st.cache_data(ttl=600)
 def carregar_lista_pessoas():
     client = conectar_google_sheets()
     try:
@@ -185,26 +185,24 @@ def carregar_lista_pessoas():
             return [], [] # Se não achar, retorna listas vazias
             
         # Pega todos os dados
-        dados = ws.get_all_records() # O get_all_records já pega a linha 1 como cabeçalho automaticamente
+        dados = ws.get_all_records()
         df = pd.DataFrame(dados)
         
-        # Normaliza nomes das colunas para evitar erro de maiúscula/minúscula
-        # Ex: "Lider Atual" vira "LIDER ATUAL"
+        # Normaliza nomes das colunas
         df.columns = [str(c).upper().strip() for c in df.columns]
         
-        # Extrai listas únicas e ordenadas
         lideres = []
         ilhas = []
         
-        # Procura coluna de Líder (LIDER ATUAL ou LIDER)
+        # Procura coluna de Líder (aceita "LIDER ATUAL" ou "LIDER")
         col_lider = next((c for c in df.columns if 'LIDER' in c), None)
         if col_lider:
-            lideres = sorted([x for x in df[col_lider].unique() if str(x).strip() != ''])
+            lideres = sorted([str(x).strip() for x in df[col_lider].unique() if str(x).strip() != ''])
             
         # Procura coluna de Ilha
         col_ilha = next((c for c in df.columns if 'ILHA' in c), None)
         if col_ilha:
-            ilhas = sorted([x for x in df[col_ilha].unique() if str(x).strip() != ''])
+            ilhas = sorted([str(x).strip() for x in df[col_ilha].unique() if str(x).strip() != ''])
             
         return lideres, ilhas
         
