@@ -42,7 +42,7 @@ st.markdown("""
             border: 1px solid #444; border-radius: 4px; background-color: #0e1117;
         }
         .height-mensal { height: calc(100vh - 300px); }
-        .height-diaria { height: calc(100vh - 320px); }
+        .height-diaria { height: calc(100vh - 330px); }
         .height-aderencia {
             height: calc(100vh - 1000px); 
             overflow-y: auto; position: relative;
