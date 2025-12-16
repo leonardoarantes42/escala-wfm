@@ -601,7 +601,7 @@ if eh_admin and aba_aderencia:
                         names='Status', 
                         hole=0.6, 
                         color='Status', 
-                        color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'}
+                        color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#727272'}
                     )
                     
                     fig_p.update_traces(
