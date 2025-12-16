@@ -286,7 +286,7 @@ def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria
         val_str = str(val).upper().strip()
         
         # REGRAS PARA O DIVISOR VISUAL
-        if val_str in ['FINANCEIRO', 'E-MAIL', 'PLENO', 'STAFF']:
+        if val_str in ['FINANCEIRO', 'E-MAIL', 'PLENO', 'STAFF', 'BACKOFFICE']:
             return 'background-color: #000000; color: white; font-weight: bold;'
             
         if modo_cores == 'mensal':
