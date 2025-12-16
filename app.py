@@ -373,7 +373,7 @@ def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria
 
 # 1. Gerenciador de Cookies (Sem cache para evitar erros de widget)
 def get_cookie_manager():
-    return stx.CookieManager(key="turbi_cookie_manager")
+    return stx.CookieManager(key="turbi_cookie_manager_v2")
 
 # 2. Gerenciador de Sessões Ativas (Memória do Servidor)
 @st.cache_resource(show_spinner=False)
