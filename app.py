@@ -369,20 +369,14 @@ def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria
     styler = df.style.apply(style_row, axis=1)
     return f'<div class="table-container {classe_altura}">{styler.hide(axis="index").to_html()}</div>'
 
-# ================= SISTEMA DE LOGIN (VIA COOKIES 🍪) ================= #
-    
+# ================= SISTEMA DE LOGIN (VIA COOKIES 🍪) =================
+
+# 1. Gerenciador de Cookies (Sem cache para evitar erros de widget)
 def get_cookie_manager():
-    # LEMBRE-SE: SEM @st.cache AQUI, como combinamos no último fix
     return stx.CookieManager(key="turbi_cookie_manager")
 
+# 2. Gerenciador de Sessões Ativas (Memória do Servidor)
 @st.cache_resource(show_spinner=False)
-def get_session_manager():
-    return {}
-    return stx.CookieManager(key="turbi_cookie_manager")
-
-# 2. Gerenciador de Sessões Ativas (Singleton para Mata-Mata)
-# Esse aqui PODE e DEVE ter cache, pois é só memória do servidor (dict)
-@st.cache_resource
 def get_session_manager():
     return {}
 
@@ -401,6 +395,116 @@ def validar_senha(usuario, senha_digitada):
             return True, dados_user
         return False, None
     except Exception: return False, None
+
+def impor_sessao_unica(email):
+    """Garante apenas 1 aba ativa por email"""
+    manager = get_session_manager()
+    
+    if "session_id" not in st.session_state:
+        st.session_state["session_id"] = str(uuid.uuid4())
+        manager[email] = st.session_state["session_id"]
+    
+    if manager.get(email) != st.session_state["session_id"]:
+        st.warning("⚠️ Conexão desconectada. Esta conta foi aberta em outro local.")
+        time.sleep(3)
+        st.session_state.clear()
+        st.rerun()
+    
+    manager[email] = st.session_state["session_id"]
+
+# --- LÓGICA DE ENTRADA INTELIGENTE ---
+
+cookie_manager = get_cookie_manager()
+cookies = cookie_manager.get_all()
+
+# Tenta pegar login da URL
+params = st.query_params
+usuario_url = params.get("u")
+senha_url = params.get("k")
+
+# 1. TENTA LOGIN VIA COOKIE (Recuperação de F5)
+token_cookie = cookies.get("turbi_token")
+
+if token_cookie and not st.session_state.get("logado", False):
+    try:
+        email_cookie = token_cookie.split("|")[0]
+        if email_cookie in st.secrets["credentials"]["usernames"]:
+            dados = st.secrets["credentials"]["usernames"][email_cookie]
+            st.session_state.update({
+                "logado": True, 
+                "usuario": email_cookie, 
+                "nome": dados["name"], 
+                "roles": dados.get("roles", ["viewer"])
+            })
+            st.rerun()
+    except:
+        pass 
+
+# 2. ANTI-FLASH (O Segredo da Tela Preta/Carregando)
+# Se não está logado e é a PRIMEIRA vez que o script roda (F5),
+# nós forçamos uma espera antes de mostrar o login.
+if not st.session_state.get("logado", False):
+    
+    # Se ainda não tentamos verificar o cookie nesta sessão...
+    if "auth_check_completed" not in st.session_state:
+        # Mostra um spinner bonito no meio da tela
+        with st.spinner("Verificando credenciais..."):
+            # Marca que já tentamos (para na próxima passada liberar o login se falhar)
+            st.session_state["auth_check_completed"] = True
+            # Espera 1 segundinho pro CookieManager ter tempo de conversar com o navegador
+            time.sleep(1)
+            # Recarrega a página
+            st.rerun()
+            
+    # Se chegou aqui, é porque já esperamos 1 segundo e o cookie não apareceu.
+    # Então liberamos a tela de login.
+
+# 3. Se ainda não logou (e já passou pelo Anti-Flash), mostra Login
+if not st.session_state.get("logado", False):
+    login_aprovado = False
+    email_login = ""
+    dados_login = {}
+
+    if usuario_url and senha_url:
+        val, dados = validar_senha(usuario_url, senha_url)
+        if val:
+            login_aprovado = True
+            email_login = usuario_url
+            dados_login = dados
+            st.query_params.clear()
+
+    if not login_aprovado:
+        c1, c2, c3 = st.columns([1, 2, 1])
+        with c2:
+            st.markdown("### 🔒 Acesso Sistema de Escalas Turbi")
+            i_user = st.text_input("E-mail", placeholder="ex: nome@turbi.com.br")
+            i_pass = st.text_input("Senha", type="password")
+            if st.button("Entrar", type="primary", use_container_width=True):
+                val, dados = validar_senha(i_user.strip(), i_pass)
+                if val:
+                    login_aprovado = True
+                    email_login = i_user.strip()
+                    dados_login = dados
+                else: st.error("Acesso negado.")
+    
+    if login_aprovado:
+        st.session_state.update({
+            "logado": True, 
+            "usuario": email_login, 
+            "nome": dados_login["name"], 
+            "roles": dados_login.get("roles", ["viewer"])
+        })
+        
+        token_seguro = f"{email_login}|{str(uuid.uuid4())}"
+        cookie_manager.set("turbi_token", token_seguro, key="set_cookie", expires_at=datetime.now() + pd.Timedelta(days=1))
+        
+        time.sleep(0.5) 
+        st.rerun()
+    
+    st.stop() 
+
+# Se passou, está logado. Ativa guardião.
+impor_sessao_unica(st.session_state["usuario"])
 
 def impor_sessao_unica(email):
     """Garante apenas 1 aba ativa por email"""
