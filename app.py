@@ -31,6 +31,10 @@ st.markdown("""
             overflow: hidden !important;
         }
         
+        section[data-testid="stSidebar"] {
+            z-index: 99999 !important;
+        }
+        
         /* 2. TABELA */
         .table-container {
             overflow-y: auto; overflow-x: auto; display: block;
@@ -96,7 +100,8 @@ def normalizar_texto(texto):
     """Remove acentos e deixa maiúsculo (ex: LÍDER -> LIDER)"""
     return ''.join(c for c in unicodedata.normalize('NFD', str(texto))
                   if unicodedata.category(c) != 'Mn').upper().strip()
-
+    
+@st.cache_data(ttl=300) 
 def carregar_dados_aba(nome_aba):
     client = conectar_google_sheets()
     try:
@@ -340,7 +345,19 @@ impor_sessao_unica(st.session_state["usuario"])
 
 # ================= APP PRINCIPAL =================
 
-df_global, _ = carregar_dados_aba('Mensal') # Será substituído dinamicamente na aba Mensal, mas mantemos aqui para a Sidebar carregar opções
+# Mova o mapa de meses para cá (Escopo Global) para usarmos antes de tudo
+MAPA_MESES = {
+    1: "JANEIRO", 2: "FEVEREIRO", 3: "MARÇO", 4: "ABRIL",
+    5: "MAIO", 6: "JUNHO", 7: "JULHO", 8: "AGOSTO",
+    9: "SETEMBRO", 10: "OUTUBRO", 11: "NOVEMBRO", 12: "DEZEMBRO"
+}
+
+# 1. Define data padrão (Hoje)
+hoje = datetime.now()
+nome_aba_inicial = MAPA_MESES.get(hoje.month)
+
+# 2. Carrega dados do mês ATUAL para preencher os filtros da sidebar
+df_global, _ = carregar_dados_aba(nome_aba_inicial)
 
 # --- SIDEBAR ---
 with st.sidebar:
