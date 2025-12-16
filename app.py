@@ -414,7 +414,6 @@ def impor_sessao_unica(email):
 
 # --- LÓGICA DE ENTRADA INTELIGENTE ---
 
-cookie_manager = get_cookie_manager()
 cookies = cookie_manager.get_all()
 
 # Tenta pegar login da URL
