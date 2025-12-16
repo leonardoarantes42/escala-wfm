@@ -285,20 +285,30 @@ def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria
     def get_color(val):
         val_str = str(val).upper().strip()
         
-        # REGRAS PARA O DIVISOR VISUAL
-        if val_str in ['FINANCEIRO', 'E-MAIL', 'PLENO', 'STAFF', 'BACKOFFICE']:
+        # 1. DIVISORES VISUAIS (Adicionei PLENO e STAFF aqui)
+        if val_str in ['FINANCEIRO', 'E-MAIL', 'FINANCEIRO ASSINCRONO', 'ANALISTAS JR TRABALHANDO NO DIA', 'PLENO', 'STAFF']:
             return 'background-color: #000000; color: white; font-weight: bold;'
             
+        # 2. REGRA GERAL (Vale para Mensal e Diário)
+        if val_str == 'FR': 
+            return 'background-color: #ffffff; color: black' # Fundo branco, letra preta
+
+        # 3. REGRAS ESPECÍFICAS POR MODO
         if modo_cores == 'mensal':
             if val_str == 'T': return 'background-color: #c9daf8; color: black'
             elif val_str == 'F': return 'background-color: #93c47d; color: black'
             elif val_str == 'AF': return 'background-color: #f4cccc; color: black'
-        else:
+            
+        else: # Modo Diário
             if val_str == 'F': return 'background-color: #002060; color: white'
+            elif val_str == 'AF': return 'background-color: #f4cccc; color: black' # Igual ao Mensal
+            elif val_str == 'RT': return 'background-color: #e6cff2; color: black' # Lilás solicitado
+            
             elif 'CHAT' in val_str: return 'background-color: #d9ead3; color: black'
             elif 'PAUSA' in val_str or val_str == 'P': return 'background-color: #fce5cd; color: black'
             elif 'EMAIL' in val_str: return 'background-color: #bfe1f6; color: black'
-            elif 'FINANCEIRO' in val_str: return 'background-color: #000000; color: white'
+            elif 'FINANCEIRO' in val_str: return 'background-color: #11734b; color: white'
+            elif 'BACKOFFICE' in val_str: return 'background-color: #5a3286; color: white'
             
         return ''
         
