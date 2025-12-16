@@ -462,8 +462,7 @@ with aba_diaria:
         st.warning("Nenhuma aba de dimensão (DIM) encontrada.")
     else:
         aba_sel = next((a for a in abas_dim if texto_busca in a), abas_dim[0])
-        st.caption(f"Exibindo dados da aba: **{aba_sel}**")
-        
+                
         df_dim, _ = carregar_dados_aba(aba_sel)
         
         if df_dim is not None:
