@@ -7,6 +7,7 @@ import plotly.express as px
 import bcrypt
 import time
 import uuid
+import unicodedata
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
@@ -91,41 +92,85 @@ def listar_abas_dim():
     todas_abas = [ws.title for ws in sh.worksheets()]
     return sorted([aba for aba in todas_abas if aba.startswith("DIM")])
 
+def normalizar_texto(texto):
+    """Remove acentos e deixa maiúsculo (ex: LÍDER -> LIDER)"""
+    return ''.join(c for c in unicodedata.normalize('NFD', str(texto))
+                  if unicodedata.category(c) != 'Mn').upper().strip()
+
 def carregar_dados_aba(nome_aba):
     client = conectar_google_sheets()
     try:
         sh = client.open_by_url(URL_PLANILHA)
-        worksheet = sh.get_worksheet(0) if nome_aba == 'MENSAL' else sh.worksheet(nome_aba)
+        
+        # Tenta abrir a aba específica
+        try:
+            worksheet = sh.worksheet(nome_aba)
+        except gspread.WorksheetNotFound:
+            return None, None # Retorna vazio para tratarmos no layout principal
+            
         dados = worksheet.get_all_values()
         
+        # 1. Localizar Cabeçalho (Busca nas primeiras 10 linhas)
         indice_cabecalho = -1
         cabecalho_bruto = []
-        for i, linha in enumerate(dados[:5]):
-            linha_upper = [str(col).upper().strip() for col in linha]
-            if "NOME" in linha_upper or "NOMES" in linha_upper:
-                indice_cabecalho = i; cabecalho_bruto = linha; break
+        
+        for i, linha in enumerate(dados[:10]):
+            # Normaliza a linha inteira para comparar sem acentos
+            linha_norm = [normalizar_texto(col) for col in linha]
+            
+            # Procura por palavras chave
+            if ("NOME" in linha_norm or "NOMES" in linha_norm) and ("LIDER" in linha_norm or "HORARIO" in linha_norm):
+                indice_cabecalho = i
+                cabecalho_bruto = linha # Pega a linha original (com formatação se tiver)
+                break
         
         if indice_cabecalho == -1: return None, None
 
+        # 2. Tratamento do Cabeçalho (Padronização)
         cabecalho_tratado = []
         contagem_cols = {}
         for col in cabecalho_bruto:
-            col_str = str(col).strip().upper()
+            col_str = normalizar_texto(col) # Remove acentos aqui! LÍDER vira LIDER
+            
             if col_str == "NOMES": col_str = "NOME"
+            
+            # Tratamento de colunas duplicadas
             if col_str in contagem_cols:
-                contagem_cols[col_str] += 1; cabecalho_tratado.append(f"{col_str} ")
+                contagem_cols[col_str] += 1
+                cabecalho_tratado.append(f"{col_str} ") 
             else:
                 if col_str != "": contagem_cols[col_str] = 1
                 cabecalho_tratado.append(col_str)
 
+        # 3. Criar DataFrame
         linhas = dados[indice_cabecalho + 1:]   
         df = pd.DataFrame(linhas, columns=cabecalho_tratado)
-        df = df.loc[:, df.columns != '']
-        if 'ILHA' in df.columns: df = df[df['ILHA'].astype(str).str.strip() != '']
-        if 'NOME' in df.columns: df = df[df['NOME'].astype(str).str.strip() != '']
-        if nome_aba == 'Mensal': df = df.iloc[:, :39] 
+        
+        # Limpeza básica
+        df = df.loc[:, df.columns != ''] # Remove colunas sem nome
+        
+        # Remove linhas vazias baseadas no NOME
+        if 'NOME' in df.columns: 
+            df = df[df['NOME'].astype(str).str.strip() != '']
+            
+            # Remove linhas de separação (aquelas pretas como "Financeiro Assíncrono")
+            # Geralmente elas não têm horário de entrada ou líder preenchido
+            if 'LIDER' in df.columns:
+                 # Mantém apenas quem tem Lider preenchido OU é uma exceção válida
+                 df = df[df['LIDER'].astype(str).str.strip() != '']
+
+        if 'ILHA' in df.columns: 
+            df = df[df['ILHA'].astype(str).str.strip() != '']
+            
+        # Se for visão mensal (tem muitas colunas de datas), corta o excesso
+        if len(df.columns) > 35: 
+            df = df.iloc[:, :40] 
+            
         return df, worksheet
-    except Exception: return None, None
+
+    except Exception as e:
+        print(f"Erro interno: {e}")
+        return None, None
 
 def calcular_picos_vales_mensal(df_mensal):
     cols_data = [c for c in df_mensal.columns if '/' in c]
@@ -346,26 +391,63 @@ aba_mensal, aba_diaria = abas[0], abas[1]
 aba_aderencia = abas[2] if eh_admin else None
 
 # --- CONTEÚDO ABAS ---
+# Mapeamento manual para garantir os nomes exatos da sua planilha
+MAPA_MESES = {
+    1: "JANEIRO", 2: "FEVEREIRO", 3: "MARÇO", 4: "ABRIL",
+    5: "MAIO", 6: "JUNHO", 7: "JULHO", 8: "AGOSTO",
+    9: "SETEMBRO", 10: "OUTUBRO", 11: "NOVEMBRO", 12: "DEZEMBRO"
+}
+
 with aba_mensal:
-    if df_global is not None:
+    # 1. Descobre qual aba carregar baseado na data selecionada no filtro lá em cima
+    mes_selecionado = data_sel.month
+    nome_aba_alvo = MAPA_MESES.get(mes_selecionado)
+    
+    # 2. Tenta carregar
+    df_global, _ = carregar_dados_aba(nome_aba_alvo)
+
+    # 3. Verifica se carregou
+    if df_global is None:
+        # SE NÃO ACHOU A ABA (ex: buscou Março/2024 mas a planilha não tem ainda)
+        st.warning(f"⚠️ A aba **{nome_aba_alvo}** não está disponível no arquivo atual.")
+        st.markdown(f"""
+            <div style="background-color: #1e1e1e; padding: 15px; border-radius: 5px; border-left: 5px solid #ffbd45;">
+                <p>Para poupar recursos, mantemos apenas os meses ativos nesta planilha.</p>
+                <p>O histórico completo pode ser acessado no Drive:</p>
+                <a href="https://drive.google.com/drive/folders/1WeIKaV6OvFOsNHdWhCirOx-zZogwdyPd?usp=drive_link" target="_blank" class="custom-link-btn" style="width: 200px;">
+                    📂 Acessar Histórico (Drive)
+                </a>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    else:
+        # SE ACHOU, MOSTRA OS DADOS (Seu código original de exibição)
         colunas_datas = [c for c in df_global.columns if '/' in c]
-        dia_show = texto_busca if texto_busca in colunas_datas else colunas_datas[0]
-        kpis = calcular_kpis_mensal_detalhado(df_global, dia_show)
-        picos = calcular_picos_vales_mensal(df_global)
-        k1, k2, k3, k4, k5, k6 = st.columns(6)
-        with k1: st.metric("✅ Escalados", kpis["NoChat"])
-        with k2: st.metric("🛋️ Folgas", kpis["Folga"])
-        with k3: st.metric("🎧 Suporte", kpis["Suporte"])
-        with k4: st.metric("🚨 Emergência", kpis["Emergencia"])
-        if picos:
-            with k5: st.metric("📈 Pico", f"{picos['max_dia']}", f"{picos['max_val']}")
-            with k6: st.metric("📉 Vale", f"{picos['min_dia']}", f"{picos['min_val']}", delta_color="inverse")
-        df_f = df_global.copy()
-        if sel_lider: df_f = df_f[df_f['LIDER'].isin(sel_lider)]
-        if sel_ilha: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
-        if busca_nome: df_f = df_f[df_f['NOME'].str.contains(busca_nome, case=False)]
-        cols_clean = [c for c in df_f.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ADMISSÃO', 'ILHA', 'Z']]
-        st.markdown(renderizar_tabela_html(df_f[cols_clean], 'mensal', 'height-mensal'), unsafe_allow_html=True)
+        dia_show = texto_busca if texto_busca in colunas_datas else (colunas_datas[0] if colunas_datas else None)
+        
+        if dia_show:
+            kpis = calcular_kpis_mensal_detalhado(df_global, dia_show)
+            picos = calcular_picos_vales_mensal(df_global)
+            
+            k1, k2, k3, k4, k5, k6 = st.columns(6)
+            with k1: st.metric("✅ Escalados", kpis["NoChat"])
+            with k2: st.metric("🛋️ Folgas", kpis["Folga"])
+            with k3: st.metric("🎧 Suporte", kpis["Suporte"])
+            with k4: st.metric("🚨 Emergência", kpis["Emergencia"])
+            if picos:
+                with k5: st.metric("📈 Pico", f"{picos['max_dia']}", f"{picos['max_val']}")
+                with k6: st.metric("📉 Vale", f"{picos['min_dia']}", f"{picos['min_val']}", delta_color="inverse")
+            
+            df_f = df_global.copy()
+            if sel_lider: df_f = df_f[df_f['LIDER'].isin(sel_lider)]
+            if sel_ilha and 'ILHA' in df_f.columns: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
+            if busca_nome: df_f = df_f[df_f['NOME'].str.contains(busca_nome, case=False)]
+            
+            # Remove colunas técnicas para exibição
+            cols_clean = [c for c in df_f.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ADMISSÃO', 'ILHA', 'Z']]
+            st.markdown(renderizar_tabela_html(df_f[cols_clean], 'mensal', 'height-mensal'), unsafe_allow_html=True)
+        else:
+            st.info("Nenhuma coluna de data encontrada nesta aba.")
 
 with aba_diaria:
     abas_dim = listar_abas_dim()
