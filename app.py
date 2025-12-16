@@ -95,7 +95,7 @@ def carregar_dados_aba(nome_aba):
     client = conectar_google_sheets()
     try:
         sh = client.open_by_url(URL_PLANILHA)
-        worksheet = sh.get_worksheet(0) if nome_aba == 'Mensal' else sh.worksheet(nome_aba)
+        worksheet = sh.get_worksheet(0) if nome_aba == 'MENSAL' else sh.worksheet(nome_aba)
         dados = worksheet.get_all_values()
         
         indice_cabecalho = -1
