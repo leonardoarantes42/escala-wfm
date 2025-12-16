@@ -383,19 +383,8 @@ impor_sessao_unica(st.session_state["usuario"])
 
 # ================= APP PRINCIPAL =================
 
-# Mova o mapa de meses para cá (Escopo Global) para usarmos antes de tudo
-MAPA_MESES = {
-    1: "JANEIRO", 2: "FEVEREIRO", 3: "MARÇO", 4: "ABRIL",
-    5: "MAIO", 6: "JUNHO", 7: "JULHO", 8: "AGOSTO",
-    9: "SETEMBRO", 10: "OUTUBRO", 11: "NOVEMBRO", 12: "DEZEMBRO"
-}
-
-# 1. Define data padrão (Hoje)
-hoje = datetime.now()
-nome_aba_inicial = MAPA_MESES.get(hoje.month)
-
-# 2. Carrega dados do mês ATUAL para preencher os filtros da sidebar
-df_global, _ = carregar_dados_aba(nome_aba_inicial)
+# 1. Carrega APENAS as listas leves para os filtros (Muito mais rápido!)
+opcoes_lider, opcoes_ilha = carregar_lista_pessoas()
 
 # --- SIDEBAR ---
 with st.sidebar:
@@ -404,20 +393,11 @@ with st.sidebar:
         st.session_state.clear(); st.query_params.clear(); st.rerun()
     st.divider()
     
-    # LOGO VOLTOU AQUI (Descomentado)
     st.image("logo_turbi.png", width=180) 
     
     st.markdown("#### 🔍 Filtros")
     
-    opcoes_lider = []
-    opcoes_ilha = []
-    
-    if df_global is not None:
-        if 'LIDER' in df_global.columns:
-            opcoes_lider = sorted(df_global['LIDER'].unique().tolist())
-        if 'ILHA' in df_global.columns:
-            opcoes_ilha = sorted(df_global['ILHA'].unique().tolist())
-            
+    # Agora as opções vêm da aba Pessoas, e não mais do df_global pesado
     sel_lider = st.multiselect("Líder", options=opcoes_lider)
     sel_ilha = st.multiselect("Ilha", options=opcoes_ilha)
     
@@ -426,6 +406,7 @@ with st.sidebar:
     st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
     st.markdown('<div class="footer-simple">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
 
+# --- HEADER ---
 # --- HEADER ---
 c_title, _, c_search = st.columns([2, 0.5, 1.2])
 with c_title: st.markdown("### 🚙 Sistema de Escalas Turbi")
