@@ -298,7 +298,7 @@ def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria
             elif 'CHAT' in val_str: return 'background-color: #d9ead3; color: black'
             elif 'PAUSA' in val_str or val_str == 'P': return 'background-color: #fce5cd; color: black'
             elif 'EMAIL' in val_str: return 'background-color: #bfe1f6; color: black'
-            elif 'FINANCEIRO' in val_str: return 'background-color: #11734b; color: white'
+            elif 'FINANCEIRO' in val_str: return 'background-color: #000000; color: white'
             
         return ''
         
