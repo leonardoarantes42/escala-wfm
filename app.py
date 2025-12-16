@@ -35,7 +35,7 @@ st.markdown("""
             z-index: 99999 !important;
         }
         
-        /* 2. TABELA */
+       /* 2. TABELA */
         .table-container {
             overflow-y: auto; overflow-x: auto; display: block;
             border: 1px solid #444; border-radius: 4px; background-color: #0e1117;
@@ -48,9 +48,23 @@ st.markdown("""
             top: -30px; margin-bottom: -30px;
         }
         table { width: 100%; border-collapse: separate; border-spacing: 0; font-family: sans-serif; font-size: 11px; }
-        th, td { padding: 4px 6px; text-align: center; border-bottom: 1px solid #444; border-right: 1px solid #444; white-space: nowrap; }
+        
+        /* AJUSTE DE LARGURA: min-width garante que as colunas do final não fiquem espremidas */
+        th, td { 
+            padding: 4px 6px; text-align: center; 
+            border-bottom: 1px solid #444; border-right: 1px solid #444; 
+            white-space: nowrap; 
+            min-width: 70px; /* <--- NOVO: Largura mínima para todas as células */
+        }
+        
         thead th { position: sticky; top: 0; background-color: #0e1117; color: white; z-index: 5; border-bottom: 2px solid #666; height: 35px; font-size: 11px; }
-        table td:first-child, table th:first-child { position: sticky; left: 0; background-color: #1c1e24; z-index: 6; border-right: 2px solid #666; font-weight: bold; text-align: left; min-width: 140px; }
+        
+        /* Primeira coluna (Nomes) fica um pouco mais larga e fixa */
+        table td:first-child, table th:first-child { 
+            position: sticky; left: 0; background-color: #1c1e24; z-index: 6; 
+            border-right: 2px solid #666; font-weight: bold; text-align: left; 
+            min-width: 160px; /* <--- NOVO: Largura fixa maior para nomes */
+        }
         thead th:first-child { z-index: 7; background-color: #0e1117; }
 
         @media (prefers-color-scheme: light) {
@@ -282,37 +296,62 @@ def filtrar_e_ordenar_dim(df, modo):
     return df_f.drop(columns=['SORT_TEMP'])
 
 def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria'):
-    def get_color(val):
-        val_str = str(val).upper().strip()
+    # Função que analisa a LINHA INTEIRA (row)
+    def style_row(row):
+        styles = []
         
-        # 1. DIVISORES VISUAIS (Adicionei PLENO e STAFF aqui)
-        if val_str in ['FINANCEIRO', 'E-MAIL', 'FINANCEIRO ASSINCRONO', 'PLENO', 'STAFF', 'N2']:
-            return 'background-color: #000000; color: white; font-weight: bold;'
+        # 1. Verifica se é uma LINHA DE CABEÇALHO/DIVISÃO (Olhando a coluna NOME)
+        # Se a coluna NOME tiver um desses valores, a linha toda fica preta
+        nome_linha = str(row['NOME']).upper().strip() if 'NOME' in row else ''
+        
+        # Lista de divisores visuais
+        eh_cabecalho = nome_linha in [
+            'FINANCEIRO', 'E-MAIL', 'FINANCEIRO ASSINCRONO', 
+            'ANALISTAS JR TRABALHANDO NO DIA', 'PLENO', 'STAFF', 
+            'ANALISTAS FINANCEIRO TRABALHANDO NO DIA', 'ANALISTAS E-MAIL TRABALHANDO NO DIA'
+        ]
+        
+        for col, val in row.items():
+            val_str = str(val).upper().strip()
+            style = ''
             
-        # 2. REGRA GERAL (Vale para Mensal e Diário)
-        if val_str == 'FR': 
-            return 'background-color: #ffffff; color: black' # Fundo branco, letra preta
+            # --- REGRA 1: CABEÇALHOS (Linha Preta) ---
+            if eh_cabecalho:
+                style = 'background-color: #000000; color: white; font-weight: bold;'
+            
+            # --- REGRA 2: SLOTS NORMAIS (Coloridos) ---
+            else:
+                # Regras Gerais (Valem para Mensal e Diário)
+                if val_str == 'FR': 
+                    style = 'background-color: #ffffff; color: black' # Branco pedido
+                elif val_str == 'AF': 
+                    style = 'background-color: #f4cccc; color: black' # Vermelho claro
 
-        # 3. REGRAS ESPECÍFICAS POR MODO
-        if modo_cores == 'mensal':
-            if val_str == 'T': return 'background-color: #c9daf8; color: black'
-            elif val_str == 'F': return 'background-color: #93c47d; color: black'
-            elif val_str == 'AF': return 'background-color: #f4cccc; color: black'
+                # Regras Específicas
+                if modo_cores == 'mensal':
+                    if val_str == 'T': style = 'background-color: #c9daf8; color: black'
+                    elif val_str == 'F': style = 'background-color: #93c47d; color: black'
+                else:
+                    # Cores Diárias
+                    if val_str == 'F': style = 'background-color: #002060; color: white'
+                    elif val_str == 'RT': style = 'background-color: #e6cff2; color: black' # Lilás pedido
+                    elif val_str == 'REEMBOLSOS': style = 'background-color: #d4edbc; color: black' # Verde claro pedido
+                    
+                    elif 'CHAT' in val_str: style = 'background-color: #d9ead3; color: black'
+                    elif 'PAUSA' in val_str or val_str == 'P': style = 'background-color: #fce5cd; color: black'
+                    
+                    # Aqui resolvemos a "Separação":
+                    # Como já passamos pelo 'if eh_cabecalho', se caiu aqui é porque é SLOT de horário
+                    elif 'EMAIL' in val_str or 'E-MAIL' in val_str: style = 'background-color: #bfe1f6; color: black' # Azul claro
+                    elif 'FINANCEIRO' in val_str: style = 'background-color: #11734b; color: white' # Verde escuro
+                    elif 'BACKOFFICE' in val_str: style = 'background-color: #5a3286; color: white'
             
-        else: # Modo Diário
-            if val_str == 'F': return 'background-color: #002060; color: white'
-            elif val_str == 'AF': return 'background-color: #f4cccc; color: black' 
-            elif val_str == 'RT': return 'background-color: #e6cff2; color: black'
-            
-            elif 'CHAT' in val_str: return 'background-color: #d9ead3; color: black'
-            elif 'PAUSA' in val_str or val_str == 'P': return 'background-color: #fce5cd; color: black'
-            elif 'EMAIL' in val_str: return 'background-color: #bfe1f6; color: black'
-            elif 'FINANCEIRO' in val_str: return 'background-color: #11734b; color: white'
-            elif 'BACKOFFICE' in val_str: return 'background-color: #5a3286; color: white'
-            
-        return ''
-        
-    return f'<div class="table-container {classe_altura}">{df.style.map(get_color).hide(axis="index").to_html()}</div>'
+            styles.append(style)
+        return styles
+
+    # Aplica o estilo linha por linha
+    styler = df.style.apply(style_row, axis=1)
+    return f'<div class="table-container {classe_altura}">{styler.hide(axis="index").to_html()}</div>'
 
 # ================= SISTEMA DE LOGIN SEGURO =================
 
@@ -485,12 +524,14 @@ with aba_mensal:
 
 with aba_diaria:
     abas_dim = listar_abas_dim()
-    if not abas_dim: 
-        st.warning("Nenhuma aba de dimensão (DIM) encontrada.")
-    else:
-        aba_sel = next((a for a in abas_dim if texto_busca in a), abas_dim[0])
-                
-        df_dim, _ = carregar_dados_aba(aba_sel)
+    
+    # Formata a busca para bater com o nome da aba (Ex: "16/12")
+    # Tenta achar uma aba que contenha a data filtrada
+    aba_encontrada = next((a for a in abas_dim if texto_busca in a), None)
+    
+    if aba_encontrada:
+        # SE ACHAR, CARREGA NORMALMENTE
+        df_dim, _ = carregar_dados_aba(aba_encontrada)
         
         if df_dim is not None:
             analise = analisar_gargalos_dim(df_dim)
@@ -507,19 +548,29 @@ with aba_diaria:
             
             if sel_lider and 'LIDER' in df_dim_f.columns:
                 df_dim_f = df_dim_f[df_dim_f['LIDER'].isin(sel_lider)]
-                
             if sel_ilha and 'ILHA' in df_dim_f.columns:
                 df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
-                
             if busca_nome and 'NOME' in df_dim_f.columns:
                 df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
             
             tipo = st.radio("Modo:", ["▦ Grade", "💬 Apenas Chat", "🚫 Apenas Folgas"], horizontal=True, label_visibility="collapsed")
-            
             df_exibicao = df_dim_f if tipo == "▦ Grade" else filtrar_e_ordenar_dim(df_dim_f, tipo)
             
             cols_v = [c for c in df_exibicao.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ILHA', 'Z']]
             st.markdown(renderizar_tabela_html(df_exibicao[cols_v], 'diario', 'height-diaria'), unsafe_allow_html=True)
+            
+    else:
+        # SE NÃO ACHAR A ABA (MOSTRA O AVISO)
+        st.warning(f"⚠️ A aba diária para **{texto_busca}** não foi encontrada.")
+        st.markdown(f"""
+            <div style="background-color: #1e1e1e; padding: 15px; border-radius: 5px; border-left: 5px solid #ffbd45;">
+                <p>Para poupar recursos, mantemos apenas as abas ativas nesta planilha.</p>
+                <p>O histórico completo pode ser acessado no Drive:</p>
+                <a href="https://drive.google.com/drive/folders/1WeIKaV6OvFOsNHdWhCirOx-zZogwdyPd?usp=drive_link" target="_blank" class="custom-link-btn" style="width: 200px;">
+                    📂 Acessar Histórico (Drive)
+                </a>
+            </div>
+        """, unsafe_allow_html=True)
 
 if eh_admin and aba_aderencia:
     with aba_aderencia:
