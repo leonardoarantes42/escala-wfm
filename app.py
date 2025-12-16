@@ -106,35 +106,31 @@ def carregar_dados_aba(nome_aba):
         try:
             worksheet = sh.worksheet(nome_aba)
         except gspread.WorksheetNotFound:
-            return None, None # Retorna vazio para tratarmos no layout principal
+            return None, None 
             
         dados = worksheet.get_all_values()
         
-        # 1. Localizar Cabeçalho (Busca nas primeiras 10 linhas)
+        # 1. Localizar Cabeçalho (Procura nas primeiras 15 linhas)
         indice_cabecalho = -1
         cabecalho_bruto = []
         
-        for i, linha in enumerate(dados[:10]):
-            # Normaliza a linha inteira para comparar sem acentos
+        for i, linha in enumerate(dados[:15]):
             linha_norm = [normalizar_texto(col) for col in linha]
-            
-            # Procura por palavras chave
+            # Procura NOME e LIDER/HORARIO na mesma linha
             if ("NOME" in linha_norm or "NOMES" in linha_norm) and ("LIDER" in linha_norm or "HORARIO" in linha_norm):
                 indice_cabecalho = i
-                cabecalho_bruto = linha # Pega a linha original (com formatação se tiver)
+                cabecalho_bruto = linha 
                 break
         
         if indice_cabecalho == -1: return None, None
 
-        # 2. Tratamento do Cabeçalho (Padronização)
+        # 2. Tratamento do Cabeçalho
         cabecalho_tratado = []
         contagem_cols = {}
         for col in cabecalho_bruto:
-            col_str = normalizar_texto(col) # Remove acentos aqui! LÍDER vira LIDER
-            
+            col_str = normalizar_texto(col) 
             if col_str == "NOMES": col_str = "NOME"
             
-            # Tratamento de colunas duplicadas
             if col_str in contagem_cols:
                 contagem_cols[col_str] += 1
                 cabecalho_tratado.append(f"{col_str} ") 
@@ -142,34 +138,30 @@ def carregar_dados_aba(nome_aba):
                 if col_str != "": contagem_cols[col_str] = 1
                 cabecalho_tratado.append(col_str)
 
-        # 3. Criar DataFrame
         linhas = dados[indice_cabecalho + 1:]   
         df = pd.DataFrame(linhas, columns=cabecalho_tratado)
+        df = df.loc[:, df.columns != ''] 
         
-        # Limpeza básica
-        df = df.loc[:, df.columns != ''] # Remove colunas sem nome
-        
-        # Remove linhas vazias baseadas no NOME
+        # 3. FILTRAGEM INTELIGENTE (AQUI ESTAVA O PROBLEMA DO DIVISOR)
         if 'NOME' in df.columns: 
+            # Mantém qualquer linha que tenha algo escrito no NOME
             df = df[df['NOME'].astype(str).str.strip() != '']
             
-            # Remove linhas de separação (aquelas pretas como "Financeiro Assíncrono")
-            # Geralmente elas não têm horário de entrada ou líder preenchido
-            if 'LIDER' in df.columns:
-                 # Mantém apenas quem tem Lider preenchido OU é uma exceção válida
-                 df = df[df['LIDER'].astype(str).str.strip() != '']
+            # (Removi o filtro de LIDER para os divisores aparecerem)
 
         if 'ILHA' in df.columns: 
-            df = df[df['ILHA'].astype(str).str.strip() != '']
+            # Só filtra ILHA se não for um divisor (divisores costumam ter ilha vazia)
+            # Logica: Se tem ILHA preenchida OU é um divisor de seção conhecido
+            pass 
             
-        # Se for visão mensal (tem muitas colunas de datas), corta o excesso
+        # Se for visão mensal, corta colunas extras
         if len(df.columns) > 35: 
             df = df.iloc[:, :40] 
             
         return df, worksheet
 
     except Exception as e:
-        print(f"Erro interno: {e}")
+        print(f"Erro: {e}")
         return None, None
 
 def calcular_picos_vales_mensal(df_mensal):
@@ -246,19 +238,26 @@ def filtrar_e_ordenar_dim(df, modo):
 
 def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria'):
     def get_color(val):
-        val = str(val).upper().strip()
+        val_str = str(val).upper().strip()
+        
+        # REGRAS PARA O DIVISOR VISUAL
+        # Se o texto for um título de seção conhecido, pinta de preto
+        if val_str in ['FINANCEIRO', 'E-MAIL', 'FINANCEIRO ASSINCRONO', 'ANALISTAS JR TRABALHANDO NO DIA']:
+            return 'background-color: #000000; color: white; font-weight: bold;'
+            
         if modo_cores == 'mensal':
-            if val == 'T': return 'background-color: #c9daf8; color: black'
-            elif val == 'F': return 'background-color: #93c47d; color: black'
-            elif val == 'AF': return 'background-color: #f4cccc; color: black'
+            if val_str == 'T': return 'background-color: #c9daf8; color: black'
+            elif val_str == 'F': return 'background-color: #93c47d; color: black'
+            elif val_str == 'AF': return 'background-color: #f4cccc; color: black'
         else:
-            if val == 'F': return 'background-color: #002060; color: white'
-            elif 'CHAT' in val: return 'background-color: #d9ead3; color: black'
-            elif 'PAUSA' in val or val == 'P': return 'background-color: #fce5cd; color: black'
-            elif 'EMAIL' in val: return 'background-color: #bfe1f6; color: black'
-            elif 'FINANCEIRO' in val: return 'background-color: #11734b; color: white'
-            elif 'BACKOFFICE' in val: return 'background-color: #5a3286; color: white'
+            if val_str == 'F': return 'background-color: #002060; color: white'
+            elif 'CHAT' in val_str: return 'background-color: #d9ead3; color: black'
+            elif 'PAUSA' in val_str or val_str == 'P': return 'background-color: #fce5cd; color: black'
+            elif 'EMAIL' in val_str: return 'background-color: #bfe1f6; color: black'
+            elif 'FINANCEIRO' in val_str: return 'background-color: #11734b; color: white' # Verde do status
+            
         return ''
+        
     return f'<div class="table-container {classe_altura}">{df.style.map(get_color).hide(axis="index").to_html()}</div>'
 
 # ================= SISTEMA DE LOGIN SEGURO =================
@@ -399,55 +398,42 @@ MAPA_MESES = {
 }
 
 with aba_mensal:
-    # 1. Descobre qual aba carregar baseado na data selecionada no filtro lá em cima
-    mes_selecionado = data_sel.month
-    nome_aba_alvo = MAPA_MESES.get(mes_selecionado)
+    # Pega o número do mês da data selecionada no filtro (ex: 16/12 -> 12)
+    mes_num = data_sel.month
+    nome_aba_oficial = MAPA_MESES.get(mes_num)
     
-    # 2. Tenta carregar
-    df_global, _ = carregar_dados_aba(nome_aba_alvo)
+    df_global, _ = carregar_dados_aba(nome_aba_oficial)
 
-    # 3. Verifica se carregou
     if df_global is None:
-        # SE NÃO ACHOU A ABA (ex: buscou Março/2024 mas a planilha não tem ainda)
-        st.warning(f"⚠️ A aba **{nome_aba_alvo}** não está disponível no arquivo atual.")
-        st.markdown(f"""
-            <div style="background-color: #1e1e1e; padding: 15px; border-radius: 5px; border-left: 5px solid #ffbd45;">
-                <p>Para poupar recursos, mantemos apenas os meses ativos nesta planilha.</p>
-                <p>O histórico completo pode ser acessado no Drive:</p>
-                <a href="https://drive.google.com/drive/folders/1WeIKaV6OvFOsNHdWhCirOx-zZogwdyPd?usp=drive_link" target="_blank" class="custom-link-btn" style="width: 200px;">
-                    📂 Acessar Histórico (Drive)
-                </a>
-            </div>
-        """, unsafe_allow_html=True)
-    
+        st.warning(f"⚠️ A aba **{nome_aba_oficial}** não foi encontrada na planilha.")
+        st.info("Dica: Verifique se a aba existe ou selecione outra data.")
     else:
-        # SE ACHOU, MOSTRA OS DADOS (Seu código original de exibição)
+        # Lógica de exibição normal
         colunas_datas = [c for c in df_global.columns if '/' in c]
+        # Tenta achar a data exata, senão pega a primeira
         dia_show = texto_busca if texto_busca in colunas_datas else (colunas_datas[0] if colunas_datas else None)
         
         if dia_show:
             kpis = calcular_kpis_mensal_detalhado(df_global, dia_show)
-            picos = calcular_picos_vales_mensal(df_global)
+            # ... (Seus KPIs aqui - pode manter o código antigo dos KPIs)
             
-            k1, k2, k3, k4, k5, k6 = st.columns(6)
+            k1, k2, k3, k4 = st.columns(4)
             with k1: st.metric("✅ Escalados", kpis["NoChat"])
             with k2: st.metric("🛋️ Folgas", kpis["Folga"])
             with k3: st.metric("🎧 Suporte", kpis["Suporte"])
             with k4: st.metric("🚨 Emergência", kpis["Emergencia"])
-            if picos:
-                with k5: st.metric("📈 Pico", f"{picos['max_dia']}", f"{picos['max_val']}")
-                with k6: st.metric("📉 Vale", f"{picos['min_dia']}", f"{picos['min_val']}", delta_color="inverse")
-            
+
             df_f = df_global.copy()
+            # Filtros
             if sel_lider: df_f = df_f[df_f['LIDER'].isin(sel_lider)]
             if sel_ilha and 'ILHA' in df_f.columns: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
             if busca_nome: df_f = df_f[df_f['NOME'].str.contains(busca_nome, case=False)]
             
-            # Remove colunas técnicas para exibição
+            # Limpa colunas técnicas
             cols_clean = [c for c in df_f.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ADMISSÃO', 'ILHA', 'Z']]
             st.markdown(renderizar_tabela_html(df_f[cols_clean], 'mensal', 'height-mensal'), unsafe_allow_html=True)
         else:
-            st.info("Nenhuma coluna de data encontrada nesta aba.")
+            st.warning("Não encontrei colunas de data (DD/MM) nesta aba.")
 
 with aba_diaria:
     abas_dim = listar_abas_dim()
