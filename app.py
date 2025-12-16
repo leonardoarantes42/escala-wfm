@@ -419,8 +419,6 @@ usuario_url = params.get("u")
 senha_url = params.get("k")
 
 # 1. TENTA LOGIN VIA COOKIE (Recuperação de F5)
-token_cookie = cookies.get("turbi_token")
-
 if token_cookie and not st.session_state.get("logado", False):
     try:
         email_cookie = token_cookie.split("|")[0]
