@@ -203,18 +203,7 @@ def carregar_lista_pessoas():
             ws = sh.worksheet("Pessoas")
         except:
             return [], []
-        dados = ws.get_all_records()
-        df = pd.DataFrame(dados)
-        df.columns = [str(c).upper().strip() for c in df.columns]
-        lideres = []; ilhas = []
-        col_lider = next((c for c in df.columns if 'LIDER' in c), None)
-        if col_lider: lideres = sorted([str(x).strip() for x in df[col_lider].unique() if str(x).strip() != ''])
-        col_ilha = next((c for c in df.columns if 'ILHA' in c), None)
-        if col_ilha: ilhas = sorted([str(x).strip() for x in df[col_ilha].unique() if str(x).strip() != ''])
-        return lideres, ilhas
-    except Exception as e:
-        return [], []
-            
+        
         # Pega todos os dados
         dados = ws.get_all_records()
         df = pd.DataFrame(dados)
@@ -240,6 +229,7 @@ def carregar_lista_pessoas():
     except Exception as e:
         print(f"Erro ao ler Pessoas: {e}")
         return [], []
+
 def calcular_picos_vales_mensal(df_mensal):
     cols_data = [c for c in df_mensal.columns if '/' in c]
     if not cols_data: return None
@@ -412,6 +402,10 @@ def impor_sessao_unica(email):
     
     manager[email] = st.session_state["session_id"]
 
+# --- LÓGICA DE ENTRADA ---
+
+cookie_manager = get_cookie_manager()
+cookies = cookie_manager.get_all()
 
 # Tenta pegar login da URL
 params = st.query_params
@@ -419,6 +413,8 @@ usuario_url = params.get("u")
 senha_url = params.get("k")
 
 # 1. TENTA LOGIN VIA COOKIE (Recuperação de F5)
+token_cookie = cookies.get("turbi_token")
+
 if token_cookie and not st.session_state.get("logado", False):
     try:
         email_cookie = token_cookie.split("|")[0]
@@ -434,26 +430,15 @@ if token_cookie and not st.session_state.get("logado", False):
     except:
         pass 
 
-# 2. ANTI-FLASH (O Segredo da Tela Preta/Carregando)
-# Se não está logado e é a PRIMEIRA vez que o script roda (F5),
-# nós forçamos uma espera antes de mostrar o login.
+# 2. ANTI-FLASH
 if not st.session_state.get("logado", False):
-    
-    # Se ainda não tentamos verificar o cookie nesta sessão...
     if "auth_check_completed" not in st.session_state:
-        # Mostra um spinner bonito no meio da tela
         with st.spinner("Verificando credenciais..."):
-            # Marca que já tentamos (para na próxima passada liberar o login se falhar)
             st.session_state["auth_check_completed"] = True
-            # Espera 1 segundinho pro CookieManager ter tempo de conversar com o navegador
             time.sleep(1)
-            # Recarrega a página
             st.rerun()
-            
-    # Se chegou aqui, é porque já esperamos 1 segundo e o cookie não apareceu.
-    # Então liberamos a tela de login.
 
-# 3. Se ainda não logou (e já passou pelo Anti-Flash), mostra Login
+# 3. Se ainda não logou, mostra Login
 if not st.session_state.get("logado", False):
     login_aprovado = False
     email_login = ""
@@ -500,110 +485,6 @@ if not st.session_state.get("logado", False):
 # Se passou, está logado. Ativa guardião.
 impor_sessao_unica(st.session_state["usuario"])
 
-def impor_sessao_unica(email):
-    """Garante apenas 1 aba ativa por email"""
-    manager = get_session_manager()
-    
-    if "session_id" not in st.session_state:
-        st.session_state["session_id"] = str(uuid.uuid4())
-        manager[email] = st.session_state["session_id"]
-    
-    # Se o ID salvo no servidor for diferente do meu, alguém entrou depois
-    if manager.get(email) != st.session_state["session_id"]:
-        st.warning("⚠️ Conexão desconectada. Esta conta foi aberta em outro local.")
-        time.sleep(3)
-        st.session_state.clear()
-        st.rerun()
-    
-    # Renova a posse
-    manager[email] = st.session_state["session_id"]
-
-# --- LÓGICA DE ENTRADA ---
-
-cookie_manager = get_cookie_manager()
-
-# Pega todos os cookies disponíveis
-cookies = cookie_manager.get_all()
-
-# Tenta pegar login da URL (Link Mágico)
-params = st.query_params
-usuario_url = params.get("u")
-senha_url = params.get("k")
-
-# 1. TENTA LOGIN VIA COOKIE (Recuperação de F5)
-token_cookie = cookies.get("turbi_token")
-
-# Só tenta validar o cookie se o usuário NÃO estiver logado na sessão atual
-if token_cookie and not st.session_state.get("logado", False):
-    try:
-        email_cookie = token_cookie.split("|")[0]
-        # Valida se o email existe nos secrets
-        if email_cookie in st.secrets["credentials"]["usernames"]:
-            dados = st.secrets["credentials"]["usernames"][email_cookie]
-            st.session_state.update({
-                "logado": True, 
-                "usuario": email_cookie, 
-                "nome": dados["name"], 
-                "roles": dados.get("roles", ["viewer"])
-            })
-            # Se recuperou pelo cookie, forçamos um rerun para atualizar a tela limpa
-            st.rerun()
-    except:
-        pass # Cookie inválido ou antigo
-
-# 2. Se ainda não logou, tenta Manual ou Link da URL
-if not st.session_state.get("logado", False):
-    login_aprovado = False
-    email_login = ""
-    dados_login = {}
-
-    # A) Veio pelo Link Mágico (URL)?
-    if usuario_url and senha_url:
-        val, dados = validar_senha(usuario_url, senha_url)
-        if val:
-            login_aprovado = True
-            email_login = usuario_url
-            dados_login = dados
-            st.query_params.clear() # Limpa a URL para segurança
-
-    # B) Tela de Login Manual
-    if not login_aprovado:
-        c1, c2, c3 = st.columns([1, 2, 1])
-        with c2:
-            st.markdown("### 🔒 Acesso Sistema de Escalas Turbi")
-            i_user = st.text_input("E-mail", placeholder="ex: nome@turbi.com.br")
-            i_pass = st.text_input("Senha", type="password")
-            if st.button("Entrar", type="primary", use_container_width=True):
-                val, dados = validar_senha(i_user.strip(), i_pass)
-                if val:
-                    login_aprovado = True
-                    email_login = i_user.strip()
-                    dados_login = dados
-                else: st.error("Acesso negado.")
-    
-    # 3. Executa o Login e GRAVA O COOKIE
-    if login_aprovado:
-        st.session_state.update({
-            "logado": True, 
-            "usuario": email_login, 
-            "nome": dados_login["name"], 
-            "roles": dados_login.get("roles", ["viewer"])
-        })
-        
-        # SALVA O COOKIE NO NAVEGADOR (Validade de 1 dia)
-        token_seguro = f"{email_login}|{str(uuid.uuid4())}"
-        
-        # O cookie_manager.set demora um pouquinho, por isso o sleep
-        cookie_manager.set("turbi_token", token_seguro, key="set_cookie", expires_at=datetime.now() + pd.Timedelta(days=1))
-        
-        time.sleep(0.5) 
-        st.rerun()
-    
-    st.stop() # Para o código aqui se não estiver logado
-
-# Se passou, está logado. Ativa guardião de sessão única.
-impor_sessao_unica(st.session_state["usuario"])
-
 # ================= APP PRINCIPAL =================
 
 # 1. Carrega APENAS as listas leves para os filtros (Muito mais rápido!)
@@ -620,7 +501,6 @@ with st.sidebar:
     
     st.markdown("#### 🔍 Filtros")
     
-    # Agora as opções vêm da aba Pessoas, e não mais do df_global pesado
     sel_lider = st.multiselect("Líder", options=opcoes_lider)
     sel_ilha = st.multiselect("Ilha", options=opcoes_ilha)
     
@@ -629,7 +509,6 @@ with st.sidebar:
     st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
     st.markdown('<div class="footer-simple">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
 
-# --- HEADER ---
 # --- HEADER ---
 c_title, _, c_search = st.columns([2, 0.5, 1.2])
 with c_title: st.markdown("### 🚙 Sistema de Escalas Turbi")
