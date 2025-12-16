@@ -90,12 +90,13 @@ st.markdown("""
         .footer-simple { margin-top: 10px; padding-top: 10px; border-top: 1px solid #444; color: #666; font-size: 10px; text-align: center; }
         [data-testid="stTabs"] { margin-top: -40px !important; }
         [data-testid="stRadio"] { margin-top: -30px !important; }
-    </style>
+
         /* 5. REMOVER STATUS DE CARREGAMENTO (NOVIDADE) */
         /* Esconde o "Running..." do topo direito */
         [data-testid="stStatusWidget"] {
             visibility: hidden;
         }
+    </style>
 """, unsafe_allow_html=True)
 
 # --- CONSTANTES ---
