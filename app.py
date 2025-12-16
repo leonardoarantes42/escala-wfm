@@ -502,14 +502,14 @@ with aba_mensal:
             
             k1, k2, k3, k4, k5, k6 = st.columns(6)
             
-            with k1: st.metric("✅ Escalados", kpis["NoChat"])
-            with k2: st.metric("🛋️ Folgas", kpis["Folga"])
-            with k3: st.metric("🎧 Suporte", kpis["Suporte"])
-            with k4: st.metric("🚨 Emergência", kpis["Emergencia"])
+            with k1: st.metric("✅ Escalados(Sup & Emerg)", kpis["NoChat"])
+            with k2: st.metric("🛋️ Folgas(Sup & Emerg)", kpis["Folga"])
+            with k3: st.metric("🎧 Escalados Suporte", kpis["Suporte"])
+            with k4: st.metric("🚨 Escalados Emergência", kpis["Emergencia"])
             
             if picos:
-                with k5: st.metric("📈 Pico", f"{picos['max_dia']}", f"{picos['max_val']}")
-                with k6: st.metric("📉 Vale", f"{picos['min_dia']}", f"{picos['min_val']}", delta_color="inverse")
+                with k5: st.metric("📈 Pico(Sup & Emerg)", f"{picos['max_dia']}", f"{picos['max_val']}")
+                with k6: st.metric("📉 Vale(Sup & Emerg)", f"{picos['min_dia']}", f"{picos['min_val']}", delta_color="inverse")
 
             df_f = df_global.copy()
             if sel_lider: df_f = df_f[df_f['LIDER'].isin(sel_lider)]
@@ -538,7 +538,7 @@ with aba_diaria:
             
             kc1, kc2, kc3, kc4 = st.columns(4)
             with kc1: st.metric("👥 No Chat", resumo["Trabalhando"])
-            with kc2: st.metric("🛋️ Folgas", resumo["Folga"])
+            with kc2: st.metric("🛋️ Folgas(Sup & Emerg)", resumo["Folga"])
             if analise:
                 with kc3: st.metric("⚠️ Menos Chats", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
                 with kc4: st.metric("☕ Mais Pausas", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
