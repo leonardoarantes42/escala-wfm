@@ -306,9 +306,8 @@ def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria
         
         # Lista de divisores visuais
         eh_cabecalho = nome_linha in [
-            'FINANCEIRO', 'E-MAIL', 'FINANCEIRO ASSINCRONO', 
-            'ANALISTAS JR TRABALHANDO NO DIA', 'PLENO', 'STAFF', 
-            'ANALISTAS FINANCEIRO TRABALHANDO NO DIA', 'ANALISTAS E-MAIL TRABALHANDO NO DIA'
+            'FINANCEIRO', 'E-MAIL', 'FINANCEIRO ASSÍNCRONO', 
+            'PLENO', 'STAFF', 'N2'
         ]
         
         for col, val in row.items():
