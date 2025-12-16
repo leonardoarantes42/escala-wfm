@@ -101,7 +101,7 @@ def normalizar_texto(texto):
     return ''.join(c for c in unicodedata.normalize('NFD', str(texto))
                   if unicodedata.category(c) != 'Mn').upper().strip()
     
-@st.cache_data(ttl=300) 
+@st.cache_data(ttl=600) 
 def carregar_dados_aba(nome_aba):
     client = conectar_google_sheets()
     try:
@@ -172,7 +172,45 @@ def carregar_dados_aba(nome_aba):
     except Exception as e:
         print(f"Erro: {e}")
         return None, None
-
+    pass
+    @st.cache_data(ttl=600)
+def carregar_lista_pessoas():
+    client = conectar_google_sheets()
+    try:
+        sh = client.open_by_url(URL_PLANILHA)
+        # Tenta pegar a aba "Pessoas"
+        try:
+            ws = sh.worksheet("Pessoas")
+        except:
+            return [], [] # Se não achar, retorna listas vazias
+            
+        # Pega todos os dados
+        dados = ws.get_all_records() # O get_all_records já pega a linha 1 como cabeçalho automaticamente
+        df = pd.DataFrame(dados)
+        
+        # Normaliza nomes das colunas para evitar erro de maiúscula/minúscula
+        # Ex: "Lider Atual" vira "LIDER ATUAL"
+        df.columns = [str(c).upper().strip() for c in df.columns]
+        
+        # Extrai listas únicas e ordenadas
+        lideres = []
+        ilhas = []
+        
+        # Procura coluna de Líder (LIDER ATUAL ou LIDER)
+        col_lider = next((c for c in df.columns if 'LIDER' in c), None)
+        if col_lider:
+            lideres = sorted([x for x in df[col_lider].unique() if str(x).strip() != ''])
+            
+        # Procura coluna de Ilha
+        col_ilha = next((c for c in df.columns if 'ILHA' in c), None)
+        if col_ilha:
+            ilhas = sorted([x for x in df[col_ilha].unique() if str(x).strip() != ''])
+            
+        return lideres, ilhas
+        
+    except Exception as e:
+        print(f"Erro ao ler Pessoas: {e}")
+        return [], []
 def calcular_picos_vales_mensal(df_mensal):
     cols_data = [c for c in df_mensal.columns if '/' in c]
     if not cols_data: return None
