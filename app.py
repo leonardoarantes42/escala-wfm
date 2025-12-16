@@ -74,7 +74,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- CONSTANTES ---
-URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1sZ8fpjLMfJb25TfJL9Rj8Yhkdw91sZ0yNWGZIgKPO8Q"
+URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1L1WbR0rQcIra7J8S9AUX0yhwT-2RO-O4GMxAjaaBqr8/edit?gid=1076760569#gid=1076760569"
 LINK_FORMULARIO = "https://docs.google.com/forms/u/0/d/e/1FAIpQLScWvMZ60ISW6RqF0_ZxN_hD5ugOCITUQRlqiFi249EvmLbXyQ/formResponse"
 
 # --- FUNÇÕES DE DADOS ---
