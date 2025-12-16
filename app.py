@@ -356,12 +356,14 @@ def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria
 # ================= SISTEMA DE LOGIN (VIA COOKIES 🍪) =================
 
 # 1. Gerenciador de Cookies
-# CORREÇÃO: Removemos o parâmetro (experimental_allow_widgets=True) que dava erro
-@st.cache_resource
+# CORREÇÃO: Removemos o @st.cache_resource daqui. 
+# O componente deve ser carregado diretamente.
 def get_cookie_manager():
-    return stx.CookieManager()
+    # Adicionei uma key fixa para evitar recriação desnecessária na interface
+    return stx.CookieManager(key="turbi_cookie_manager")
 
 # 2. Gerenciador de Sessões Ativas (Singleton para Mata-Mata)
+# Esse aqui PODE e DEVE ter cache, pois é só memória do servidor (dict)
 @st.cache_resource
 def get_session_manager():
     return {}
@@ -390,33 +392,36 @@ def impor_sessao_unica(email):
         st.session_state["session_id"] = str(uuid.uuid4())
         manager[email] = st.session_state["session_id"]
     
+    # Se o ID salvo no servidor for diferente do meu, alguém entrou depois
     if manager.get(email) != st.session_state["session_id"]:
         st.warning("⚠️ Conexão desconectada. Esta conta foi aberta em outro local.")
         time.sleep(3)
         st.session_state.clear()
         st.rerun()
     
+    # Renova a posse
     manager[email] = st.session_state["session_id"]
 
 # --- LÓGICA DE ENTRADA ---
 
 cookie_manager = get_cookie_manager()
 
-# Pequeno delay para garantir que o cookie manager carregou antes de ler
-# Isso evita leituras falsas no primeiro milissegundo
+# Pega todos os cookies disponíveis
 cookies = cookie_manager.get_all()
 
-# Tenta pegar login da URL (apenas para o primeiro acesso via link mágico)
+# Tenta pegar login da URL (Link Mágico)
 params = st.query_params
 usuario_url = params.get("u")
 senha_url = params.get("k")
 
-# 1. Verifica se já existe um Cookie de Login Válido (Para o F5 funcionar)
+# 1. TENTA LOGIN VIA COOKIE (Recuperação de F5)
 token_cookie = cookies.get("turbi_token")
 
+# Só tenta validar o cookie se o usuário NÃO estiver logado na sessão atual
 if token_cookie and not st.session_state.get("logado", False):
     try:
         email_cookie = token_cookie.split("|")[0]
+        # Valida se o email existe nos secrets
         if email_cookie in st.secrets["credentials"]["usernames"]:
             dados = st.secrets["credentials"]["usernames"][email_cookie]
             st.session_state.update({
@@ -425,23 +430,25 @@ if token_cookie and not st.session_state.get("logado", False):
                 "nome": dados["name"], 
                 "roles": dados.get("roles", ["viewer"])
             })
+            # Se recuperou pelo cookie, forçamos um rerun para atualizar a tela limpa
+            st.rerun()
     except:
-        pass 
+        pass # Cookie inválido ou antigo
 
-# 2. Se não está logado pelo Cookie, tenta login Manual ou URL
+# 2. Se ainda não logou, tenta Manual ou Link da URL
 if not st.session_state.get("logado", False):
     login_aprovado = False
     email_login = ""
     dados_login = {}
 
-    # A) Veio pelo Link Mágico?
+    # A) Veio pelo Link Mágico (URL)?
     if usuario_url and senha_url:
         val, dados = validar_senha(usuario_url, senha_url)
         if val:
             login_aprovado = True
             email_login = usuario_url
             dados_login = dados
-            st.query_params.clear()
+            st.query_params.clear() # Limpa a URL para segurança
 
     # B) Tela de Login Manual
     if not login_aprovado:
@@ -467,16 +474,18 @@ if not st.session_state.get("logado", False):
             "roles": dados_login.get("roles", ["viewer"])
         })
         
-        # SALVA O COOKIE (Validade de 1 dia)
+        # SALVA O COOKIE NO NAVEGADOR (Validade de 1 dia)
         token_seguro = f"{email_login}|{str(uuid.uuid4())}"
+        
+        # O cookie_manager.set demora um pouquinho, por isso o sleep
         cookie_manager.set("turbi_token", token_seguro, key="set_cookie", expires_at=datetime.now() + pd.Timedelta(days=1))
         
         time.sleep(0.5) 
         st.rerun()
     
-    st.stop() 
+    st.stop() # Para o código aqui se não estiver logado
 
-# Se passou, está logado. Ativa guardião.
+# Se passou, está logado. Ativa guardião de sessão única.
 impor_sessao_unica(st.session_state["usuario"])
 
 # ================= APP PRINCIPAL =================
