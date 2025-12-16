@@ -468,7 +468,7 @@ with aba_mensal:
             if sel_ilha and 'ILHA' in df_f.columns: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
             if busca_nome: df_f = df_f[df_f['NOME'].str.contains(busca_nome, case=False)]
             
-            cols_clean = [c for c in df_f.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ADMISSÃO', 'ILHA', 'Z']]
+            cols_clean = [c for c in df_f.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ADMISSAO', 'ILHA', 'Z']]
             st.markdown(renderizar_tabela_html(df_f[cols_clean], 'mensal', 'height-mensal'), unsafe_allow_html=True)
         else:
             st.warning("Não encontrei colunas de data nesta aba.")
