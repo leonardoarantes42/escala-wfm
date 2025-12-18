@@ -775,7 +775,7 @@ if eh_admin and aba_aderencia:
                 
                 /* 3. Aproxima os blocos verticais (métricas, gráficos) */
                 [data-testid='stVerticalBlock'] {
-                    gap: 0.5rem !important; 
+                    gap: 1rem !important; 
                 }
                 
                 /* 4. Remove gaps laterais das colunas */
