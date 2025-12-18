@@ -758,7 +758,19 @@ with aba_diaria:
 
 if eh_admin and aba_aderencia:
     with aba_aderencia:
-        st.markdown("<style>[data-testid='stVerticalBlock'] > [style*='flex-direction: column;'] > [data-testid='stVerticalBlock'] {gap: 0rem;}</style>", unsafe_allow_html=True)
+        # --- CSS PARA DEIXAR TUDO COMPACTO ---
+        st.markdown("""
+            <style>
+                /* Reduz o espaçamento entre os blocos verticais */
+                [data-testid='stVerticalBlock'] {
+                    gap: 0.5rem !important;
+                }
+                /* Reduz o padding interno das colunas */
+                [data-testid='stColumn'] {
+                    gap: 0rem !important;
+                }
+            </style>
+        """, unsafe_allow_html=True)
 
         # --- CARREGAMENTO ---
         df_pausas = carregar_dados_pausas()
@@ -779,9 +791,7 @@ if eh_admin and aba_aderencia:
                 if row_ad is not None:
                     qtd_prevista_pessoas = row_ad['Realizado (T)'] + row_ad['Afastado (AF)']
 
-        # --- CABEÇALHO ---
-        st.markdown(f"##### Resultados do Dia: **{texto_busca}**")
-        
+        # --- MÉTRICAS (KPIs) - LOGO NO TOPO ---
         c_desvio, c_pausa = st.columns(2)
         
         # KPI 1: DESVIO %
@@ -822,15 +832,14 @@ if eh_admin and aba_aderencia:
             if df_global is not None:
                  fig_b = px.bar(df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], text_auto='.0f', title="Evolução de Presença", color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
                  
-                 # Gráfico Barras: Y="Headcount", X=Sem Título
                  fig_b.update_layout(
-                     height=300, 
+                     height=250, # Reduzi altura para 250px para ficar mais compacto
                      margin=dict(t=30, b=0, l=0, r=0), 
                      showlegend=True,
                      xaxis_title=None,
                      yaxis_title="Headcount", 
                      legend_title_text=None,
-                     legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5)
+                     legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5)
                  )
                  st.plotly_chart(fig_b, use_container_width=True)
         with g2:
@@ -852,14 +861,13 @@ if eh_admin and aba_aderencia:
                     fig_l.update_traces(line_color='#d32f2f', name="Pausa Improdutiva", showlegend=True)
                     fig_l.update_xaxes(type='category', tickangle=-45)
                     
-                    # Gráfico Linha: Y="Total...", X=Sem Título
                     fig_l.update_layout(
-                        height=300, 
+                        height=250, # Reduzi altura para 250px para ficar mais compacto
                         margin=dict(t=30, b=0, l=0, r=0),
                         xaxis_title=None,
-                        yaxis_title="Total (menos e-mail e Projeto)", # <--- Restaurei aqui!
+                        yaxis_title="Total (menos e-mail e Projeto)",
                         legend_title_text=None,
-                        legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5)
+                        legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5)
                     )
                     st.plotly_chart(fig_l, use_container_width=True)
                 else:
