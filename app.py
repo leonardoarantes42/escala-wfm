@@ -764,85 +764,79 @@ if eh_admin and aba_aderencia:
         df_pausas = carregar_dados_pausas()
         df_online = carregar_dados_online()
         
-        # Filtros de Texto
         data_str_filtro = data_sel.strftime("%d/%m/%Y")
         string_busca_total_pausa = f"{data_str_filtro} Total"
 
-        # --- CÁLCULO DO PREVISTO (SEM TURNOVER) ---
+        # --- CÁLCULO DO PREVISTO ---
         qtd_prevista_pessoas = 0
         if df_global is not None:
             df_ad = gerar_dados_aderencia(df_global)
             cols_d = [c for c in df_global.columns if '/' in c]
             d_sel_fmt = data_sel.strftime("%d/%m")
             d_match = d_sel_fmt if d_sel_fmt in cols_d else (cols_d[0] if cols_d else None)
-            
             if df_ad is not None and d_match:
                 row_ad = df_ad[df_ad['Data'] == d_match].iloc[0] if not df_ad[df_ad['Data'] == d_match].empty else None
-                
                 if row_ad is not None:
-                    # REGRA NOVA: Soma T (Realizado) + AF (Afastado). Ignora TO (Turnover).
                     qtd_prevista_pessoas = row_ad['Realizado (T)'] + row_ad['Afastado (AF)']
 
-        # --- CABEÇALHO ---
+        # --- CABEÇALHO CENTRALIZADO COM EMOJIS ---
         st.markdown(f"##### Resultados do Dia: **{texto_busca}**")
-        k1, k2, k3 = st.columns(3)
         
-        # -----------------------------------------------------------
+        # Usamos 2 colunas iguais para centralizar
+        c_desvio, c_pausa = st.columns(2)
+        
         # KPI 1: DESVIO %
-        # -----------------------------------------------------------
-        # Multiplicador corrigido: 9.8 horas
         horas_previstas = qtd_prevista_pessoas * 9.8
         horas_realizadas = 0.0
-        
         if df_online is not None and 'Dia_Str' in df_online.columns:
             mask_dia = df_online['Dia_Str'] == data_str_filtro
             mask_val = df_online['Horas_Valor'] > 0
             df_online_filt = df_online[mask_dia & mask_val]
             horas_realizadas = df_online_filt['Horas_Valor'].sum()
             
-        # Cálculo do Desvio: (Real / Previsto) - 1
-        if horas_previstas > 0:
-            pct_desvio = ((horas_realizadas / horas_previstas) - 1) * 100
-        else:
-            pct_desvio = 0
+        pct_desvio = ((horas_realizadas / horas_previstas) - 1) * 100 if horas_previstas > 0 else 0
         
-        k1.metric(
-            "Desvio %", 
-            f"{pct_desvio:+.1f}%", 
-            f"Real: {horas_realizadas:.1f}h / Previsto: {horas_previstas:.1f}h"
-        )
+        with c_desvio:
+            st.metric(
+                "🎯 Desvio % (Real vs Previsto)", 
+                f"{pct_desvio:+.1f}%", 
+                f"Real: {horas_realizadas:.1f}h / Previsto: {horas_previstas:.1f}h"
+            )
 
         # KPI 2: MÉDIA PAUSA
         media_improdutiva = 0
         col_improd = "Total (menos e-mail e Projeto)" 
-        
         if df_pausas is not None and 'Dia_Str' in df_pausas.columns:
             row_total = df_pausas[df_pausas['Dia_Str'] == string_busca_total_pausa]
             if not row_total.empty and col_improd in df_pausas.columns:
                 media_improdutiva = row_total.iloc[0][col_improd]
         
-        k2.metric("Média % Pausa Improdutiva", f"{media_improdutiva:.1f}%", delta_color="inverse")
-        k3.empty()
+        with c_pausa:
+            st.metric("🛋️ Média % Pausa Improdutiva", f"{media_improdutiva:.1f}%", delta_color="inverse")
+            
         st.divider()
 
-        # --- GRÁFICOS ---
+        # --- GRÁFICOS COM LEGENDAS ---
         st.markdown("#### 📅 Visão Mensal & Detalhe")
         g1, g2 = st.columns(2)
         with g1:
             if df_global is not None:
                  fig_b = px.bar(df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], text_auto='.0f', title="Evolução de Presença", color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
-                 fig_b.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0), showlegend=False)
+                 # AJUSTE: showlegend=True e posicionamento na parte inferior
+                 fig_b.update_layout(
+                     height=300, 
+                     margin=dict(t=30, b=0, l=0, r=0), 
+                     showlegend=True,
+                     legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5)
+                 )
                  st.plotly_chart(fig_b, use_container_width=True)
         with g2:
             if df_pausas is not None and col_improd in df_pausas.columns:
                 df_trend = df_pausas.dropna(subset=['Dia_Date']).copy()
-                
-                # Filtro de Mês Vigente
                 df_trend = df_trend[
                     (df_trend['Dia_Date'].dt.month == data_sel.month) & 
                     (df_trend['Dia_Date'].dt.year == data_sel.year)
                 ]
-                
                 if not df_trend.empty:
                     df_trend_gp = df_trend.groupby('Dia_Date')[col_improd].mean().reset_index()
                     df_trend_gp['Data_Curta'] = df_trend_gp['Dia_Date'].dt.strftime('%d/%m')
@@ -851,9 +845,15 @@ if eh_admin and aba_aderencia:
                         df_trend_gp, x='Data_Curta', y=col_improd, 
                         title="Tendência Pausa (%)", markers=True
                     )
-                    fig_l.update_traces(line_color='#d32f2f')
-                    fig_l.update_xaxes(type='category', tickangle=30)
-                    fig_l.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0))
+                    # AJUSTE: Adiciona nome para legenda e ativa a legenda
+                    fig_l.update_traces(line_color='#d32f2f', name="Pausa Improdutiva", showlegend=True)
+                    fig_l.update_xaxes(type='category', tickangle=-45)
+                    # AJUSTE: Posicionamento da legenda na parte inferior
+                    fig_l.update_layout(
+                        height=300, 
+                        margin=dict(t=30, b=0, l=0, r=0),
+                        legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5)
+                    )
                     st.plotly_chart(fig_l, use_container_width=True)
                 else:
                     st.info("Sem dados de pausa para este mês.")
@@ -862,13 +862,11 @@ if eh_admin and aba_aderencia:
         if df_pausas is not None:
             mask_dia = df_pausas['Dia_Str'] == data_str_filtro
             mask_no_total = ~df_pausas['Dia_Str'].str.contains("Total", case=False, na=False)
-            
             df_detalhe = df_pausas[mask_dia & mask_no_total].copy()
             
             if not df_detalhe.empty:
                 col_pessoal = "%Pessoal"         
                 col_prog = "%Programacao"        
-                
                 cols_show = ['Nome_Analista', col_improd, col_pessoal, col_prog]
                 cols_show = [c for c in cols_show if c in df_detalhe.columns]
                 
@@ -876,7 +874,6 @@ if eh_admin and aba_aderencia:
                     df_detalhe = df_detalhe.sort_values(by=col_improd, ascending=False)
                 
                 st.markdown(f"##### 🕵️ Detalhe por Analista ({len(df_detalhe)} pessoas)")
-                
                 st.dataframe(
                     df_detalhe[cols_show],
                     use_container_width=True,
