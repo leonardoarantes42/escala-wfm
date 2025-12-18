@@ -230,6 +230,47 @@ def carregar_lista_pessoas():
         print(f"Erro ao ler Pessoas: {e}")
         return [], []
 
+@st.cache_data(ttl=600, show_spinner=False)
+def carregar_dados_pausas():
+    client = conectar_google_sheets()
+    try:
+        sh = client.open_by_url(URL_PLANILHA)
+        try:
+            ws = sh.worksheet("Pausas")
+        except:
+            return None
+            
+        # Pega todos os valores como lista de listas para garantir que headers venham certos
+        dados = ws.get_all_records()
+        df = pd.DataFrame(dados)
+        
+        # 1. Tratamento da Data
+        if 'Dia' in df.columns:
+            df['Dia'] = pd.to_datetime(df['Dia'], format="%d/%m/%Y", errors='coerce').dt.date
+            
+        # 2. Tratamento da Coluna Alvo (Total menos e-mail e Projeto)
+        # Nome exato que está no cabeçalho da coluna O do seu print
+        col_alvo = "Total (menos e-mail e Projeto)"
+        
+        if col_alvo in df.columns:
+            # Remove o '%' e troca vírgula por ponto (ex: "14,29%" -> 14.29)
+            df[col_alvo] = df[col_alvo].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False)
+            # Converte para número e divide por 100 para virar decimal (0.1429)
+            df[col_alvo] = pd.to_numeric(df[col_alvo], errors='coerce') / 100
+        
+        # Opcional: Tratar outras colunas se quiser mostrar detalhes
+        cols_extras = ['%Refeicao', '%Pessoal']
+        for c in cols_extras:
+            if c in df.columns:
+                df[c] = df[c].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False)
+                df[c] = pd.to_numeric(df[c], errors='coerce') / 100
+
+        return df
+        
+    except Exception as e:
+        print(f"Erro ao ler Pausas: {e}")
+        return None
+
 def calcular_picos_vales_mensal(df_mensal):
     cols_data = [c for c in df_mensal.columns if '/' in c]
     if not cols_data: return None
@@ -629,8 +670,65 @@ with aba_diaria:
 
 if eh_admin and aba_aderencia:
     with aba_aderencia:
+        # Tira o espaçamento padrão do Streamlit para ficar compacto
         st.markdown("<style>[data-testid='stVerticalBlock'] > [style*='flex-direction: column;'] > [data-testid='stVerticalBlock'] {gap: 0rem;}</style>", unsafe_allow_html=True)
         
+        # ==============================================================================
+        # 1. VISÃO DE PAUSAS (NOVA TABELA)
+        # ==============================================================================
+        df_pausas = carregar_dados_pausas()
+        
+        st.markdown(f"#### 📊 Aderência de Pausas (Improdutivas) - {texto_busca}")
+        
+        if df_pausas is not None and not df_pausas.empty:
+            df_dia = df_pausas[df_pausas['Dia'] == data_sel]
+            col_target = "Total (menos e-mail e Projeto)"
+            
+            if not df_dia.empty and col_target in df_dia.columns:
+                cols_to_show = ['Nome_Analista', col_target, '%Refeicao', '%Pessoal']
+                cols_to_show = [c for c in cols_to_show if c in df_dia.columns]
+                
+                df_show = df_dia[cols_to_show].copy()
+                df_show = df_show.sort_values(by=col_target, ascending=False)
+                
+                # Métricas Rápidas
+                media_improdutiva = df_show[col_target].mean()
+                max_improdutiva = df_show[col_target].max()
+                
+                m1, m2, m3 = st.columns(3)
+                with m1: st.metric("Média Pausa Improdutiva", f"{media_improdutiva:.1%}")
+                with m2: st.metric("Maior Desvio", f"{max_improdutiva:.1%}")
+                
+                st.divider()
+
+                # Tabela Visual
+                st.dataframe(
+                    df_show,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Nome_Analista": st.column_config.TextColumn("Analista", width="medium"),
+                        col_target: st.column_config.ProgressColumn(
+                            "Total Improdutivo",
+                            help="Soma de pausas (exceto E-mail e Projeto)",
+                            format="%.1f%%",
+                            min_value=0,
+                            max_value=0.3, 
+                        ),
+                        "%Refeicao": st.column_config.NumberColumn("% Refeição", format="%.1f%%"),
+                        "%Pessoal": st.column_config.NumberColumn("% Pessoal", format="%.1f%%")
+                    }
+                )
+            else:
+                st.info(f"Nenhum registro de pausa encontrado para {texto_busca}.")
+        else:
+            st.warning("Não foi possível carregar a aba 'Pausas'.")
+            
+        st.divider()
+
+        # ==============================================================================
+        # 2. VISÃO GERAL DE ADERÊNCIA (SEUS GRÁFICOS ANTIGOS)
+        # ==============================================================================
         if df_global is not None:
             df_ad = gerar_dados_aderencia(df_global)
             cols_d = [c for c in df_global.columns if '/' in c]
@@ -640,7 +738,7 @@ if eh_admin and aba_aderencia:
             
             if row is not None:
                 st.markdown('<div class="height-aderencia">', unsafe_allow_html=True)
-                st.markdown(f"#### Resultados para: **{d_sel}**")
+                st.markdown(f"#### Resultados Globais: **{d_sel}**")
                 
                 cg1, cg2 = st.columns([1, 2])
                 
