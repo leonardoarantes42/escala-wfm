@@ -773,12 +773,26 @@ if eh_admin and aba_aderencia:
                     gap: 0rem !important;
                 }
                 
-                /* 3. Aproxima os blocos verticais (métricas, gráficos) */
+                /* 3. Aproxima os blocos verticais */
                 [data-testid='stVerticalBlock'] {
-                    gap: 1rem !important; 
+                    gap: 0.1rem !important; 
                 }
                 
-                /* 4. Remove gaps laterais das colunas */
+                /* 4. Tira a margem gorda do Título H4 ("Visão Mensal & Detalhe") */
+                h4 {
+                    margin-top: 0.5rem !important;
+                    margin-bottom: 0.5rem !important;
+                    padding-top: 0rem !important;
+                    padding-bottom: 0rem !important;
+                }
+                
+                /* 5. Ajusta a Linha Divisória para ser fina e sem margem */
+                hr {
+                    margin-top: 0.2rem !important;
+                    margin-bottom: 0.2rem !important;
+                }
+                
+                /* 6. Remove gaps laterais das colunas */
                 [data-testid='stColumn'] {
                     gap: 0rem !important;
                 }
