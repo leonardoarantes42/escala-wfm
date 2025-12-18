@@ -272,6 +272,34 @@ def carregar_dados_pausas():
         return None
 
 @st.cache_data(ttl=600, show_spinner=False)
+def carregar_dados_online():
+    client = conectar_google_sheets()
+    try:
+        sh = client.open_by_url(URL_PLANILHA)
+        try:
+            ws = sh.worksheet("Online")
+        except:
+            return None
+            
+        dados = ws.get_all_records()
+        df = pd.DataFrame(dados)
+        
+        # Tratamento da Data (DD/MM/YYYY)
+        if 'Dia' in df.columns:
+            df['Dia_Dt'] = pd.to_datetime(df['Dia'], format="%d/%m/%Y", errors='coerce').dt.date
+
+        # Tratamento da Coluna de Horas (Online)
+        if 'Online' in df.columns:
+            # Troca vírgula por ponto (ex: "7,64" -> 7.64)
+            df['Online'] = df['Online'].astype(str).str.replace(',', '.', regex=False)
+            df['Online'] = pd.to_numeric(df['Online'], errors='coerce').fillna(0)
+            
+        return df
+    except Exception as e:
+        print(f"Erro ao ler Online: {e}")
+        return None
+
+@st.cache_data(ttl=600, show_spinner=False)
 def carregar_mapa_lideres():
     """Cria um dicionário {Nome_Analista: Nome_Lider} usando a aba Pessoas"""
     client = conectar_google_sheets()
@@ -699,152 +727,171 @@ if eh_admin and aba_aderencia:
 
         # --- CARREGAMENTO DE DADOS ---
         df_pausas = carregar_dados_pausas()
-        mapa_lideres = carregar_mapa_lideres() # Carrega o mapa de supervisores
+        df_online = carregar_dados_online()
+        mapa_lideres = carregar_mapa_lideres()
         
-        # Dados de Aderência Geral (Query do BigQuery/Logs)
-        df_ad = None
-        row_ad = None
+        # Preparação de datas para busca
+        # data_sel vem do calendário (YYYY-MM-DD). Precisamos converter para DD/MM/YYYY para buscar na planilha
+        data_busca_str = data_sel.strftime("%d/%m/%Y")
+        texto_busca_total = f"{data_busca_str} Total" # Ex: "18/12/2025 Total"
+
+        # Recupera número de pessoas escaladas (Do df_ad calculado anteriormente)
+        qtd_escalados = 0
         if df_global is not None:
             df_ad = gerar_dados_aderencia(df_global)
             cols_d = [c for c in df_global.columns if '/' in c]
-            d_sel = texto_busca if texto_busca in cols_d else (cols_d[0] if cols_d else None)
-            if df_ad is not None and d_sel:
-                row_ad = df_ad[df_ad['Data'] == d_sel].iloc[0] if not df_ad[df_ad['Data'] == d_sel].empty else None
+            d_sel_fmt = data_sel.strftime("%d/%m")
+            # Tenta achar a coluna compatível (ex: 18/12)
+            d_match = d_sel_fmt if d_sel_fmt in cols_d else (cols_d[0] if cols_d else None)
+            
+            if df_ad is not None and d_match:
+                row_ad = df_ad[df_ad['Data'] == d_match].iloc[0] if not df_ad[df_ad['Data'] == d_match].empty else None
+                if row_ad is not None:
+                    qtd_escalados = row_ad['Planejado']
 
         # ==============================================================================
-        # 1. CABEÇALHO DE MÉTRICAS (KPIs DO DIA)
+        # 1. CABEÇALHO DE RESULTADOS
         # ==============================================================================
-        st.markdown(f"### 🚀 Resultados do Dia: **{texto_busca}**")
+        st.markdown(f"##### Resultados do Dia: **{texto_busca}**") # Fonte menor (h5)
         
         k1, k2, k3 = st.columns(3)
         
-        # KPI 1: Aderência (Calculado da aba Mensal)
-        pct_aderencia = 0
-        meta_planejada = 0
-        if row_ad is not None:
-            pct_aderencia = (row_ad['Realizado (T)']/row_ad['Planejado']*100) if row_ad['Planejado'] > 0 else 0
-            meta_planejada = row_ad['Planejado']
+        # --- KPI 1: ADERÊNCIA GLOBAL (HORAS) ---
+        # Regra: Escalados * 8.8h (8h48) vs Soma Online
+        horas_planejadas = qtd_escalados * 8.8
+        horas_realizadas = 0.0
         
-        k1.metric("Aderência Global", f"{pct_aderencia:.1f}%", f"Escalados: {meta_planejada}")
+        if df_online is not None and not df_online.empty:
+            # Filtra o dia no df_online
+            mask_online = df_online['Dia_Dt'] == data_sel
+            horas_realizadas = df_online[mask_online]['Online'].sum()
+            
+        pct_aderencia_horas = (horas_realizadas / horas_planejadas * 100) if horas_planejadas > 0 else 0
+        
+        k1.metric(
+            "Aderência Global (Horas)", 
+            f"{pct_aderencia_horas:.1f}%", 
+            f"Real: {horas_realizadas:.1f}h / Meta: {horas_planejadas:.1f}h"
+        )
 
-        # KPI 2 e 3: Dados de Pausa (Calculado da aba Pausas)
-        col_improdutiva = "Total (menos e-mail e Projeto)" # Nome exato da coluna O
-        col_pausa_total_min = "Pausas_Total" # Nome da coluna que tem os minutos absolutos (M)
+        # --- KPI 2: MÉDIA PAUSA IMPRODUTIVA (DA LINHA TOTAL) ---
+        # Busca a linha específica "dd/mm/yyyy Total" na coluna 'Dia' da aba Pausas
+        media_improdutiva_total = 0
         
-        if df_pausas is not None and not df_pausas.empty:
-            df_dia_pausas = df_pausas[df_pausas['Dia'] == data_sel]
+        if df_pausas is not None:
+            # Procura a linha exata do total
+            row_total = df_pausas[df_pausas['Dia'] == texto_busca_total]
+            col_target = "Total (menos e-mail e Projeto)"
             
-            total_minutos_improdutivos = 0
-            media_percentual_improdutivo = 0
-            
-            if not df_dia_pausas.empty:
-                # Se tiver a coluna de % Improdutiva, calculamos a média do time
-                if col_improdutiva in df_dia_pausas.columns:
-                    media_percentual_improdutivo = df_dia_pausas[col_improdutiva].mean()
+            if not row_total.empty and col_target in df_pausas.columns:
+                media_improdutiva_total = row_total.iloc[0][col_target]
                 
-                # Tenta somar os minutos totais de pausa (Improdutiva + Produtiva ou só Improdutiva dependendo da coluna M ou O)
-                # Vamos usar a coluna M (Pausas_Total) para mostrar o volume bruto de pausa
-                if col_pausa_total_min in df_dia_pausas.columns:
-                    total_minutos_improdutivos = df_dia_pausas[col_pausa_total_min].sum()
-
-            k2.metric("Média % Pausa Improdutiva", f"{media_percentual_improdutivo:.1%}", delta_color="inverse")
-            k3.metric("Minutos Totais em Pausa (Time)", f"{int(total_minutos_improdutivos)} min")
+        k2.metric("Média % Pausa Improdutiva", f"{media_improdutiva_total:.1%}", delta_color="inverse")
+        
+        # KPI 3: (Vazio ou outra métrica futura, removi o Minutos Totais que estava zerado)
+        k3.empty()
         
         st.divider()
 
         # ==============================================================================
-        # 2. GRÁFICOS DE TENDÊNCIA (MÊS)
+        # 2. GRÁFICOS DE TENDÊNCIA
         # ==============================================================================
         st.markdown("#### 📅 Visão Mensal")
         g1, g2 = st.columns(2)
         
-        # GRÁFICO 1: Barras de Aderência (Esquerda)
+        # Gráfico Aderência (Igual anterior)
         with g1:
-            if df_ad is not None:
-                fig_b = px.bar(
+            if df_global is not None: # Reutilizando df_ad calculado lá em cima
+                 fig_b = px.bar(
                     df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], 
                     text_auto='.0f', title="Evolução de Presença",
                     color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'}
                 )
-                fig_b.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0), showlegend=False)
-                st.plotly_chart(fig_b, use_container_width=True)
+                 fig_b.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0), showlegend=False)
+                 st.plotly_chart(fig_b, use_container_width=True)
 
-        # GRÁFICO 2: Linha de Pausas (Direita) - NOVIDADE
+        # Gráfico Linha de Pausa (Tentativa de converter Dia para data válida para plotar)
         with g2:
-            if df_pausas is not None and col_improdutiva in df_pausas.columns:
-                # Agrupa por dia para pegar a média de pausa do time
-                df_trend = df_pausas.groupby('Dia')[col_improdutiva].mean().reset_index()
+            if df_pausas is not None:
+                # Cria cópia para não estragar o original
+                df_trend = df_pausas.copy()
+                # Tenta converter Dia para data, ignorando as linhas de "Total"
+                df_trend['Dia_Date'] = pd.to_datetime(df_trend['Dia'], format="%d/%m/%Y", errors='coerce')
+                df_trend = df_trend.dropna(subset=['Dia_Date']) # Remove linhas de Total
                 
-                fig_line = px.line(
-                    df_trend, x='Dia', y=col_improdutiva, 
-                    title="Tendência de Pausa Improdutiva (%)",
-                    markers=True
-                )
-                fig_line.update_traces(line_color='#d32f2f', texttemplate='%{y:.1%}', textposition="top center")
-                fig_line.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0), yaxis_tickformat='.0%')
-                st.plotly_chart(fig_line, use_container_width=True)
+                col_target = "Total (menos e-mail e Projeto)"
+                if col_target in df_trend.columns:
+                    # Agrupa por dia (média das pessoas no dia)
+                    df_trend_grouped = df_trend.groupby('Dia_Date')[col_target].mean().reset_index()
+                    
+                    fig_line = px.line(
+                        df_trend_grouped, x='Dia_Date', y=col_target, 
+                        title="Tendência de Pausa Improdutiva (%)", markers=True
+                    )
+                    fig_line.update_traces(line_color='#d32f2f', texttemplate='%{y:.1%}', textposition="top center")
+                    fig_line.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0), yaxis_tickformat='.0%')
+                    st.plotly_chart(fig_line, use_container_width=True)
 
         st.divider()
 
         # ==============================================================================
-        # 3. TABELA DETALHADA (COM FILTRO DE SUPERVISOR)
+        # 3. TABELA DETALHADA
         # ==============================================================================
         
         c_filt, c_tab = st.columns([1, 4])
         
-        df_show_final = pd.DataFrame()
-        
-        if df_pausas is not None and not df_pausas.empty:
-            df_dia = df_pausas[df_pausas['Dia'] == data_sel].copy()
+        if df_pausas is not None:
+            # Filtra apenas o dia selecionado (exato), removendo linha de Total
+            df_dia = df_pausas[df_pausas['Dia'] == data_busca_str].copy()
             
             if not df_dia.empty:
-                # --- PROCV DO LÍDER ---
-                # Cria coluna Líder mapeando o nome
+                # Mapeia Lider
                 df_dia['Lider'] = df_dia['Nome_Analista'].map(mapa_lideres).fillna("Não Identificado")
                 
-                # Filtro Lateral
                 with c_filt:
                     st.markdown("##### Filtros")
                     opcoes_lideres = sorted(df_dia['Lider'].unique().tolist())
                     sel_lider_pausa = st.multiselect("Filtrar Supervisor", options=opcoes_lideres)
                     
-                    # Filtra o DataFrame
                     if sel_lider_pausa:
                         df_dia = df_dia[df_dia['Lider'].isin(sel_lider_pausa)]
                 
-                # Prepara Tabela Final
-                if col_improdutiva in df_dia.columns:
-                    # Seleciona colunas
-                    cols = ['Nome_Analista', 'Lider', col_improdutiva, 'Pausas_Total', '%Refeicao', '%Pessoal']
-                    # Garante existência
-                    cols = [c for c in cols if c in df_dia.columns]
-                    
-                    df_show_final = df_dia[cols].copy()
-                    
-                    # Ordena do MAIOR infrator para o menor
-                    df_show_final = df_show_final.sort_values(by=col_improdutiva, ascending=False)
+                # Colunas solicitadas
+                col_pausa_total = "%Pausas_Total" 
+                col_pessoal = "%Pessoal"
+                col_prog = "%Programacao"
+                
+                cols_finais = ['Nome_Analista', 'Lider', col_pausa_total, col_pessoal, col_prog]
+                # Garante que existem
+                cols_finais = [c for c in cols_finais if c in df_dia.columns]
+                
+                df_show_final = df_dia[cols_finais].copy()
+                
+                # Ordena por Pausa Total descrescente
+                if col_pausa_total in df_show_final.columns:
+                    df_show_final = df_show_final.sort_values(by=col_pausa_total, ascending=False)
 
-                    with c_tab:
-                        st.markdown(f"##### 🕵️ Detalhe por Analista ({len(df_show_final)} pessoas)")
-                        st.dataframe(
-                            df_show_final,
-                            use_container_width=True,
-                            hide_index=True,
-                            height=500, # Aumentei a altura para ver mais gente
-                            column_config={
-                                "Nome_Analista": st.column_config.TextColumn("Analista", width="medium"),
-                                "Lider": st.column_config.TextColumn("Supervisor", width="small"),
-                                
-                                col_improdutiva: st.column_config.ProgressColumn(
-                                    "Pausa Improdutiva",
-                                    format="%.1f%%",
-                                    min_value=0,
-                                    max_value=0.30, # Barra enche aos 30%
-                                ),
-                                "Pausas_Total": st.column_config.NumberColumn("Min Totais", format="%d min"),
-                                "%Refeicao": st.column_config.NumberColumn("% Refeição", format="%.1f%%"),
-                                "%Pessoal": st.column_config.NumberColumn("% Pessoal", format="%.1f%%")
-                            }
-                        )
+                with c_tab:
+                    st.markdown(f"##### 🕵️ Detalhe por Analista ({len(df_show_final)} pessoas)")
+                    st.dataframe(
+                        df_show_final,
+                        use_container_width=True,
+                        hide_index=True,
+                        height=500,
+                        column_config={
+                            "Nome_Analista": st.column_config.TextColumn("Analista", width="medium"),
+                            "Lider": st.column_config.TextColumn("Supervisor", width="small"),
+                            
+                            col_pausa_total: st.column_config.NumberColumn(
+                                "Pausa Total", format="%.1f%%"
+                            ),
+                            col_pessoal: st.column_config.NumberColumn(
+                                "% Pessoal", format="%.1f%%"
+                            ),
+                            col_prog: st.column_config.NumberColumn(
+                                "% Programação", format="%.1f%%"
+                            )
+                        }
+                    )
             else:
-                st.info("Sem dados de pausa para este dia.")
+                st.info(f"Sem dados detalhados para o dia {texto_busca}.")
