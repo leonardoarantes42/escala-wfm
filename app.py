@@ -762,7 +762,7 @@ if eh_admin and aba_aderencia:
         st.markdown("""
             <style>
                 [data-testid='stVerticalBlock'] {
-                    gap: 0.2rem !important; 
+                    gap: 0rem !important; 
                 }
                 [data-testid='stColumn'] {
                     gap: 0rem !important;
