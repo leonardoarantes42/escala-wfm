@@ -231,6 +231,7 @@ def carregar_lista_pessoas():
         return [], []
 
 @st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def carregar_dados_pausas():
     client = conectar_google_sheets()
     try:
@@ -243,12 +244,11 @@ def carregar_dados_pausas():
         dados = ws.get_all_values()
         if len(dados) > 0:
             headers = dados[0]
+            # Remove espaços extras dos headers
+            headers = [str(h).strip() for h in headers]
             df = pd.DataFrame(dados[1:], columns=headers)
         else:
             return None
-
-        # Limpa nomes das colunas
-        df.columns = [str(c).strip() for c in df.columns]
 
         # Colunas de porcentagem
         cols_percent = [
@@ -258,29 +258,34 @@ def carregar_dados_pausas():
         
         for c in cols_percent:
             if c in df.columns:
-                def limpar_inteligente(x):
+                def limpar_percentual(x):
                     x_str = str(x).strip()
-                    # Se tiver %, limpa e divide
-                    if '%' in x_str:
-                        return float(x_str.replace('%', '').replace(',', '.')) / 100
+                    if not x_str: return 0.0
                     
-                    # Se for número puro (ex: "0,20" ou "20")
+                    # Se tiver %, remove, troca virgula e DIVIDE por 100
+                    if '%' in x_str:
+                        clean_val = x_str.replace('%', '').replace(',', '.')
+                        return float(clean_val) / 100
+                    
+                    # Se for número puro
                     try:
                         val = float(x_str.replace(',', '.'))
-                        # SEGREDO: Se for menor que 2, assume que já está em decimal (0.20)
-                        # Se for maior que 2, assume que está em inteiro (20) e divide
-                        if val <= 2.0: 
-                            return val
-                        else:
+                        # Lógica de segurança:
+                        # Se for > 1.0 (ex: 24.74), assume que é porcentagem inteira -> divide por 100
+                        # Se for <= 1.0 (ex: 0.24), assume que já é decimal -> mantém
+                        if val > 1.0:
                             return val / 100
+                        return val
                     except:
                         return 0.0
                 
-                df[c] = df[c].apply(limpar_inteligente)
+                df[c] = df[c].apply(limpar_percentual)
 
-        # Coluna de Data Texto
+        # Coluna de Data Texto (Para filtro exato) e Data Objeto (Para gráfico)
         if 'Dia' in df.columns:
              df['Dia_Str'] = df['Dia'].astype(str).str.strip()
+             # Cria uma data real para o gráfico, ignorando erros (como "Total")
+             df['Dia_Date'] = pd.to_datetime(df['Dia'], format="%d/%m/%Y", errors='coerce')
 
         return df
     except Exception as e:
@@ -296,38 +301,29 @@ def carregar_dados_online():
         except:
             return None
             
-        # Pega TUDO como texto bruto para não confiar no gspread
-        dados = ws.get_all_values()
-        if not dados: return None
+        dados = ws.get_all_records()
+        df = pd.DataFrame(dados)
         
-        # Procura onde começa o cabeçalho (linha que tem "Online" ou "Dia")
-        header_idx = 0
-        for i, row in enumerate(dados[:5]): # Olha as primeiras 5 linhas
-            row_upper = [str(x).upper() for x in row]
-            if "ONLINE" in row_upper and "DIA" in row_upper:
-                header_idx = i
-                break
-                
-        headers = dados[header_idx]
-        df = pd.DataFrame(dados[header_idx+1:], columns=headers)
-        
-        # Limpeza de Nomes de Colunas (tira espaços)
+        # Limpa nomes das colunas
         df.columns = [str(c).strip() for c in df.columns]
         
-        # 1. Tratamento da Coluna de Horas
-        if 'Online' in df.columns:
-            # Troca vírgula por ponto e força numérico
-            df['Online'] = df['Online'].astype(str).str.replace(',', '.', regex=False)
-            df['Online'] = pd.to_numeric(df['Online'], errors='coerce').fillna(0)
+        # 1. Tratamento da Coluna 'Total' (Coluna M)
+        # Se não achar 'Total', tenta pegar a última coluna
+        col_total = 'Total'
+        if col_total not in df.columns:
+            # Fallback: pega a última coluna se o nome não bater exato
+            col_total = df.columns[-1] 
+
+        if col_total in df.columns:
+            df['Total_Horas'] = df[col_total].astype(str).str.replace(',', '.', regex=False)
+            df['Total_Horas'] = pd.to_numeric(df['Total_Horas'], errors='coerce').fillna(0)
             
-        # 2. Tratamento da Data (CRÍTICO)
+        # 2. Tratamento da Data (TEXTO BRUTO)
         if 'Dia' in df.columns:
-            # Força string e limpa espaços
             df['Dia_Str'] = df['Dia'].astype(str).str.strip()
             
         return df
     except Exception as e:
-        st.error(f"Erro debug online: {e}")
         return None
 
 @st.cache_data(ttl=600, show_spinner=False)
@@ -764,7 +760,7 @@ if eh_admin and aba_aderencia:
         # Datas
         data_str_filtro = data_sel.strftime("%d/%m/%Y") # Ex: "18/12/2025"
         
-        # Recupera escalados
+        # Recupera escalados (Meta)
         qtd_escalados = 0
         if df_global is not None:
             df_ad = gerar_dados_aderencia(df_global)
@@ -782,25 +778,21 @@ if eh_admin and aba_aderencia:
         
         k1, k2, k3 = st.columns(3)
         
-        # KPI 1: ADERÊNCIA GLOBAL
+        # KPI 1: ADERÊNCIA GLOBAL (Via Coluna M - Total)
         horas_planejadas = qtd_escalados * 8.8
         horas_realizadas = 0.0
         
-        # Debug Filter Variables
-        debug_filtro_online_count = 0
-        
-        if df_online is not None and 'Dia_Str' in df_online.columns:
+        if df_online is not None and 'Dia_Str' in df_online.columns and 'Total_Horas' in df_online.columns:
             # Filtro Texto Exato
             mask_dia = df_online['Dia_Str'] == data_str_filtro
             
-            # Remove linhas de Total
+            # Remove linhas de Total Geral se houver (segurança)
             mask_sem_total = ~df_online['Dia_Str'].str.contains("Total", case=False, na=False)
             if 'Nome_Analista' in df_online.columns:
                  mask_sem_total = mask_sem_total & ~df_online['Nome_Analista'].astype(str).str.contains("Total", case=False, na=False)
 
             df_online_filtrado = df_online[mask_dia & mask_sem_total]
-            horas_realizadas = df_online_filtrado['Online'].sum()
-            debug_filtro_online_count = len(df_online_filtrado)
+            horas_realizadas = df_online_filtrado['Total_Horas'].sum()
             
         pct_aderencia_horas = (horas_realizadas / horas_planejadas * 100) if horas_planejadas > 0 else 0
         
@@ -812,7 +804,6 @@ if eh_admin and aba_aderencia:
         string_busca_total_pausa = f"{data_str_filtro} Total"
         
         if df_pausas is not None and 'Dia_Str' in df_pausas.columns:
-            # Tenta achar a linha de total
             row_total = df_pausas[df_pausas['Dia_Str'] == string_busca_total_pausa]
             if not row_total.empty and col_target_pausa in df_pausas.columns:
                 media_improdutiva = row_total.iloc[0][col_target_pausa]
@@ -820,6 +811,38 @@ if eh_admin and aba_aderencia:
         k2.metric("Média % Pausa Improdutiva", f"{media_improdutiva:.1%}", delta_color="inverse")
         k3.empty()
         
+        st.divider()
+
+        # --- GRÁFICOS ---
+        st.markdown("#### 📅 Visão Mensal")
+        g1, g2 = st.columns(2)
+        
+        with g1:
+            if df_global is not None: 
+                 fig_b = px.bar(
+                    df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], 
+                    text_auto='.0f', title="Evolução de Presença",
+                    color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'}
+                )
+                 fig_b.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0), showlegend=False)
+                 st.plotly_chart(fig_b, use_container_width=True)
+
+        with g2:
+            if df_pausas is not None and col_target_pausa in df_pausas.columns:
+                # Remove NaT (linhas de total ou erros de data)
+                df_trend = df_pausas.dropna(subset=['Dia_Date']).copy()
+                
+                if not df_trend.empty:
+                    df_trend_grouped = df_trend.groupby('Dia_Date')[col_target_pausa].mean().reset_index()
+                    
+                    fig_line = px.line(
+                        df_trend_grouped, x='Dia_Date', y=col_target_pausa, 
+                        title="Tendência de Pausa Improdutiva (%)", markers=True
+                    )
+                    fig_line.update_traces(line_color='#d32f2f', texttemplate='%{y:.1%}', textposition="top center")
+                    fig_line.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0), yaxis_tickformat='.0%')
+                    st.plotly_chart(fig_line, use_container_width=True)
+
         st.divider()
 
         # --- TABELA DETALHADA ---
@@ -860,6 +883,8 @@ if eh_admin and aba_aderencia:
                         height=500,
                         column_config={
                             "Nome_Analista": st.column_config.TextColumn("Analista", width="medium"),
+                            "Lider": st.column_config.TextColumn("Supervisor", width="small"),
+                            
                             col_pausa_total: st.column_config.NumberColumn("Pausa Total", format="%.1f%%"),
                             col_pessoal: st.column_config.NumberColumn("% Pessoal", format="%.1f%%"),
                             col_prog: st.column_config.NumberColumn("% Programação", format="%.1f%%")
@@ -867,31 +892,5 @@ if eh_admin and aba_aderencia:
                     )
             else:
                 st.info(f"Sem dados detalhados para o dia {texto_busca}.")
-
-        # ==========================================
-        # 🔧 ÁREA DE DIAGNÓSTICO (Remover depois)
-        # ==========================================
-        with st.expander("🔧 Diagnóstico Técnico (Clique para ver o erro)", expanded=False):
-            st.write(f"**Data Selecionada:** {data_str_filtro}")
-            st.write(f"**String de Busca Total Pausa:** '{string_busca_total_pausa}'")
-            
-            st.markdown("---")
-            st.write("**Diagnóstico Aba Online:**")
-            if df_online is not None:
-                st.write(f"Linhas totais na aba: {len(df_online)}")
-                st.write(f"Linhas após filtrar '{data_str_filtro}': {debug_filtro_online_count}")
-                st.write("Amostra das Colunas encontradas:", df_online.columns.tolist())
-                st.write("Amostra dos Dados (Primeiras 5 linhas):")
-                st.dataframe(df_online.head(5))
-                st.write("Valores únicos encontrados na coluna 'Dia_Str' (Amostra):")
-                st.write(df_online['Dia_Str'].unique()[:10])
-            else:
-                st.error("DataFrame Online está Vazio/None")
-
-            st.markdown("---")
-            st.write("**Diagnóstico Aba Pausas:**")
-            if df_pausas is not None:
-                st.write("Amostra das Colunas encontradas:", df_pausas.columns.tolist())
-                if 'Dia_Str' in df_pausas.columns:
-                    st.write(f"Tem linha de Total ('{string_busca_total_pausa}')? ", 
-                             not df_pausas[df_pausas['Dia_Str'] == string_busca_total_pausa].empty)
+        else:
+            st.warning("Aba Pausas não carregada.")
