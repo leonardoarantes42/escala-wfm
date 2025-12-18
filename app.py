@@ -761,11 +761,10 @@ if eh_admin and aba_aderencia:
         # --- CSS PARA DEIXAR TUDO COMPACTO ---
         st.markdown("""
             <style>
-                /* Reduz o espaçamento entre os blocos verticais */
+                /* CONTROLE DE MARGEM AQUI */
                 [data-testid='stVerticalBlock'] {
-                    gap: 0.5rem !important;
+                    gap: 0.2rem !important; /* Estava 0.5rem. Diminuí para aproximar os blocos */
                 }
-                /* Reduz o padding interno das colunas */
                 [data-testid='stColumn'] {
                     gap: 0rem !important;
                 }
@@ -791,7 +790,7 @@ if eh_admin and aba_aderencia:
                 if row_ad is not None:
                     qtd_prevista_pessoas = row_ad['Realizado (T)'] + row_ad['Afastado (AF)']
 
-        # --- MÉTRICAS (KPIs) - LOGO NO TOPO ---
+        # --- MÉTRICAS (KPIs) ---
         c_desvio, c_pausa = st.columns(2)
         
         # KPI 1: DESVIO %
@@ -811,6 +810,8 @@ if eh_admin and aba_aderencia:
                 f"{pct_desvio:+.1f}%", 
                 f"Real: {horas_realizadas:.1f}h / Previsto: {horas_previstas:.1f}h"
             )
+            # AVISO ADICIONADO AQUI
+            st.caption("⚠️ Os dados do dia vigente podem não estar 100% atualizados.")
 
         # KPI 2: MÉDIA PAUSA
         media_improdutiva = 0
@@ -823,7 +824,8 @@ if eh_admin and aba_aderencia:
         with c_pausa:
             st.metric("🛋️ Média % Pausa Improdutiva", f"{media_improdutiva:.1f}%", delta_color="inverse")
             
-        st.divider()
+        # DIVISOR MAIS FINO (Substitui st.divider para ocupar menos espaço)
+        st.markdown("<hr style='margin-top: 5px; margin-bottom: 5px;'>", unsafe_allow_html=True)
 
         # --- GRÁFICOS ---
         st.markdown("#### 📅 Visão Mensal & Detalhe")
@@ -833,7 +835,7 @@ if eh_admin and aba_aderencia:
                  fig_b = px.bar(df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], text_auto='.0f', title="Evolução de Presença", color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
                  
                  fig_b.update_layout(
-                     height=400, # Reduzi altura para 250px para ficar mais compacto
+                     height=300, 
                      margin=dict(t=30, b=0, l=0, r=0), 
                      showlegend=True,
                      xaxis_title=None,
@@ -862,7 +864,7 @@ if eh_admin and aba_aderencia:
                     fig_l.update_xaxes(type='category', tickangle=30)
                     
                     fig_l.update_layout(
-                        height=400, # Reduzi altura para 250px para ficar mais compacto
+                        height=300, 
                         margin=dict(t=30, b=0, l=0, r=0),
                         xaxis_title=None,
                         yaxis_title="Total (menos e-mail e Projeto)",
