@@ -831,25 +831,36 @@ if eh_admin and aba_aderencia:
             if df_pausas is not None and col_improd in df_pausas.columns:
                 df_trend = df_pausas.dropna(subset=['Dia_Date']).copy()
                 
+                # 1. FILTRO DE MÊS VIGENTE
+                # Mantém apenas datas que sejam do mesmo Mês e Ano da data selecionada no filtro
+                df_trend = df_trend[
+                    (df_trend['Dia_Date'].dt.month == data_sel.month) & 
+                    (df_trend['Dia_Date'].dt.year == data_sel.year)
+                ]
+                
                 if not df_trend.empty:
-                    # Agrupa pela data real para garantir a ordem cronológica correta
+                    # Agrupa pela data real
                     df_trend_gp = df_trend.groupby('Dia_Date')[col_improd].mean().reset_index()
                     
-                    # AGORA O TRUQUE: Cria a coluna de texto formatado "DD/MM"
+                    # Cria a coluna de texto formatado "DD/MM"
                     df_trend_gp['Data_Curta'] = df_trend_gp['Dia_Date'].dt.strftime('%d/%m')
                     
-                    # Plota usando a Data_Curta no eixo X
                     fig_l = px.line(
                         df_trend_gp, x='Data_Curta', y=col_improd, 
                         title="Tendência Pausa (%)", markers=True
                     )
                     fig_l.update_traces(line_color='#d32f2f')
                     
-                    # Ajuste fino para não pular datas se tiver muitas
-                    fig_l.update_xaxes(type='category') 
+                    # 2. AJUSTE DE ANGULAÇÃO E EIXO
+                    fig_l.update_xaxes(
+                        type='category', # Garante que mostre todos os dias
+                        tickangle=-45    # Inclina a data igual ao gráfico de barras
+                    )
                     
                     fig_l.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0))
                     st.plotly_chart(fig_l, use_container_width=True)
+                else:
+                    st.info("Sem dados de pausa para o mês selecionado.")
 
         # --- TABELA DETALHADA SIMPLIFICADA ---
         if df_pausas is not None:
