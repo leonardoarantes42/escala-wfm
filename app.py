@@ -782,14 +782,14 @@ if eh_admin and aba_aderencia:
                 h4 {
                     margin-top: 2rem !important;
                     margin-bottom: 1rem !important;
-                    padding-top: 1rem !important;
-                    padding-bottom: 1rem !important;
+                    padding-top: 0rem !important;
+                    padding-bottom: 0rem !important;
                 }
                 
                 /* 5. Ajusta a Linha Divisória para ser fina e sem margem */
                 hr {
-                    margin-top: 0.2rem !important;
-                    margin-bottom: 0.2rem !important;
+                    margin-top: 1rem !important;
+                    margin-bottom: 1rem !important;
                 }
                 
                 /* 6. Remove gaps laterais das colunas */
