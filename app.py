@@ -782,7 +782,7 @@ if eh_admin and aba_aderencia:
                 h4 {
                     margin-top: 2rem !important;
                     margin-bottom: 1rem !important;
-                    padding-top: 0rem !important;
+                    padding-top: 1rem !important;
                     padding-bottom: 1rem !important;
                 }
                 
