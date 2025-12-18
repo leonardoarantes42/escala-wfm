@@ -230,6 +230,56 @@ def carregar_lista_pessoas():
         print(f"Erro ao ler Pessoas: {e}")
         return [], []
 
+# ==========================================
+# 1. FUNÇÃO ONLINE (Recupera Coluna M)
+# ==========================================
+@st.cache_data(ttl=600, show_spinner=False)
+def carregar_dados_online():
+    client = conectar_google_sheets()
+    try:
+        sh = client.open_by_url(URL_PLANILHA)
+        try:
+            ws = sh.worksheet("Online")
+        except:
+            return None
+            
+        # Pega tudo como texto bruto (matriz)
+        dados = ws.get_all_values()
+        if not dados or len(dados) < 2: return None
+        
+        # Cria DataFrame ignorando cabeçalho original para usar índices
+        df = pd.DataFrame(dados[1:])
+        
+        # SELEÇÃO POSICIONAL RÍGIDA
+        # Coluna B = Índice 1 (Data)
+        # Coluna M = Índice 12 (Total)
+        if len(df.columns) <= 12:
+            return None
+            
+        # Renomeia para facilitar
+        df = df.rename(columns={1: 'Dia_Fixo', 12: 'Total_M'})
+        
+        # Tratamento da Coluna M (Valor)
+        df['Total_M'] = df['Total_M'].astype(str).str.replace(',', '.', regex=False)
+        def limpar_valor(x):
+            try:
+                x = str(x).strip()
+                if not x: return 0.0
+                return float(x)
+            except:
+                return 0.0
+        df['Horas_Valor'] = df['Total_M'].apply(limpar_valor)
+        
+        # Tratamento da Coluna B (Data Texto)
+        df['Dia_Str'] = df['Dia_Fixo'].astype(str).str.strip()
+        
+        return df
+    except Exception as e:
+        return None
+
+# ==========================================
+# 2. FUNÇÃO PAUSAS (Recupera Porcentagens)
+# ==========================================
 @st.cache_data(ttl=600, show_spinner=False)
 def carregar_dados_pausas():
     client = conectar_google_sheets()
@@ -247,7 +297,7 @@ def carregar_dados_pausas():
         else:
             return None
 
-        # Colunas Alvo (Total, Pessoal, Programação)
+        # Colunas Alvo
         cols_alvo = [
             'Total (menos e-mail e Projeto)', 
             '%Pessoal',                       
@@ -261,14 +311,12 @@ def carregar_dados_pausas():
                     x_str = str(x).strip()
                     if not x_str: return 0.0
                     
-                    # 1. Remove % e troca vírgula
+                    # Remove % e troca vírgula
                     clean = x_str.replace('%', '').replace(',', '.')
                     
                     try:
                         val = float(clean)
-                        # LÓGICA DA MULTIPLICAÇÃO:
-                        # Se o valor for pequeno (ex: 0.14 para 14%), multiplica por 100
-                        # Se já for grande (ex: 14.2), mantém
+                        # Se for decimal pequeno (ex: 0.14), multiplica por 100
                         if val <= 1.0 and val != 0.0:
                             return val * 100
                         return val
@@ -277,7 +325,7 @@ def carregar_dados_pausas():
                 
                 df[c] = df[c].apply(limpar_e_multiplicar)
 
-        # Prepara a Data Texto
+        # Prepara a Data
         if 'Dia' in df.columns:
              df['Dia_Str'] = df['Dia'].astype(str).str.strip()
              df['Dia_Date'] = pd.to_datetime(df['Dia'], format="%d/%m/%Y", errors='coerce')
@@ -285,6 +333,7 @@ def carregar_dados_pausas():
         return df
     except Exception as e:
         return None
+        
 @st.cache_data(ttl=600, show_spinner=False)
 def carregar_mapa_lideres():
     """Cria um dicionário {Nome_Analista: Nome_Lider} usando a aba Pessoas"""
