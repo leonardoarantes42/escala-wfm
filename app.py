@@ -859,7 +859,7 @@ if eh_admin and aba_aderencia:
                     )
                     
                     fig_l.update_traces(line_color='#d32f2f', name="Pausa Improdutiva", showlegend=True)
-                    fig_l.update_xaxes(type='category', tickangle=-45)
+                    fig_l.update_xaxes(type='category', tickangle=30)
                     
                     fig_l.update_layout(
                         height=350, # Reduzi altura para 250px para ficar mais compacto
