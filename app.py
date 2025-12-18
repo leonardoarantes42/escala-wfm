@@ -815,18 +815,21 @@ if eh_admin and aba_aderencia:
             
         st.divider()
 
-        # --- GRÁFICOS (SEM TÍTULO NO EIXO X) ---
+        # --- GRÁFICOS (AJUSTADOS) ---
         st.markdown("#### 📅 Visão Mensal & Detalhe")
         g1, g2 = st.columns(2)
         with g1:
             if df_global is not None:
                  fig_b = px.bar(df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], text_auto='.0f', title="Evolução de Presença", color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
                  
+                 # AJUSTE AQUI: Trocando Value por Headcount e removendo Variable
                  fig_b.update_layout(
                      height=300, 
                      margin=dict(t=30, b=0, l=0, r=0), 
                      showlegend=True,
-                     xaxis_title=None, # <--- REMOVE O TÍTULO "DATA"
+                     xaxis_title=None,       # Remove "variable" ou "Data" de baixo
+                     yaxis_title="Headcount", # Troca "value" por "Headcount"
+                     legend_title_text=None, # Remove título da legenda
                      legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5)
                  )
                  st.plotly_chart(fig_b, use_container_width=True)
@@ -849,10 +852,13 @@ if eh_admin and aba_aderencia:
                     fig_l.update_traces(line_color='#d32f2f', name="Pausa Improdutiva", showlegend=True)
                     fig_l.update_xaxes(type='category', tickangle=-45)
                     
+                    # Mantemos o padrão limpo aqui também
                     fig_l.update_layout(
                         height=300, 
                         margin=dict(t=30, b=0, l=0, r=0),
-                        xaxis_title=None, # <--- REMOVE O TÍTULO "DATA_CURTA"
+                        xaxis_title=None,
+                        yaxis_title=None, # Aqui deixamos sem título ou "%" se preferir
+                        legend_title_text=None,
                         legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5)
                     )
                     st.plotly_chart(fig_l, use_container_width=True)
