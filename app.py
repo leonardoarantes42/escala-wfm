@@ -768,26 +768,30 @@ if eh_admin and aba_aderencia:
         data_str_filtro = data_sel.strftime("%d/%m/%Y")
         string_busca_total_pausa = f"{data_str_filtro} Total"
 
-        # --- CÁLCULO DA META (Escalados) ---
-        qtd_escalados = 0
+        # --- CÁLCULO DO PREVISTO (SEM TURNOVER) ---
+        qtd_prevista_pessoas = 0
         if df_global is not None:
             df_ad = gerar_dados_aderencia(df_global)
             cols_d = [c for c in df_global.columns if '/' in c]
             d_sel_fmt = data_sel.strftime("%d/%m")
             d_match = d_sel_fmt if d_sel_fmt in cols_d else (cols_d[0] if cols_d else None)
+            
             if df_ad is not None and d_match:
                 row_ad = df_ad[df_ad['Data'] == d_match].iloc[0] if not df_ad[df_ad['Data'] == d_match].empty else None
-                if row_ad is not None: qtd_escalados = row_ad['Planejado']
+                
+                if row_ad is not None:
+                    # REGRA NOVA: Soma T (Realizado) + AF (Afastado). Ignora TO (Turnover).
+                    qtd_prevista_pessoas = row_ad['Realizado (T)'] + row_ad['Afastado (AF)']
 
         # --- CABEÇALHO ---
         st.markdown(f"##### Resultados do Dia: **{texto_busca}**")
         k1, k2, k3 = st.columns(3)
         
         # -----------------------------------------------------------
-        # KPI 1: DESVIO % (Atualizado para multiplicar por 9.8)
+        # KPI 1: DESVIO %
         # -----------------------------------------------------------
-        # Nova regra: Multiplicar por 9.8 horas
-        horas_planejadas = qtd_escalados * 9.8
+        # Multiplicador corrigido: 9.8 horas
+        horas_previstas = qtd_prevista_pessoas * 9.8
         horas_realizadas = 0.0
         
         if df_online is not None and 'Dia_Str' in df_online.columns:
@@ -796,17 +800,16 @@ if eh_admin and aba_aderencia:
             df_online_filt = df_online[mask_dia & mask_val]
             horas_realizadas = df_online_filt['Horas_Valor'].sum()
             
-        # Cálculo do Desvio: (Real / Meta) - 1
-        # Multiplicamos por 100 apenas para exibir como porcentagem
-        if horas_planejadas > 0:
-            pct_desvio = ((horas_realizadas / horas_planejadas) - 1) * 100
+        # Cálculo do Desvio: (Real / Previsto) - 1
+        if horas_previstas > 0:
+            pct_desvio = ((horas_realizadas / horas_previstas) - 1) * 100
         else:
             pct_desvio = 0
         
         k1.metric(
             "Desvio %", 
-            f"{pct_desvio:+.1f}%", # Mostra sinal + ou -
-            f"Real: {horas_realizadas:.1f}h / Meta: {horas_planejadas:.1f}h"
+            f"{pct_desvio:+.1f}%", 
+            f"Real: {horas_realizadas:.1f}h / Previsto: {horas_previstas:.1f}h"
         )
 
         # KPI 2: MÉDIA PAUSA
