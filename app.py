@@ -852,7 +852,7 @@ if eh_admin and aba_aderencia:
                         title="Tendência Pausa (%)", markers=True
                     )
                     fig_l.update_traces(line_color='#d32f2f')
-                    fig_l.update_xaxes(type='category', tickangle=-45)
+                    fig_l.update_xaxes(type='category', tickangle=30)
                     fig_l.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0))
                     st.plotly_chart(fig_l, use_container_width=True)
                 else:
