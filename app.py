@@ -854,7 +854,7 @@ if eh_admin and aba_aderencia:
                     # 2. AJUSTE DE ANGULAÇÃO E EIXO
                     fig_l.update_xaxes(
                         type='category', # Garante que mostre todos os dias
-                        tickangle=45    # Inclina a data igual ao gráfico de barras
+                        tickangle=30    # Inclina a data igual ao gráfico de barras
                     )
                     
                     fig_l.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0))
