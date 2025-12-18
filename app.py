@@ -763,7 +763,7 @@ if eh_admin and aba_aderencia:
             <style>
                 /* 1. Remove o espaço gigante do topo da página inteira */
                 .block-container {
-                    padding-top: 1rem !important;
+                    padding-top: 5rem !important;
                     padding-bottom: 1rem !important;
                 }
                 
@@ -775,7 +775,7 @@ if eh_admin and aba_aderencia:
                 
                 /* 3. Aproxima os blocos verticais (métricas, gráficos) */
                 [data-testid='stVerticalBlock'] {
-                    gap: 0.2rem !important; 
+                    gap: 0.5rem !important; 
                 }
                 
                 /* 4. Remove gaps laterais das colunas */
