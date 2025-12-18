@@ -231,7 +231,6 @@ def carregar_lista_pessoas():
         return [], []
 
 @st.cache_data(ttl=600, show_spinner=False)
-@st.cache_data(ttl=600, show_spinner=False)
 def carregar_dados_pausas():
     client = conectar_google_sheets()
     try:
@@ -241,7 +240,6 @@ def carregar_dados_pausas():
         except:
             return None
             
-        # Pega valores brutos (incluindo cabeçalho e linhas de total)
         dados = ws.get_all_values()
         if len(dados) > 0:
             headers = dados[0]
@@ -249,7 +247,7 @@ def carregar_dados_pausas():
         else:
             return None
 
-        # Tratamento das colunas numéricas (%)
+        # Lista de colunas que precisam ser número
         cols_percent = [
             'Total (menos e-mail e Projeto)', 
             '%Pausas_Total', 
@@ -260,13 +258,29 @@ def carregar_dados_pausas():
         
         for c in cols_percent:
             if c in df.columns:
-                df[c] = df[c].astype(str).str.replace('%', '', regex=False).str.replace(',', '.', regex=False)
-                df[c] = pd.to_numeric(df[c], errors='coerce') / 100
+                # FUNÇÃO DE LIMPEZA INTELIGENTE
+                def limpar_percentual(x):
+                    if isinstance(x, str):
+                        if '%' in x:
+                            # Se tem %, remove, troca virgula e DIVIDE por 100
+                            x = x.replace('%', '').replace(',', '.')
+                            return float(x) / 100
+                        else:
+                            # Se é texto mas sem %, apenas troca virgula (pode ser 0,16)
+                            x = x.replace(',', '.')
+                            return float(x)
+                    return x # Se já for número (float), retorna ele mesmo
+
+                df[c] = df[c].apply(limpar_percentual)
+
+        # Tratamento da Data (para filtro da tabela)
+        # Mantemos a coluna original 'Dia' para buscar o texto "Total" depois
+        if 'Dia' in df.columns:
+             df['Dia_Dt'] = pd.to_datetime(df['Dia'], format="%d/%m/%Y", errors='coerce').dt.date
 
         return df
     except Exception as e:
         return None
-
 @st.cache_data(ttl=600, show_spinner=False)
 def carregar_dados_online():
     client = conectar_google_sheets()
@@ -280,14 +294,17 @@ def carregar_dados_online():
         dados = ws.get_all_records()
         df = pd.DataFrame(dados)
         
-        # 1. Garante que a coluna de valor é número
+        # 1. Tratamento da Coluna de Horas
         if 'Online' in df.columns:
+            # Garante que é número, trocando vírgula por ponto
             df['Online'] = df['Online'].astype(str).str.replace(',', '.', regex=False)
             df['Online'] = pd.to_numeric(df['Online'], errors='coerce').fillna(0)
             
-        # 2. Garante que a coluna Dia é string limpa para comparação
+        # 2. Tratamento da Data (CRÍTICO)
+        # Vamos converter para datetime de verdade para o filtro funcionar
         if 'Dia' in df.columns:
-            df['Dia_Str'] = df['Dia'].astype(str).str.strip()
+            # Tenta converter DD/MM/YYYY
+            df['Dia_Dt'] = pd.to_datetime(df['Dia'], format="%d/%m/%Y", errors='coerce').dt.date
             
         return df
     except Exception as e:
@@ -724,12 +741,8 @@ if eh_admin and aba_aderencia:
         df_online = carregar_dados_online()
         mapa_lideres = carregar_mapa_lideres()
         
-        # Strings de Busca (A Chave da Correção)
-        # Formata a data escolhida para STRING: "18/12/2025"
+        # String para buscar o Total na aba Pausas (Ex: "18/12/2025 Total")
         data_str_filtro = data_sel.strftime("%d/%m/%Y")
-        
-        # Cria a string mágica para buscar o total na aba Pausas
-        # Ex: "18/12/2025 Total"
         string_busca_total_pausa = f"{data_str_filtro} Total"
 
         # Recupera escalados (Meta)
@@ -751,18 +764,20 @@ if eh_admin and aba_aderencia:
         k1, k2, k3 = st.columns(3)
         
         # ------------------------------------------------------------------
-        # KPI 1: ADERÊNCIA GLOBAL (Correção da soma gigante)
+        # KPI 1: ADERÊNCIA GLOBAL (Correção da Data)
         # ------------------------------------------------------------------
         horas_planejadas = qtd_escalados * 8.8
         horas_realizadas = 0.0
         
         if df_online is not None and not df_online.empty:
-            # 1. Filtra exatamente a string da data (ex: "18/12/2025")
-            mask_dia = df_online['Dia_Str'] == data_str_filtro
+            # 1. Filtra pela DATA exata (objeto date)
+            mask_dia = df_online['Dia_Dt'] == data_sel
             
-            # 2. Removemos linhas que possam ser "Totais" da própria tabela Online (segurança extra)
-            # Verifica se a coluna 'Nome_Analista' não contem "Total" ou vazio
-            mask_analista = ~df_online['Dia_Str'].str.contains("Total", case=False, na=False)
+            # 2. Remove linha de Total (se houver na aba Online)
+            # Verifica se 'Nome_Analista' (ou coluna C) não contém "Total"
+            # Ajuste conforme o nome exato da coluna de nomes na aba Online
+            col_nome_online = 'Nome_Analista' if 'Nome_Analista' in df_online.columns else df_online.columns[2] # Tenta pegar a 3ª coluna
+            mask_analista = ~df_online[col_nome_online].astype(str).str.contains("Total", case=False, na=False)
             
             df_online_filtrado = df_online[mask_dia & mask_analista]
             horas_realizadas = df_online_filtrado['Online'].sum()
@@ -782,7 +797,7 @@ if eh_admin and aba_aderencia:
         col_target_pausa = "Total (menos e-mail e Projeto)"
         
         if df_pausas is not None:
-            # Busca a linha onde a coluna 'Dia' é igual a "18/12/2025 Total"
+            # Busca a linha onde a coluna 'Dia' é texto "dd/mm/yyyy Total"
             row_total = df_pausas[df_pausas['Dia'] == string_busca_total_pausa]
             
             if not row_total.empty and col_target_pausa in df_pausas.columns:
@@ -793,7 +808,7 @@ if eh_admin and aba_aderencia:
         
         st.divider()
 
-        # --- GRÁFICOS DE TENDÊNCIA ---
+        # --- GRÁFICOS ---
         st.markdown("#### 📅 Visão Mensal")
         g1, g2 = st.columns(2)
         
@@ -809,47 +824,39 @@ if eh_admin and aba_aderencia:
 
         with g2:
             if df_pausas is not None and col_target_pausa in df_pausas.columns:
-                # Remove linhas que contenham "Total" para o gráfico não quebrar com string
-                # Filtra apenas linhas que pareçam datas "dd/mm/yyyy" (tamanho 10)
-                df_trend = df_pausas[df_pausas['Dia'].astype(str).str.len() == 10].copy()
-                
-                # Converte para data real para o gráfico ordenar certo
-                df_trend['Dia_Date'] = pd.to_datetime(df_trend['Dia'], format="%d/%m/%Y", errors='coerce')
-                df_trend = df_trend.dropna(subset=['Dia_Date'])
-                
-                df_trend_grouped = df_trend.groupby('Dia_Date')[col_target_pausa].mean().reset_index()
-                
-                fig_line = px.line(
-                    df_trend_grouped, x='Dia_Date', y=col_target_pausa, 
-                    title="Tendência de Pausa Improdutiva (%)", markers=True
-                )
-                fig_line.update_traces(line_color='#d32f2f', texttemplate='%{y:.1%}', textposition="top center")
-                fig_line.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0), yaxis_tickformat='.0%')
-                st.plotly_chart(fig_line, use_container_width=True)
+                # Remove NaT (linhas de total)
+                df_trend = df_pausas.dropna(subset=['Dia_Dt'])
+                if not df_trend.empty:
+                    df_trend_grouped = df_trend.groupby('Dia_Dt')[col_target_pausa].mean().reset_index()
+                    
+                    fig_line = px.line(
+                        df_trend_grouped, x='Dia_Dt', y=col_target_pausa, 
+                        title="Tendência de Pausa Improdutiva (%)", markers=True
+                    )
+                    fig_line.update_traces(line_color='#d32f2f', texttemplate='%{y:.1%}', textposition="top center")
+                    fig_line.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0), yaxis_tickformat='.0%')
+                    st.plotly_chart(fig_line, use_container_width=True)
 
         st.divider()
 
         # --- TABELA DETALHADA ---
         c_filt, c_tab = st.columns([1, 4])
         
-        # Filtra analistas (exclui linhas de Total)
-        # Usamos o mesmo filtro de string da data simples
         if df_pausas is not None:
-            df_dia_detalhe = df_pausas[df_pausas['Dia'] == data_str_filtro].copy()
+            # Filtra data exata no dataframe tratado
+            df_dia_detalhe = df_pausas[df_pausas['Dia_Dt'] == data_sel].copy()
             
             if not df_dia_detalhe.empty:
-                # Mapeia Lider
                 df_dia_detalhe['Lider'] = df_dia_detalhe['Nome_Analista'].map(mapa_lideres).fillna("Não Identificado")
                 
                 with c_filt:
                     st.markdown("##### Filtros")
                     opcoes_lideres = sorted(df_dia_detalhe['Lider'].unique().tolist())
                     sel_lider_pausa = st.multiselect("Filtrar Supervisor", options=opcoes_lideres)
-                    
                     if sel_lider_pausa:
                         df_dia_detalhe = df_dia_detalhe[df_dia_detalhe['Lider'].isin(sel_lider_pausa)]
                 
-                # Colunas
+                # Colunas (Use os nomes exatos do print da aba Pausas)
                 col_pausa_total = "%Pausas_Total" 
                 col_pessoal = "%Pessoal"
                 col_prog = "%Programacao"
@@ -872,6 +879,7 @@ if eh_admin and aba_aderencia:
                         column_config={
                             "Nome_Analista": st.column_config.TextColumn("Analista", width="medium"),
                             "Lider": st.column_config.TextColumn("Supervisor", width="small"),
+                            # Formatando como %
                             col_pausa_total: st.column_config.NumberColumn("Pausa Total", format="%.1f%%"),
                             col_pessoal: st.column_config.NumberColumn("% Pessoal", format="%.1f%%"),
                             col_prog: st.column_config.NumberColumn("% Programação", format="%.1f%%")
