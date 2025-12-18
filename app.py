@@ -247,93 +247,44 @@ def carregar_dados_pausas():
         else:
             return None
 
-        # Colunas Alvo (D, H, L, O)
+        # Colunas Alvo (Total, Pessoal, Programação)
         cols_alvo = [
-            'Total (menos e-mail e Projeto)', # Coluna O
-            '%Pessoal',                       # Coluna H
-            '%Programacao'                    # Coluna L
+            'Total (menos e-mail e Projeto)', 
+            '%Pessoal',                       
+            '%Programacao',
+            '%Pausas_Total'
         ]
         
         for c in cols_alvo:
             if c in df.columns:
-                def limpar_valor(x):
+                def limpar_e_multiplicar(x):
                     x_str = str(x).strip()
                     if not x_str: return 0.0
                     
-                    # Remove % e troca vírgula
+                    # 1. Remove % e troca vírgula
                     clean = x_str.replace('%', '').replace(',', '.')
                     
                     try:
                         val = float(clean)
-                        # Se o valor for > 1 (ex: 14.29), divide por 100 para virar 0.1429
-                        # Isso garante que a formatação %.2f%% mostre "14.29%"
-                        if val > 1.0:
-                            return val / 100
+                        # LÓGICA DA MULTIPLICAÇÃO:
+                        # Se o valor for pequeno (ex: 0.14 para 14%), multiplica por 100
+                        # Se já for grande (ex: 14.2), mantém
+                        if val <= 1.0 and val != 0.0:
+                            return val * 100
                         return val
                     except:
                         return 0.0
                 
-                df[c] = df[c].apply(limpar_valor)
+                df[c] = df[c].apply(limpar_e_multiplicar)
 
-        # Prepara a Data Texto para filtro exato
+        # Prepara a Data Texto
         if 'Dia' in df.columns:
              df['Dia_Str'] = df['Dia'].astype(str).str.strip()
-             # Data objeto para gráficos
              df['Dia_Date'] = pd.to_datetime(df['Dia'], format="%d/%m/%Y", errors='coerce')
 
         return df
     except Exception as e:
         return None
-        
-@st.cache_data(ttl=600, show_spinner=False)
-def carregar_dados_online():
-    client = conectar_google_sheets()
-    try:
-        sh = client.open_by_url(URL_PLANILHA)
-        try:
-            ws = sh.worksheet("Online")
-        except:
-            return None
-            
-        # Pega tudo como texto bruto (matriz)
-        dados = ws.get_all_values()
-        if not dados or len(dados) < 2: return None
-        
-        # Cria DataFrame sem depender dos nomes do cabeçalho
-        # Pula a primeira linha (cabeçalho)
-        df = pd.DataFrame(dados[1:])
-        
-        # SELEÇÃO POSICIONAL RÍGIDA
-        # Coluna B = Índice 1 (Data)
-        # Coluna M = Índice 12 (Total)
-        # Verificamos se a planilha tem largura suficiente
-        if len(df.columns) <= 12:
-            return None
-            
-        # Renomeia para facilitar a vida
-        df = df.rename(columns={1: 'Dia_Fixo', 12: 'Total_M'})
-        
-        # 1. Tratamento da Coluna M (Valor)
-        # Troca vírgula por ponto e converte
-        df['Total_M'] = df['Total_M'].astype(str).str.replace(',', '.', regex=False)
-        def limpar_valor(x):
-            try:
-                # Remove caracteres invisíveis
-                x = str(x).strip()
-                if not x: return 0.0
-                return float(x)
-            except:
-                return 0.0
-        df['Horas_Valor'] = df['Total_M'].apply(limpar_valor)
-        
-        # 2. Tratamento da Coluna B (Data Texto)
-        # Limpa espaços e garante formato string limpo "dd/mm/yyyy"
-        df['Dia_Str'] = df['Dia_Fixo'].astype(str).str.strip()
-        
-        return df
-    except Exception as e:
-        return None
-
 @st.cache_data(ttl=600, show_spinner=False)
 def carregar_mapa_lideres():
     """Cria um dicionário {Nome_Analista: Nome_Lider} usando a aba Pessoas"""
@@ -763,7 +714,7 @@ if eh_admin and aba_aderencia:
         # --- CARREGAMENTO ---
         df_pausas = carregar_dados_pausas()
         df_online = carregar_dados_online()
-        # (Mapa de líderes removido pois não vamos mais filtrar)
+        # (Sem filtro de supervisor, conforme pedido)
         
         # Filtros de Texto
         data_str_filtro = data_sel.strftime("%d/%m/%Y")
@@ -797,7 +748,7 @@ if eh_admin and aba_aderencia:
         pct_aderencia_horas = (horas_realizadas / horas_planejadas * 100) if horas_planejadas > 0 else 0
         k1.metric("Aderência Global (Horas)", f"{pct_aderencia_horas:.1f}%", f"Real: {horas_realizadas:.1f}h / Meta: {horas_planejadas:.1f}h")
 
-        # KPI 2: MÉDIA PAUSA
+        # KPI 2: MÉDIA PAUSA (Formatado manualmente com %)
         media_improdutiva = 0
         col_improd = "Total (menos e-mail e Projeto)" # Coluna O
         
@@ -806,6 +757,7 @@ if eh_admin and aba_aderencia:
             if not row_total.empty and col_improd in df_pausas.columns:
                 media_improdutiva = row_total.iloc[0][col_improd]
         
+        # AJUSTE 1: Formatação direta do número multiplicado (ex: 14.2%)
         k2.metric("Média % Pausa Improdutiva", f"{media_improdutiva:.1f}%", delta_color="inverse")
         k3.empty()
         st.divider()
@@ -825,7 +777,8 @@ if eh_admin and aba_aderencia:
                     df_trend_gp = df_trend.groupby('Dia_Date')[col_improd].mean().reset_index()
                     fig_l = px.line(df_trend_gp, x='Dia_Date', y=col_improd, title="Tendência Pausa (%)", markers=True)
                     fig_l.update_traces(line_color='#d32f2f')
-                    fig_l.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0), yaxis_tickformat='.1%')
+                    # AJUSTE 2: Eixo Y formatado como número normal com sufixo (ex: 20)
+                    fig_l.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0))
                     st.plotly_chart(fig_l, use_container_width=True)
 
         # --- TABELA DETALHADA SIMPLIFICADA ---
@@ -850,6 +803,8 @@ if eh_admin and aba_aderencia:
                     df_detalhe = df_detalhe.sort_values(by=col_improd, ascending=False)
                 
                 st.markdown(f"##### 🕵️ Detalhe por Analista ({len(df_detalhe)} pessoas)")
+                
+                # AJUSTE 3: Formatação "%.2f" (apenas número)
                 st.dataframe(
                     df_detalhe[cols_show],
                     use_container_width=True,
@@ -857,15 +812,14 @@ if eh_admin and aba_aderencia:
                     column_config={
                         "Nome_Analista": st.column_config.TextColumn("Analista", width="medium"),
                         
-                        # Colunas Numéricas Simples (Sem barra, apenas %)
                         col_improd: st.column_config.NumberColumn(
-                            "Total Improdutivo", format="%.2f%%"
+                            "Total Improdutivo (%)", format="%.2f"
                         ),
                         col_pessoal: st.column_config.NumberColumn(
-                            "% Pessoal", format="%.2f%%"
+                            "% Pessoal", format="%.2f"
                         ),
                         col_prog: st.column_config.NumberColumn(
-                            "% Programação", format="%.2f%%"
+                            "% Programação", format="%.2f"
                         )
                     }
                 )
