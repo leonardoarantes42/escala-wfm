@@ -845,7 +845,7 @@ if eh_admin and aba_aderencia:
                 
                 if not df_trend.empty:
                     df_trend_gp = df_trend.groupby('Dia_Date')[col_improd].mean().reset_index()
-                    df_trend_gp['Data'] = df_trend_gp['Dia_Date'].dt.strftime('%d/%m')
+                    df_trend_gp['Data_Curta'] = df_trend_gp['Dia_Date'].dt.strftime('%d/%m')
                     
                     fig_l = px.line(
                         df_trend_gp, x='Data_Curta', y=col_improd, 
