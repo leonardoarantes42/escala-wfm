@@ -758,38 +758,29 @@ with aba_diaria:
 
 if eh_admin and aba_aderencia:
     with aba_aderencia:
-        # --- CSS CSS AJUSTADO (Para colar os KPIs nos Gráficos) ---
+        # --- CSS SUPER COMPACTO (REMOVE TODOS OS ESPAÇOS) ---
         st.markdown("""
             <style>
-                /* 1. Ajuste do topo da página */
+                /* 1. Remove o espaço gigante do topo da página inteira */
                 .block-container {
-                    padding-top: 5rem !important;
+                    padding-top: 1rem !important;
                     padding-bottom: 1rem !important;
                 }
                 
-                /* 2. Espaço interno das abas */
+                /* 2. Remove o espaço interno logo abaixo da aba selecionada */
                 [data-baseweb="tab-panel"] {
-                    padding-top: 2rem !important; 
+                    padding-top: 0rem !important;
                     gap: 0rem !important;
                 }
                 
-                /* 3. Aproxima os blocos verticais */
+                /* 3. Aproxima os blocos verticais (métricas, gráficos) */
                 [data-testid='stVerticalBlock'] {
-                    gap: 0.1rem !important; /* Gap mínimo */
+                    gap: 0.2rem !important; 
                 }
                 
-                /* 4. Tira a margem do Título H4 ("Visão Mensal & Detalhe") */
-                h4 {
-                    margin-top: 0.5rem !important;
-                    margin-bottom: 0.5rem !important;
-                    padding-top: 0rem !important;
-                    padding-bottom: 0rem !important;
-                }
-                
-                /* 5. Ajusta a Linha Divisória para não ocupar espaço */
-                hr {
-                    margin-top: 0.2rem !important;
-                    margin-bottom: 0.2rem !important;
+                /* 4. Remove gaps laterais das colunas */
+                [data-testid='stColumn'] {
+                    gap: 0rem !important;
                 }
             </style>
         """, unsafe_allow_html=True)
@@ -833,6 +824,7 @@ if eh_admin and aba_aderencia:
                 f"{pct_desvio:+.1f}%", 
                 f"Real: {horas_realizadas:.1f}h / Previsto: {horas_previstas:.1f}h"
             )
+            # AVISO CONDICIONAL (Só aparece se for HOJE)
             if data_sel == pd.Timestamp.now().date():
                 st.caption("⚠️ Os dados do dia vigente podem não estar 100% atualizados.")
 
@@ -847,13 +839,11 @@ if eh_admin and aba_aderencia:
         with c_pausa:
             st.metric("🛋️ Média % Pausa Improdutiva", f"{media_improdutiva:.1f}%", delta_color="inverse")
             
-        # DIVISOR (Mantive, mas o CSS acima vai deixá-lo bem fino e sem margem)
-        st.markdown("<hr>", unsafe_allow_html=True)
+        # DIVISOR ULTRA FINO
+        st.markdown("<hr style='margin-top: 5px; margin-bottom: 5px;'>", unsafe_allow_html=True)
 
         # --- GRÁFICOS ---
-        # O CSS 'h4' acima vai remover a gordura deste título
         st.markdown("#### 📅 Visão Mensal & Detalhe")
-        
         g1, g2 = st.columns(2)
         with g1:
             if df_global is not None:
@@ -886,7 +876,7 @@ if eh_admin and aba_aderencia:
                     )
                     
                     fig_l.update_traces(line_color='#d32f2f', name="Pausa Improdutiva", showlegend=True)
-                    fig_l.update_xaxes(type='category', tickangle=30)
+                    fig_l.update_xaxes(type='category', tickangle=-45)
                     
                     fig_l.update_layout(
                         height=300, 
