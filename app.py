@@ -856,7 +856,7 @@ if eh_admin and aba_aderencia:
                 media_improdutiva = row_total.iloc[0][col_improd]
         
         with c_pausa:
-            st.metric("🛋️ Média % Pausa Improdutiva", f"{media_improdutiva:.1f}%", delta_color="inverse")
+            st.metric("🛋️ Média % Pausas", f"{media_improdutiva:.1f}%", delta_color="inverse")
             
         # DIVISOR ULTRA FINO
         st.markdown("<hr style='margin-top: 5px; margin-bottom: 5px;'>", unsafe_allow_html=True)
