@@ -763,7 +763,7 @@ if eh_admin and aba_aderencia:
         # --- CARREGAMENTO ---
         df_pausas = carregar_dados_pausas()
         df_online = carregar_dados_online()
-        # (Sem filtro de supervisor, conforme pedido)
+        # (Sem filtro de supervisor)
         
         # Filtros de Texto
         data_str_filtro = data_sel.strftime("%d/%m/%Y")
@@ -784,7 +784,9 @@ if eh_admin and aba_aderencia:
         st.markdown(f"##### Resultados do Dia: **{texto_busca}**")
         k1, k2, k3 = st.columns(3)
         
-        # KPI 1: ADERÊNCIA GLOBAL
+        # -----------------------------------------------------------
+        # KPI 1: DESVIO % (Real - Meta / Meta)
+        # -----------------------------------------------------------
         horas_planejadas = qtd_escalados * 8.8
         horas_realizadas = 0.0
         
@@ -794,55 +796,50 @@ if eh_admin and aba_aderencia:
             df_online_filt = df_online[mask_dia & mask_val]
             horas_realizadas = df_online_filt['Horas_Valor'].sum()
             
-        pct_aderencia_horas = (horas_realizadas / horas_planejadas * 100) if horas_planejadas > 0 else 0
-        k1.metric("Aderência Global (Horas)", f"{pct_aderencia_horas:.1f}%", f"Real: {horas_realizadas:.1f}h / Meta: {horas_planejadas:.1f}h")
+        # Cálculo do Desvio
+        pct_desvio = ((horas_realizadas - horas_planejadas) / horas_planejadas * 100) if horas_planejadas > 0 else 0
+        
+        k1.metric(
+            "Desvio %", 
+            f"{pct_desvio:+.1f}%", # O "+" força aparecer o sinal positivo ou negativo
+            f"Real: {horas_realizadas:.1f}h / Meta: {horas_planejadas:.1f}h"
+        )
 
-        # KPI 2: MÉDIA PAUSA (Formatado manualmente com %)
+        # KPI 2: MÉDIA PAUSA
         media_improdutiva = 0
-        col_improd = "Total (menos e-mail e Projeto)" # Coluna O
+        col_improd = "Total (menos e-mail e Projeto)" 
         
         if df_pausas is not None and 'Dia_Str' in df_pausas.columns:
             row_total = df_pausas[df_pausas['Dia_Str'] == string_busca_total_pausa]
             if not row_total.empty and col_improd in df_pausas.columns:
                 media_improdutiva = row_total.iloc[0][col_improd]
         
-        # AJUSTE 1: Formatação direta do número multiplicado (ex: 14.2%)
         k2.metric("Média % Pausa Improdutiva", f"{media_improdutiva:.1f}%", delta_color="inverse")
         k3.empty()
         st.divider()
 
-       # --- GRÁFICOS ---
+        # --- GRÁFICOS ---
         st.markdown("#### 📅 Visão Mensal & Detalhe")
         g1, g2 = st.columns(2)
-        
-        # Gráfico 1: Barras (Presença) - MANTIDO IGUAL
         with g1:
             if df_global is not None:
-                 fig_b = px.bar(
-                     df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], 
-                     text_auto='.0f', title="Evolução de Presença", 
-                     color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'}
-                 )
+                 fig_b = px.bar(df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], text_auto='.0f', title="Evolução de Presença", color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
                  fig_b.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0), showlegend=False)
                  st.plotly_chart(fig_b, use_container_width=True)
-        
-        # Gráfico 2: Linha (Tendência Pausa) - CORRIGIDO O EIXO X
         with g2:
             if df_pausas is not None and col_improd in df_pausas.columns:
                 df_trend = df_pausas.dropna(subset=['Dia_Date']).copy()
                 
-                # 1. FILTRO DE MÊS VIGENTE
-                # Mantém apenas datas que sejam do mesmo Mês e Ano da data selecionada no filtro
+                # Filtro de Mês Vigente (Apenas mês da data selecionada)
                 df_trend = df_trend[
                     (df_trend['Dia_Date'].dt.month == data_sel.month) & 
                     (df_trend['Dia_Date'].dt.year == data_sel.year)
                 ]
                 
                 if not df_trend.empty:
-                    # Agrupa pela data real
                     df_trend_gp = df_trend.groupby('Dia_Date')[col_improd].mean().reset_index()
                     
-                    # Cria a coluna de texto formatado "DD/MM"
+                    # Formata data curta
                     df_trend_gp['Data_Curta'] = df_trend_gp['Dia_Date'].dt.strftime('%d/%m')
                     
                     fig_l = px.line(
@@ -850,58 +847,40 @@ if eh_admin and aba_aderencia:
                         title="Tendência Pausa (%)", markers=True
                     )
                     fig_l.update_traces(line_color='#d32f2f')
-                    
-                    # 2. AJUSTE DE ANGULAÇÃO E EIXO
-                    fig_l.update_xaxes(
-                        type='category', # Garante que mostre todos os dias
-                        tickangle=30    # Inclina a data igual ao gráfico de barras
-                    )
-                    
+                    fig_l.update_xaxes(type='category', tickangle=-45) # Angulação igual barras
                     fig_l.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0))
                     st.plotly_chart(fig_l, use_container_width=True)
                 else:
-                    st.info("Sem dados de pausa para o mês selecionado.")
+                    st.info("Sem dados de pausa para este mês.")
 
-        # --- TABELA DETALHADA SIMPLIFICADA ---
+        # --- TABELA DETALHADA ---
         if df_pausas is not None:
-            # 1. Filtra pelo dia exato
             mask_dia = df_pausas['Dia_Str'] == data_str_filtro
-            # 2. Remove linha de total
             mask_no_total = ~df_pausas['Dia_Str'].str.contains("Total", case=False, na=False)
             
             df_detalhe = df_pausas[mask_dia & mask_no_total].copy()
             
             if not df_detalhe.empty:
-                col_pessoal = "%Pessoal"         # Coluna H
-                col_prog = "%Programacao"        # Coluna L
+                col_pessoal = "%Pessoal"         
+                col_prog = "%Programacao"        
                 
-                # Seleciona Colunas
                 cols_show = ['Nome_Analista', col_improd, col_pessoal, col_prog]
                 cols_show = [c for c in cols_show if c in df_detalhe.columns]
                 
-                # Ordena
                 if col_improd in df_detalhe.columns:
                     df_detalhe = df_detalhe.sort_values(by=col_improd, ascending=False)
                 
                 st.markdown(f"##### 🕵️ Detalhe por Analista ({len(df_detalhe)} pessoas)")
                 
-                # AJUSTE 3: Formatação "%.2f" (apenas número)
                 st.dataframe(
                     df_detalhe[cols_show],
                     use_container_width=True,
                     hide_index=True,
                     column_config={
                         "Nome_Analista": st.column_config.TextColumn("Analista", width="medium"),
-                        
-                        col_improd: st.column_config.NumberColumn(
-                            "Total Improdutivo (%)", format="%.2f"
-                        ),
-                        col_pessoal: st.column_config.NumberColumn(
-                            "% Pessoal", format="%.2f"
-                        ),
-                        col_prog: st.column_config.NumberColumn(
-                            "% Programação", format="%.2f"
-                        )
+                        col_improd: st.column_config.NumberColumn("Total Improdutivo (%)", format="%.2f"),
+                        col_pessoal: st.column_config.NumberColumn("% Pessoal", format="%.2f"),
+                        col_prog: st.column_config.NumberColumn("% Programação", format="%.2f")
                     }
                 )
             else:
