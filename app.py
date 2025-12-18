@@ -811,22 +811,43 @@ if eh_admin and aba_aderencia:
         k3.empty()
         st.divider()
 
-        # --- GRÁFICOS ---
+       # --- GRÁFICOS ---
         st.markdown("#### 📅 Visão Mensal & Detalhe")
         g1, g2 = st.columns(2)
+        
+        # Gráfico 1: Barras (Presença) - MANTIDO IGUAL
         with g1:
             if df_global is not None:
-                 fig_b = px.bar(df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], text_auto='.0f', title="Evolução de Presença", color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
+                 fig_b = px.bar(
+                     df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], 
+                     text_auto='.0f', title="Evolução de Presença", 
+                     color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'}
+                 )
                  fig_b.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0), showlegend=False)
                  st.plotly_chart(fig_b, use_container_width=True)
+        
+        # Gráfico 2: Linha (Tendência Pausa) - CORRIGIDO O EIXO X
         with g2:
             if df_pausas is not None and col_improd in df_pausas.columns:
                 df_trend = df_pausas.dropna(subset=['Dia_Date']).copy()
+                
                 if not df_trend.empty:
+                    # Agrupa pela data real para garantir a ordem cronológica correta
                     df_trend_gp = df_trend.groupby('Dia_Date')[col_improd].mean().reset_index()
-                    fig_l = px.line(df_trend_gp, x='Dia_Date', y=col_improd, title="Tendência Pausa (%)", markers=True)
+                    
+                    # AGORA O TRUQUE: Cria a coluna de texto formatado "DD/MM"
+                    df_trend_gp['Data_Curta'] = df_trend_gp['Dia_Date'].dt.strftime('%d/%m')
+                    
+                    # Plota usando a Data_Curta no eixo X
+                    fig_l = px.line(
+                        df_trend_gp, x='Data_Curta', y=col_improd, 
+                        title="Tendência Pausa (%)", markers=True
+                    )
                     fig_l.update_traces(line_color='#d32f2f')
-                    # AJUSTE 2: Eixo Y formatado como número normal com sufixo (ex: 20)
+                    
+                    # Ajuste fino para não pular datas se tiver muitas
+                    fig_l.update_xaxes(type='category') 
+                    
                     fig_l.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0))
                     st.plotly_chart(fig_l, use_container_width=True)
 
