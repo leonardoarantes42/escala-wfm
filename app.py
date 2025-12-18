@@ -758,12 +758,27 @@ with aba_diaria:
 
 if eh_admin and aba_aderencia:
     with aba_aderencia:
-        # --- CSS PARA DEIXAR TUDO COMPACTO ---
+        # --- CSS SUPER COMPACTO (REMOVE TODOS OS ESPAÇOS) ---
         st.markdown("""
             <style>
-                [data-testid='stVerticalBlock'] {
-                    gap: 0.5rem !important; 
+                /* 1. Remove o espaço gigante do topo da página inteira */
+                .block-container {
+                    padding-top: 1rem !important;
+                    padding-bottom: 1rem !important;
                 }
+                
+                /* 2. Remove o espaço interno logo abaixo da aba selecionada */
+                [data-baseweb="tab-panel"] {
+                    padding-top: 0rem !important;
+                    gap: 0rem !important;
+                }
+                
+                /* 3. Aproxima os blocos verticais (métricas, gráficos) */
+                [data-testid='stVerticalBlock'] {
+                    gap: 0.2rem !important; 
+                }
+                
+                /* 4. Remove gaps laterais das colunas */
                 [data-testid='stColumn'] {
                     gap: 0rem !important;
                 }
@@ -809,7 +824,7 @@ if eh_admin and aba_aderencia:
                 f"{pct_desvio:+.1f}%", 
                 f"Real: {horas_realizadas:.1f}h / Previsto: {horas_previstas:.1f}h"
             )
-            # AVISO CONDICIONAL: Só aparece se for HOJE
+            # AVISO CONDICIONAL (Só aparece se for HOJE)
             if data_sel == pd.Timestamp.now().date():
                 st.caption("⚠️ Os dados do dia vigente podem não estar 100% atualizados.")
 
@@ -824,7 +839,7 @@ if eh_admin and aba_aderencia:
         with c_pausa:
             st.metric("🛋️ Média % Pausa Improdutiva", f"{media_improdutiva:.1f}%", delta_color="inverse")
             
-        # DIVISOR
+        # DIVISOR ULTRA FINO
         st.markdown("<hr style='margin-top: 5px; margin-bottom: 5px;'>", unsafe_allow_html=True)
 
         # --- GRÁFICOS ---
