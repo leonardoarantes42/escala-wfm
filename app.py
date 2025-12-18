@@ -242,46 +242,43 @@ def carregar_dados_pausas():
             
         dados = ws.get_all_values()
         if len(dados) > 0:
-            # Pega o cabeçalho e remove espaços extras
             headers = [str(h).strip() for h in dados[0]]
             df = pd.DataFrame(dados[1:], columns=headers)
         else:
             return None
 
-        # Lista exata das colunas que você pediu (H, L, O) + M para referência
+        # Colunas Alvo (D, H, L, O)
         cols_alvo = [
             'Total (menos e-mail e Projeto)', # Coluna O
             '%Pessoal',                       # Coluna H
-            '%Programacao',                   # Coluna L
-            '%Pausas_Total'                   # Coluna M (opcional, mas bom ter)
+            '%Programacao'                    # Coluna L
         ]
         
         for c in cols_alvo:
             if c in df.columns:
-                def limpar_valor_simples(x):
+                def limpar_valor(x):
                     x_str = str(x).strip()
                     if not x_str: return 0.0
                     
-                    # 1. Remove símbolo % e troca vírgula por ponto
+                    # Remove % e troca vírgula
                     clean = x_str.replace('%', '').replace(',', '.')
                     
                     try:
                         val = float(clean)
-                        # REGRA DE OURO DO STREAMLIT:
-                        # Para exibir "20.0%", o valor numérico deve ser 0.20
-                        # Se o valor vier > 1.0 (ex: 20.5), dividimos por 100
+                        # Se o valor for > 1 (ex: 14.29), divide por 100 para virar 0.1429
+                        # Isso garante que a formatação %.2f%% mostre "14.29%"
                         if val > 1.0:
                             return val / 100
                         return val
                     except:
                         return 0.0
                 
-                df[c] = df[c].apply(limpar_valor_simples)
+                df[c] = df[c].apply(limpar_valor)
 
-        # Prepara a Data para o filtro
+        # Prepara a Data Texto para filtro exato
         if 'Dia' in df.columns:
              df['Dia_Str'] = df['Dia'].astype(str).str.strip()
-             # Coluna auxiliar de data real para ordenação de gráficos, se precisar
+             # Data objeto para gráficos
              df['Dia_Date'] = pd.to_datetime(df['Dia'], format="%d/%m/%Y", errors='coerce')
 
         return df
@@ -766,13 +763,13 @@ if eh_admin and aba_aderencia:
         # --- CARREGAMENTO ---
         df_pausas = carregar_dados_pausas()
         df_online = carregar_dados_online()
-        mapa_lideres = carregar_mapa_lideres()
+        # (Mapa de líderes removido pois não vamos mais filtrar)
         
         # Filtros de Texto
         data_str_filtro = data_sel.strftime("%d/%m/%Y")
         string_busca_total_pausa = f"{data_str_filtro} Total"
 
-        # --- CÁLCULO DA META (Escalados) ---
+        # --- CÁLCULO DA META ---
         qtd_escalados = 0
         if df_global is not None:
             df_ad = gerar_dados_aderencia(df_global)
@@ -787,12 +784,11 @@ if eh_admin and aba_aderencia:
         st.markdown(f"##### Resultados do Dia: **{texto_busca}**")
         k1, k2, k3 = st.columns(3)
         
-        # KPI 1: ADERÊNCIA GLOBAL (Via Coluna M - Online)
+        # KPI 1: ADERÊNCIA GLOBAL
         horas_planejadas = qtd_escalados * 8.8
         horas_realizadas = 0.0
         
         if df_online is not None and 'Dia_Str' in df_online.columns:
-            # Filtra dia e garante que Horas > 0
             mask_dia = df_online['Dia_Str'] == data_str_filtro
             mask_val = df_online['Horas_Valor'] > 0
             df_online_filt = df_online[mask_dia & mask_val]
@@ -801,16 +797,16 @@ if eh_admin and aba_aderencia:
         pct_aderencia_horas = (horas_realizadas / horas_planejadas * 100) if horas_planejadas > 0 else 0
         k1.metric("Aderência Global (Horas)", f"{pct_aderencia_horas:.1f}%", f"Real: {horas_realizadas:.1f}h / Meta: {horas_planejadas:.1f}h")
 
-        # KPI 2: MÉDIA PAUSA (Via Linha Total da Aba Pausas)
+        # KPI 2: MÉDIA PAUSA
         media_improdutiva = 0
-        col_target_pausa = "Total (menos e-mail e Projeto)" # Coluna O
+        col_improd = "Total (menos e-mail e Projeto)" # Coluna O
         
         if df_pausas is not None and 'Dia_Str' in df_pausas.columns:
             row_total = df_pausas[df_pausas['Dia_Str'] == string_busca_total_pausa]
-            if not row_total.empty and col_target_pausa in df_pausas.columns:
-                media_improdutiva = row_total.iloc[0][col_target_pausa]
+            if not row_total.empty and col_improd in df_pausas.columns:
+                media_improdutiva = row_total.iloc[0][col_improd]
         
-        k2.metric("Média % Pausa Improdutiva", f"{media_improdutiva:.1%}", delta_color="inverse")
+        k2.metric("Média % Pausa Improdutiva", f"{media_improdutiva:.1f}%", delta_color="inverse")
         k3.empty()
         st.divider()
 
@@ -823,71 +819,56 @@ if eh_admin and aba_aderencia:
                  fig_b.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0), showlegend=False)
                  st.plotly_chart(fig_b, use_container_width=True)
         with g2:
-            if df_pausas is not None and col_target_pausa in df_pausas.columns:
-                # Filtra apenas datas válidas (remove Total) para o gráfico
+            if df_pausas is not None and col_improd in df_pausas.columns:
                 df_trend = df_pausas.dropna(subset=['Dia_Date']).copy()
                 if not df_trend.empty:
-                    df_trend_gp = df_trend.groupby('Dia_Date')[col_target_pausa].mean().reset_index()
-                    fig_l = px.line(df_trend_gp, x='Dia_Date', y=col_target_pausa, title="Tendência Pausa (%)", markers=True)
+                    df_trend_gp = df_trend.groupby('Dia_Date')[col_improd].mean().reset_index()
+                    fig_l = px.line(df_trend_gp, x='Dia_Date', y=col_improd, title="Tendência Pausa (%)", markers=True)
                     fig_l.update_traces(line_color='#d32f2f')
-                    fig_l.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0), yaxis_tickformat='.0%')
+                    fig_l.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0), yaxis_tickformat='.1%')
                     st.plotly_chart(fig_l, use_container_width=True)
 
-        # --- TABELA DETALHADA ---
+        # --- TABELA DETALHADA SIMPLIFICADA ---
         if df_pausas is not None:
-            # 1. Filtra pelo dia exato (texto)
+            # 1. Filtra pelo dia exato
             mask_dia = df_pausas['Dia_Str'] == data_str_filtro
-            # 2. Remove a linha de resumo "Total" do próprio dia
+            # 2. Remove linha de total
             mask_no_total = ~df_pausas['Dia_Str'].str.contains("Total", case=False, na=False)
             
             df_detalhe = df_pausas[mask_dia & mask_no_total].copy()
             
             if not df_detalhe.empty:
-                # Mapeia Líder
-                df_detalhe['Lider'] = df_detalhe['Nome_Analista'].map(mapa_lideres).fillna("-")
+                col_pessoal = "%Pessoal"         # Coluna H
+                col_prog = "%Programacao"        # Coluna L
                 
-                # Nomes das colunas exatas que você pediu
-                col_improd = "Total (menos e-mail e Projeto)" # Coluna O
-                col_pessoal = "%Pessoal"                     # Coluna H
-                col_prog = "%Programacao"                    # Coluna L
-                
-                # Filtro Lateral
-                c_filt, c_tab = st.columns([1, 4])
-                with c_filt:
-                    st.markdown("##### Filtros")
-                    lideres = sorted(df_detalhe['Lider'].unique().tolist())
-                    sel_lider = st.multiselect("Supervisor", options=lideres)
-                    if sel_lider:
-                        df_detalhe = df_detalhe[df_detalhe['Lider'].isin(sel_lider)]
-
-                # Exibição
-                cols_show = ['Nome_Analista', 'Lider', col_improd, col_pessoal, col_prog]
-                # Garante que as colunas existem antes de mostrar
+                # Seleciona Colunas
+                cols_show = ['Nome_Analista', col_improd, col_pessoal, col_prog]
                 cols_show = [c for c in cols_show if c in df_detalhe.columns]
                 
-                # Ordena por Pausa Improdutiva (quem pausou mais aparece primeiro)
+                # Ordena
                 if col_improd in df_detalhe.columns:
                     df_detalhe = df_detalhe.sort_values(by=col_improd, ascending=False)
                 
-                with c_tab:
-                    st.dataframe(
-                        df_detalhe[cols_show],
-                        use_container_width=True,
-                        hide_index=True,
-                        column_config={
-                            "Nome_Analista": st.column_config.TextColumn("Analista", width="medium"),
-                            "Lider": st.column_config.TextColumn("Sup", width="small"),
-                            
-                            col_improd: st.column_config.ProgressColumn(
-                                "Total Improdutivo", 
-                                format="%.2f%%", # Exibe 2 casas decimais (ex: 20.45%)
-                                min_value=0, 
-                                max_value=0.3 # Barra enche se passar de 30%
-                            ),
-                            col_pessoal: st.column_config.NumberColumn("% Pessoal", format="%.2f%%"),
-                            col_prog: st.column_config.NumberColumn("% Prog", format="%.2f%%")
-                        }
-                    )
+                st.markdown(f"##### 🕵️ Detalhe por Analista ({len(df_detalhe)} pessoas)")
+                st.dataframe(
+                    df_detalhe[cols_show],
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Nome_Analista": st.column_config.TextColumn("Analista", width="medium"),
+                        
+                        # Colunas Numéricas Simples (Sem barra, apenas %)
+                        col_improd: st.column_config.NumberColumn(
+                            "Total Improdutivo", format="%.2f%%"
+                        ),
+                        col_pessoal: st.column_config.NumberColumn(
+                            "% Pessoal", format="%.2f%%"
+                        ),
+                        col_prog: st.column_config.NumberColumn(
+                            "% Programação", format="%.2f%%"
+                        )
+                    }
+                )
             else:
                 st.info(f"Nenhum analista encontrado para o dia {texto_busca}.")
         else:
