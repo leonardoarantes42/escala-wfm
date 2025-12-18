@@ -758,29 +758,38 @@ with aba_diaria:
 
 if eh_admin and aba_aderencia:
     with aba_aderencia:
-        # --- CSS SUPER COMPACTO (REMOVE TODOS OS ESPAÇOS) ---
+        # --- CSS CSS AJUSTADO (Para colar os KPIs nos Gráficos) ---
         st.markdown("""
             <style>
-                /* 1. Remove o espaço gigante do topo da página inteira */
+                /* 1. Ajuste do topo da página */
                 .block-container {
-                    padding-top: 2rem !important;
+                    padding-top: 5rem !important;
                     padding-bottom: 1rem !important;
                 }
                 
-                /* 2. Remove o espaço interno logo abaixo da aba selecionada */
+                /* 2. Espaço interno das abas */
                 [data-baseweb="tab-panel"] {
-                    padding-top: 1rem !important;
+                    padding-top: 2rem !important; 
                     gap: 0rem !important;
                 }
                 
-                /* 3. Aproxima os blocos verticais (métricas, gráficos) */
+                /* 3. Aproxima os blocos verticais */
                 [data-testid='stVerticalBlock'] {
-                    gap: 1rem !important; 
+                    gap: 0.1rem !important; /* Gap mínimo */
                 }
                 
-                /* 4. Remove gaps laterais das colunas */
-                [data-testid='stColumn'] {
-                    gap: 0rem !important;
+                /* 4. Tira a margem do Título H4 ("Visão Mensal & Detalhe") */
+                h4 {
+                    margin-top: 0.5rem !important;
+                    margin-bottom: 0.5rem !important;
+                    padding-top: 0rem !important;
+                    padding-bottom: 0rem !important;
+                }
+                
+                /* 5. Ajusta a Linha Divisória para não ocupar espaço */
+                hr {
+                    margin-top: 0.2rem !important;
+                    margin-bottom: 0.2rem !important;
                 }
             </style>
         """, unsafe_allow_html=True)
@@ -824,7 +833,6 @@ if eh_admin and aba_aderencia:
                 f"{pct_desvio:+.1f}%", 
                 f"Real: {horas_realizadas:.1f}h / Previsto: {horas_previstas:.1f}h"
             )
-            # AVISO CONDICIONAL (Só aparece se for HOJE)
             if data_sel == pd.Timestamp.now().date():
                 st.caption("⚠️ Os dados do dia vigente podem não estar 100% atualizados.")
 
@@ -839,18 +847,20 @@ if eh_admin and aba_aderencia:
         with c_pausa:
             st.metric("🛋️ Média % Pausa Improdutiva", f"{media_improdutiva:.1f}%", delta_color="inverse")
             
-        # DIVISOR ULTRA FINO
-        st.markdown("<hr style='margin-top: 5px; margin-bottom: 5px;'>", unsafe_allow_html=True)
+        # DIVISOR (Mantive, mas o CSS acima vai deixá-lo bem fino e sem margem)
+        st.markdown("<hr>", unsafe_allow_html=True)
 
         # --- GRÁFICOS ---
+        # O CSS 'h4' acima vai remover a gordura deste título
         st.markdown("#### 📅 Visão Mensal & Detalhe")
+        
         g1, g2 = st.columns(2)
         with g1:
             if df_global is not None:
                  fig_b = px.bar(df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], text_auto='.0f', title="Evolução de Presença", color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
                  
                  fig_b.update_layout(
-                     height=400, 
+                     height=300, 
                      margin=dict(t=30, b=0, l=0, r=0), 
                      showlegend=True,
                      xaxis_title=None,
@@ -879,7 +889,7 @@ if eh_admin and aba_aderencia:
                     fig_l.update_xaxes(type='category', tickangle=30)
                     
                     fig_l.update_layout(
-                        height=400, 
+                        height=300, 
                         margin=dict(t=30, b=0, l=0, r=0),
                         xaxis_title=None,
                         yaxis_title="Total (menos e-mail e Projeto)",
