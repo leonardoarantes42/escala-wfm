@@ -763,13 +763,12 @@ if eh_admin and aba_aderencia:
         # --- CARREGAMENTO ---
         df_pausas = carregar_dados_pausas()
         df_online = carregar_dados_online()
-        # (Sem filtro de supervisor)
         
         # Filtros de Texto
         data_str_filtro = data_sel.strftime("%d/%m/%Y")
         string_busca_total_pausa = f"{data_str_filtro} Total"
 
-        # --- CÁLCULO DA META ---
+        # --- CÁLCULO DA META (Escalados) ---
         qtd_escalados = 0
         if df_global is not None:
             df_ad = gerar_dados_aderencia(df_global)
@@ -785,9 +784,10 @@ if eh_admin and aba_aderencia:
         k1, k2, k3 = st.columns(3)
         
         # -----------------------------------------------------------
-        # KPI 1: DESVIO % (Real - Meta / Meta)
+        # KPI 1: DESVIO % (Atualizado para multiplicar por 9.8)
         # -----------------------------------------------------------
-        horas_planejadas = qtd_escalados * 8.8
+        # Nova regra: Multiplicar por 9.8 horas
+        horas_planejadas = qtd_escalados * 9.8
         horas_realizadas = 0.0
         
         if df_online is not None and 'Dia_Str' in df_online.columns:
@@ -796,12 +796,16 @@ if eh_admin and aba_aderencia:
             df_online_filt = df_online[mask_dia & mask_val]
             horas_realizadas = df_online_filt['Horas_Valor'].sum()
             
-        # Cálculo do Desvio
-        pct_desvio = ((horas_realizadas - horas_planejadas) / horas_planejadas * 100) if horas_planejadas > 0 else 0
+        # Cálculo do Desvio: (Real / Meta) - 1
+        # Multiplicamos por 100 apenas para exibir como porcentagem
+        if horas_planejadas > 0:
+            pct_desvio = ((horas_realizadas / horas_planejadas) - 1) * 100
+        else:
+            pct_desvio = 0
         
         k1.metric(
             "Desvio %", 
-            f"{pct_desvio:+.1f}%", # O "+" força aparecer o sinal positivo ou negativo
+            f"{pct_desvio:+.1f}%", # Mostra sinal + ou -
             f"Real: {horas_realizadas:.1f}h / Meta: {horas_planejadas:.1f}h"
         )
 
@@ -830,7 +834,7 @@ if eh_admin and aba_aderencia:
             if df_pausas is not None and col_improd in df_pausas.columns:
                 df_trend = df_pausas.dropna(subset=['Dia_Date']).copy()
                 
-                # Filtro de Mês Vigente (Apenas mês da data selecionada)
+                # Filtro de Mês Vigente
                 df_trend = df_trend[
                     (df_trend['Dia_Date'].dt.month == data_sel.month) & 
                     (df_trend['Dia_Date'].dt.year == data_sel.year)
@@ -838,8 +842,6 @@ if eh_admin and aba_aderencia:
                 
                 if not df_trend.empty:
                     df_trend_gp = df_trend.groupby('Dia_Date')[col_improd].mean().reset_index()
-                    
-                    # Formata data curta
                     df_trend_gp['Data_Curta'] = df_trend_gp['Dia_Date'].dt.strftime('%d/%m')
                     
                     fig_l = px.line(
@@ -847,7 +849,7 @@ if eh_admin and aba_aderencia:
                         title="Tendência Pausa (%)", markers=True
                     )
                     fig_l.update_traces(line_color='#d32f2f')
-                    fig_l.update_xaxes(type='category', tickangle=-45) # Angulação igual barras
+                    fig_l.update_xaxes(type='category', tickangle=-45)
                     fig_l.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0))
                     st.plotly_chart(fig_l, use_container_width=True)
                 else:
