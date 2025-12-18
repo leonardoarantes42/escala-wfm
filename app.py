@@ -769,7 +769,7 @@ if eh_admin and aba_aderencia:
                 
                 /* 2. Remove o espaço interno logo abaixo da aba selecionada */
                 [data-baseweb="tab-panel"] {
-                    padding-top: 0rem !important;
+                    padding-top: 1rem !important;
                     gap: 0rem !important;
                 }
                 
