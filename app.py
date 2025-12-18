@@ -780,8 +780,8 @@ if eh_admin and aba_aderencia:
                 
                 /* 4. Tira a margem gorda do Título H4 ("Visão Mensal & Detalhe") */
                 h4 {
-                    margin-top: 0.5rem !important;
-                    margin-bottom: 0.5rem !important;
+                    margin-top: 1rem !important;
+                    margin-bottom: 1rem !important;
                     padding-top: 0rem !important;
                     padding-bottom: 0rem !important;
                 }
