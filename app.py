@@ -231,7 +231,6 @@ def carregar_lista_pessoas():
         return [], []
 
 @st.cache_data(ttl=600, show_spinner=False)
-@st.cache_data(ttl=600, show_spinner=False)
 def carregar_dados_pausas():
     client = conectar_google_sheets()
     try:
@@ -243,48 +242,46 @@ def carregar_dados_pausas():
             
         dados = ws.get_all_values()
         if len(dados) > 0:
-            headers = dados[0]
-            # Remove espaços extras dos headers
-            headers = [str(h).strip() for h in headers]
+            # Pega o cabeçalho e remove espaços extras
+            headers = [str(h).strip() for h in dados[0]]
             df = pd.DataFrame(dados[1:], columns=headers)
         else:
             return None
 
-        # Colunas de porcentagem
-        cols_percent = [
-            'Total (menos e-mail e Projeto)', '%Pausas_Total', 
-            '%Pessoal', '%Programacao', '%Refeicao'
+        # Lista exata das colunas que você pediu (H, L, O) + M para referência
+        cols_alvo = [
+            'Total (menos e-mail e Projeto)', # Coluna O
+            '%Pessoal',                       # Coluna H
+            '%Programacao',                   # Coluna L
+            '%Pausas_Total'                   # Coluna M (opcional, mas bom ter)
         ]
         
-        for c in cols_percent:
+        for c in cols_alvo:
             if c in df.columns:
-                def limpar_percentual(x):
+                def limpar_valor_simples(x):
                     x_str = str(x).strip()
                     if not x_str: return 0.0
                     
-                    # Se tiver %, remove, troca virgula e DIVIDE por 100
-                    if '%' in x_str:
-                        clean_val = x_str.replace('%', '').replace(',', '.')
-                        return float(clean_val) / 100
+                    # 1. Remove símbolo % e troca vírgula por ponto
+                    clean = x_str.replace('%', '').replace(',', '.')
                     
-                    # Se for número puro
                     try:
-                        val = float(x_str.replace(',', '.'))
-                        # Lógica de segurança:
-                        # Se for > 1.0 (ex: 24.74), assume que é porcentagem inteira -> divide por 100
-                        # Se for <= 1.0 (ex: 0.24), assume que já é decimal -> mantém
+                        val = float(clean)
+                        # REGRA DE OURO DO STREAMLIT:
+                        # Para exibir "20.0%", o valor numérico deve ser 0.20
+                        # Se o valor vier > 1.0 (ex: 20.5), dividimos por 100
                         if val > 1.0:
                             return val / 100
                         return val
                     except:
                         return 0.0
                 
-                df[c] = df[c].apply(limpar_percentual)
+                df[c] = df[c].apply(limpar_valor_simples)
 
-        # Coluna de Data Texto (Para filtro exato) e Data Objeto (Para gráfico)
+        # Prepara a Data para o filtro
         if 'Dia' in df.columns:
              df['Dia_Str'] = df['Dia'].astype(str).str.strip()
-             # Cria uma data real para o gráfico, ignorando erros (como "Total")
+             # Coluna auxiliar de data real para ordenação de gráficos, se precisar
              df['Dia_Date'] = pd.to_datetime(df['Dia'], format="%d/%m/%Y", errors='coerce')
 
         return df
@@ -771,11 +768,11 @@ if eh_admin and aba_aderencia:
         df_online = carregar_dados_online()
         mapa_lideres = carregar_mapa_lideres()
         
-        # Data Filtro
+        # Filtros de Texto
         data_str_filtro = data_sel.strftime("%d/%m/%Y")
         string_busca_total_pausa = f"{data_str_filtro} Total"
 
-        # Meta (Escalados)
+        # --- CÁLCULO DA META (Escalados) ---
         qtd_escalados = 0
         if df_global is not None:
             df_ad = gerar_dados_aderencia(df_global)
@@ -786,44 +783,35 @@ if eh_admin and aba_aderencia:
                 row_ad = df_ad[df_ad['Data'] == d_match].iloc[0] if not df_ad[df_ad['Data'] == d_match].empty else None
                 if row_ad is not None: qtd_escalados = row_ad['Planejado']
 
-        # --- RESULTADOS ---
+        # --- CABEÇALHO ---
         st.markdown(f"##### Resultados do Dia: **{texto_busca}**")
         k1, k2, k3 = st.columns(3)
         
-        # ------------------------------------------------------------------
-        # KPI 1: ADERÊNCIA GLOBAL (Lógica Coluna B e M)
-        # ------------------------------------------------------------------
+        # KPI 1: ADERÊNCIA GLOBAL (Via Coluna M - Online)
         horas_planejadas = qtd_escalados * 8.8
         horas_realizadas = 0.0
-        df_debug_online = pd.DataFrame() # Para mostrar no debug
         
         if df_online is not None and 'Dia_Str' in df_online.columns:
-            # 1. Filtra Coluna B (Dia_Str) == Data Selecionada
+            # Filtra dia e garante que Horas > 0
             mask_dia = df_online['Dia_Str'] == data_str_filtro
-            
-            # 2. Garante que pegamos apenas linhas válidas (que tenham valor na coluna M)
-            mask_valor = df_online['Horas_Valor'] > 0
-            
-            df_online_filtrado = df_online[mask_dia & mask_valor]
-            
-            # SOMA A COLUNA M
-            horas_realizadas = df_online_filtrado['Horas_Valor'].sum()
-            df_debug_online = df_online_filtrado
+            mask_val = df_online['Horas_Valor'] > 0
+            df_online_filt = df_online[mask_dia & mask_val]
+            horas_realizadas = df_online_filt['Horas_Valor'].sum()
             
         pct_aderencia_horas = (horas_realizadas / horas_planejadas * 100) if horas_planejadas > 0 else 0
-        
         k1.metric("Aderência Global (Horas)", f"{pct_aderencia_horas:.1f}%", f"Real: {horas_realizadas:.1f}h / Meta: {horas_planejadas:.1f}h")
 
-        # KPI 2: MÉDIA PAUSA
+        # KPI 2: MÉDIA PAUSA (Via Linha Total da Aba Pausas)
         media_improdutiva = 0
-        col_target_pausa = "Total (menos e-mail e Projeto)"
+        col_target_pausa = "Total (menos e-mail e Projeto)" # Coluna O
+        
         if df_pausas is not None and 'Dia_Str' in df_pausas.columns:
             row_total = df_pausas[df_pausas['Dia_Str'] == string_busca_total_pausa]
             if not row_total.empty and col_target_pausa in df_pausas.columns:
                 media_improdutiva = row_total.iloc[0][col_target_pausa]
+        
         k2.metric("Média % Pausa Improdutiva", f"{media_improdutiva:.1%}", delta_color="inverse")
         k3.empty()
-        
         st.divider()
 
         # --- GRÁFICOS ---
@@ -836,6 +824,7 @@ if eh_admin and aba_aderencia:
                  st.plotly_chart(fig_b, use_container_width=True)
         with g2:
             if df_pausas is not None and col_target_pausa in df_pausas.columns:
+                # Filtra apenas datas válidas (remove Total) para o gráfico
                 df_trend = df_pausas.dropna(subset=['Dia_Date']).copy()
                 if not df_trend.empty:
                     df_trend_gp = df_trend.groupby('Dia_Date')[col_target_pausa].mean().reset_index()
@@ -844,30 +833,62 @@ if eh_admin and aba_aderencia:
                     fig_l.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0), yaxis_tickformat='.0%')
                     st.plotly_chart(fig_l, use_container_width=True)
 
-        # TABELA
+        # --- TABELA DETALHADA ---
         if df_pausas is not None:
-            df_detalhe = df_pausas[df_pausas['Dia_Str'] == data_str_filtro].copy()
-            if not df_detalhe.empty:
-                df_detalhe['Lider'] = df_detalhe['Nome_Analista'].map(mapa_lideres).fillna("-")
-                cols = ['Nome_Analista', 'Lider', '%Pausas_Total', '%Pessoal', '%Programacao']
-                cols = [c for c in cols if c in df_detalhe.columns]
-                st.dataframe(df_detalhe[cols].sort_values(by=cols[2], ascending=False), use_container_width=True, hide_index=True, column_config={
-                    "%Pausas_Total": st.column_config.NumberColumn("Pausa Total", format="%.1f%%"),
-                    "%Pessoal": st.column_config.NumberColumn("% Pessoal", format="%.1f%%"),
-                    "%Programacao": st.column_config.NumberColumn("% Prog", format="%.1f%%")
-                })
-
-        # ========================================================
-        # 🕵️‍♂️ ÁREA DE DEBUG (Valide a Coluna M e B aqui)
-        # ========================================================
-        st.markdown("---")
-        with st.expander("🕵️‍♂️ DEBUG: Conferência da Coluna M (Total)", expanded=True):
-            st.info(f"Estamos buscando a data: **{data_str_filtro}** na Coluna B.")
-            st.write(f"Total Encontrado (Soma da Coluna M): **{horas_realizadas:.2f}**")
+            # 1. Filtra pelo dia exato (texto)
+            mask_dia = df_pausas['Dia_Str'] == data_str_filtro
+            # 2. Remove a linha de resumo "Total" do próprio dia
+            mask_no_total = ~df_pausas['Dia_Str'].str.contains("Total", case=False, na=False)
             
-            st.markdown("###### Linhas da aba 'Online' usadas no cálculo:")
-            if not df_debug_online.empty:
-                # Mostra apenas as colunas relevantes para não poluir
-                st.dataframe(df_debug_online[['Dia_Str', 'Horas_Valor']])
+            df_detalhe = df_pausas[mask_dia & mask_no_total].copy()
+            
+            if not df_detalhe.empty:
+                # Mapeia Líder
+                df_detalhe['Lider'] = df_detalhe['Nome_Analista'].map(mapa_lideres).fillna("-")
+                
+                # Nomes das colunas exatas que você pediu
+                col_improd = "Total (menos e-mail e Projeto)" # Coluna O
+                col_pessoal = "%Pessoal"                     # Coluna H
+                col_prog = "%Programacao"                    # Coluna L
+                
+                # Filtro Lateral
+                c_filt, c_tab = st.columns([1, 4])
+                with c_filt:
+                    st.markdown("##### Filtros")
+                    lideres = sorted(df_detalhe['Lider'].unique().tolist())
+                    sel_lider = st.multiselect("Supervisor", options=lideres)
+                    if sel_lider:
+                        df_detalhe = df_detalhe[df_detalhe['Lider'].isin(sel_lider)]
+
+                # Exibição
+                cols_show = ['Nome_Analista', 'Lider', col_improd, col_pessoal, col_prog]
+                # Garante que as colunas existem antes de mostrar
+                cols_show = [c for c in cols_show if c in df_detalhe.columns]
+                
+                # Ordena por Pausa Improdutiva (quem pausou mais aparece primeiro)
+                if col_improd in df_detalhe.columns:
+                    df_detalhe = df_detalhe.sort_values(by=col_improd, ascending=False)
+                
+                with c_tab:
+                    st.dataframe(
+                        df_detalhe[cols_show],
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config={
+                            "Nome_Analista": st.column_config.TextColumn("Analista", width="medium"),
+                            "Lider": st.column_config.TextColumn("Sup", width="small"),
+                            
+                            col_improd: st.column_config.ProgressColumn(
+                                "Total Improdutivo", 
+                                format="%.2f%%", # Exibe 2 casas decimais (ex: 20.45%)
+                                min_value=0, 
+                                max_value=0.3 # Barra enche se passar de 30%
+                            ),
+                            col_pessoal: st.column_config.NumberColumn("% Pessoal", format="%.2f%%"),
+                            col_prog: st.column_config.NumberColumn("% Prog", format="%.2f%%")
+                        }
+                    )
             else:
-                st.warning("Nenhuma linha encontrada com essa data. Verifique se a data na planilha 'Online' Coluna B está exatamente igual.")
+                st.info(f"Nenhum analista encontrado para o dia {texto_busca}.")
+        else:
+            st.error("Erro ao carregar dados de Pausa.")
