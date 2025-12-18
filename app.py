@@ -763,7 +763,7 @@ if eh_admin and aba_aderencia:
             <style>
                 /* 1. Remove o espaço gigante do topo da página inteira */
                 .block-container {
-                    padding-top: 5rem !important;
+                    padding-top: 3rem !important;
                     padding-bottom: 1rem !important;
                 }
                 
