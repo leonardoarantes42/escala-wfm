@@ -41,8 +41,8 @@ st.markdown("""
             overflow-y: auto; overflow-x: auto; display: block;
             border: 1px solid #444; border-radius: 4px; background-color: #0e1117;
         }
-        .height-mensal { height: calc(100vh - 290px); }
-        .height-diaria { height: calc(100vh - 320px); }
+        .height-mensal { height: calc(100vh - 260px); }
+        .height-diaria { height: calc(100vh - 300px); }
         .height-aderencia {
             height: calc(100vh - 1000px); 
             overflow-y: auto; position: relative;
