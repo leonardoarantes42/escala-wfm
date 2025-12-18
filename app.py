@@ -271,6 +271,31 @@ def carregar_dados_pausas():
         print(f"Erro ao ler Pausas: {e}")
         return None
 
+@st.cache_data(ttl=600, show_spinner=False)
+def carregar_mapa_lideres():
+    """Cria um dicionário {Nome_Analista: Nome_Lider} usando a aba Pessoas"""
+    client = conectar_google_sheets()
+    try:
+        sh = client.open_by_url(URL_PLANILHA)
+        ws = sh.worksheet("Pessoas")
+        dados = ws.get_all_records()
+        df = pd.DataFrame(dados)
+        
+        # Normaliza colunas
+        df.columns = [str(c).upper().strip() for c in df.columns]
+        
+        # Tenta achar as colunas certas
+        col_nome = next((c for c in df.columns if 'NOME' in c), None)
+        col_lider = next((c for c in df.columns if 'LIDER' in c), None)
+        
+        if col_nome and col_lider:
+            # Cria o dicionário
+            return pd.Series(df[col_lider].values, index=df[col_nome]).to_dict()
+            
+        return {}
+    except:
+        return {}
+
 def calcular_picos_vales_mensal(df_mensal):
     cols_data = [c for c in df_mensal.columns if '/' in c]
     if not cols_data: return None
@@ -670,140 +695,156 @@ with aba_diaria:
 
 if eh_admin and aba_aderencia:
     with aba_aderencia:
-        # Tira o espaçamento padrão do Streamlit para ficar compacto
         st.markdown("<style>[data-testid='stVerticalBlock'] > [style*='flex-direction: column;'] > [data-testid='stVerticalBlock'] {gap: 0rem;}</style>", unsafe_allow_html=True)
-        
-        # ==============================================================================
-        # 1. VISÃO DE PAUSAS (NOVA TABELA)
-        # ==============================================================================
+
+        # --- CARREGAMENTO DE DADOS ---
         df_pausas = carregar_dados_pausas()
+        mapa_lideres = carregar_mapa_lideres() # Carrega o mapa de supervisores
         
-        st.markdown(f"#### 📊 Aderência de Pausas (Improdutivas) - {texto_busca}")
-        
-        if df_pausas is not None and not df_pausas.empty:
-            df_dia = df_pausas[df_pausas['Dia'] == data_sel]
-            col_target = "Total (menos e-mail e Projeto)"
-            
-            if not df_dia.empty and col_target in df_dia.columns:
-                cols_to_show = ['Nome_Analista', col_target, '%Refeicao', '%Pessoal']
-                cols_to_show = [c for c in cols_to_show if c in df_dia.columns]
-                
-                df_show = df_dia[cols_to_show].copy()
-                df_show = df_show.sort_values(by=col_target, ascending=False)
-                
-                # Métricas Rápidas
-                media_improdutiva = df_show[col_target].mean()
-                max_improdutiva = df_show[col_target].max()
-                
-                m1, m2, m3 = st.columns(3)
-                with m1: st.metric("Média Pausa Improdutiva", f"{media_improdutiva:.1%}")
-                with m2: st.metric("Maior Desvio", f"{max_improdutiva:.1%}")
-                
-                st.divider()
-
-                # Tabela Visual
-                st.dataframe(
-                    df_show,
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config={
-                        "Nome_Analista": st.column_config.TextColumn("Analista", width="medium"),
-                        col_target: st.column_config.ProgressColumn(
-                            "Total Improdutivo",
-                            help="Soma de pausas (exceto E-mail e Projeto)",
-                            format="%.1f%%",
-                            min_value=0,
-                            max_value=0.3, 
-                        ),
-                        "%Refeicao": st.column_config.NumberColumn("% Refeição", format="%.1f%%"),
-                        "%Pessoal": st.column_config.NumberColumn("% Pessoal", format="%.1f%%")
-                    }
-                )
-            else:
-                st.info(f"Nenhum registro de pausa encontrado para {texto_busca}.")
-        else:
-            st.warning("Não foi possível carregar a aba 'Pausas'.")
-            
-        st.divider()
-
-        # ==============================================================================
-        # 2. VISÃO GERAL DE ADERÊNCIA (SEUS GRÁFICOS ANTIGOS)
-        # ==============================================================================
+        # Dados de Aderência Geral (Query do BigQuery/Logs)
+        df_ad = None
+        row_ad = None
         if df_global is not None:
             df_ad = gerar_dados_aderencia(df_global)
             cols_d = [c for c in df_global.columns if '/' in c]
-            d_sel = texto_busca if texto_busca in cols_d else cols_d[0]
+            d_sel = texto_busca if texto_busca in cols_d else (cols_d[0] if cols_d else None)
+            if df_ad is not None and d_sel:
+                row_ad = df_ad[df_ad['Data'] == d_sel].iloc[0] if not df_ad[df_ad['Data'] == d_sel].empty else None
+
+        # ==============================================================================
+        # 1. CABEÇALHO DE MÉTRICAS (KPIs DO DIA)
+        # ==============================================================================
+        st.markdown(f"### 🚀 Resultados do Dia: **{texto_busca}**")
+        
+        k1, k2, k3 = st.columns(3)
+        
+        # KPI 1: Aderência (Calculado da aba Mensal)
+        pct_aderencia = 0
+        meta_planejada = 0
+        if row_ad is not None:
+            pct_aderencia = (row_ad['Realizado (T)']/row_ad['Planejado']*100) if row_ad['Planejado'] > 0 else 0
+            meta_planejada = row_ad['Planejado']
+        
+        k1.metric("Aderência Global", f"{pct_aderencia:.1f}%", f"Escalados: {meta_planejada}")
+
+        # KPI 2 e 3: Dados de Pausa (Calculado da aba Pausas)
+        col_improdutiva = "Total (menos e-mail e Projeto)" # Nome exato da coluna O
+        col_pausa_total_min = "Pausas_Total" # Nome da coluna que tem os minutos absolutos (M)
+        
+        if df_pausas is not None and not df_pausas.empty:
+            df_dia_pausas = df_pausas[df_pausas['Dia'] == data_sel]
             
-            row = df_ad[df_ad['Data'] == d_sel].iloc[0] if not df_ad[df_ad['Data'] == d_sel].empty else None
+            total_minutos_improdutivos = 0
+            media_percentual_improdutivo = 0
             
-            if row is not None:
-                st.markdown('<div class="height-aderencia">', unsafe_allow_html=True)
-                st.markdown(f"#### Resultados Globais: **{d_sel}**")
+            if not df_dia_pausas.empty:
+                # Se tiver a coluna de % Improdutiva, calculamos a média do time
+                if col_improdutiva in df_dia_pausas.columns:
+                    media_percentual_improdutivo = df_dia_pausas[col_improdutiva].mean()
                 
-                cg1, cg2 = st.columns([1, 2])
+                # Tenta somar os minutos totais de pausa (Improdutiva + Produtiva ou só Improdutiva dependendo da coluna M ou O)
+                # Vamos usar a coluna M (Pausas_Total) para mostrar o volume bruto de pausa
+                if col_pausa_total_min in df_dia_pausas.columns:
+                    total_minutos_improdutivos = df_dia_pausas[col_pausa_total_min].sum()
+
+            k2.metric("Média % Pausa Improdutiva", f"{media_percentual_improdutivo:.1%}", delta_color="inverse")
+            k3.metric("Minutos Totais em Pausa (Time)", f"{int(total_minutos_improdutivos)} min")
+        
+        st.divider()
+
+        # ==============================================================================
+        # 2. GRÁFICOS DE TENDÊNCIA (MÊS)
+        # ==============================================================================
+        st.markdown("#### 📅 Visão Mensal")
+        g1, g2 = st.columns(2)
+        
+        # GRÁFICO 1: Barras de Aderência (Esquerda)
+        with g1:
+            if df_ad is not None:
+                fig_b = px.bar(
+                    df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], 
+                    text_auto='.0f', title="Evolução de Presença",
+                    color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'}
+                )
+                fig_b.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0), showlegend=False)
+                st.plotly_chart(fig_b, use_container_width=True)
+
+        # GRÁFICO 2: Linha de Pausas (Direita) - NOVIDADE
+        with g2:
+            if df_pausas is not None and col_improdutiva in df_pausas.columns:
+                # Agrupa por dia para pegar a média de pausa do time
+                df_trend = df_pausas.groupby('Dia')[col_improdutiva].mean().reset_index()
                 
-                with cg1:
-                    df_p = pd.DataFrame({
-                        'Status': ['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], 
-                        'Qtd': [row['Realizado (T)'], row['Afastado (AF)'], row['Turnover (TO)']]
-                    })
-                    df_p = df_p[df_p['Qtd'] > 0]
-                    
-                    fig_p = px.pie(
-                        df_p, 
-                        values='Qtd', 
-                        names='Status', 
-                        hole=0.6, 
-                        color='Status', 
-                        color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#727272'}
-                    )
-                    
-                    fig_p.update_traces(
-                        textposition='inside', 
-                        textinfo='value+percent',
-                        hovertemplate='%{label}: %{value} (%{percent})'
-                    )
+                fig_line = px.line(
+                    df_trend, x='Dia', y=col_improdutiva, 
+                    title="Tendência de Pausa Improdutiva (%)",
+                    markers=True
+                )
+                fig_line.update_traces(line_color='#d32f2f', texttemplate='%{y:.1%}', textposition="top center")
+                fig_line.update_layout(height=300, margin=dict(t=30, b=0, l=0, r=0), yaxis_tickformat='.0%')
+                st.plotly_chart(fig_line, use_container_width=True)
 
-                    fig_p.update_layout(
-                        showlegend=True, 
-                        margin=dict(t=0, b=0, l=0, r=0), 
-                        height=200, 
-                        paper_bgcolor='rgba(0,0,0,0)', 
-                        legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
-                    )
-                    st.plotly_chart(fig_p, use_container_width=True)
-                    
-                    pct = (row['Realizado (T)']/row['Planejado']*100) if row['Planejado'] > 0 else 0
-                    st.metric("Aderência do Dia", f"{pct:.1f}%", f"Planejado: {row['Planejado']}")
+        st.divider()
 
-                with cg2:
-                    st.markdown("#### Visão do Mês")
-                    
-                    fig_b = px.bar(
-                        df_ad, 
-                        x='Data', 
-                        y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], 
-                        text_auto='.0f', 
-                        color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'}
-                    )
-                    
-                    fig_b.update_traces(
-                        textfont_size=12, 
-                        textangle=0, 
-                        textposition="inside", 
-                        cliponaxis=False
-                    )
-
-                    fig_b.update_layout(
-                        barmode='stack', 
-                        margin=dict(t=10, b=0, l=0, r=0), 
-                        height=280, 
-                        paper_bgcolor='rgba(0,0,0,0)', 
-                        plot_bgcolor='rgba(0,0,0,0)', 
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                        xaxis_title=None, 
-                        yaxis_title=None  
-                    )
-                    st.plotly_chart(fig_b, use_container_width=True)
+        # ==============================================================================
+        # 3. TABELA DETALHADA (COM FILTRO DE SUPERVISOR)
+        # ==============================================================================
+        
+        c_filt, c_tab = st.columns([1, 4])
+        
+        df_show_final = pd.DataFrame()
+        
+        if df_pausas is not None and not df_pausas.empty:
+            df_dia = df_pausas[df_pausas['Dia'] == data_sel].copy()
+            
+            if not df_dia.empty:
+                # --- PROCV DO LÍDER ---
+                # Cria coluna Líder mapeando o nome
+                df_dia['Lider'] = df_dia['Nome_Analista'].map(mapa_lideres).fillna("Não Identificado")
                 
-                st.markdown('</div>', unsafe_allow_html=True)
+                # Filtro Lateral
+                with c_filt:
+                    st.markdown("##### Filtros")
+                    opcoes_lideres = sorted(df_dia['Lider'].unique().tolist())
+                    sel_lider_pausa = st.multiselect("Filtrar Supervisor", options=opcoes_lideres)
+                    
+                    # Filtra o DataFrame
+                    if sel_lider_pausa:
+                        df_dia = df_dia[df_dia['Lider'].isin(sel_lider_pausa)]
+                
+                # Prepara Tabela Final
+                if col_improdutiva in df_dia.columns:
+                    # Seleciona colunas
+                    cols = ['Nome_Analista', 'Lider', col_improdutiva, 'Pausas_Total', '%Refeicao', '%Pessoal']
+                    # Garante existência
+                    cols = [c for c in cols if c in df_dia.columns]
+                    
+                    df_show_final = df_dia[cols].copy()
+                    
+                    # Ordena do MAIOR infrator para o menor
+                    df_show_final = df_show_final.sort_values(by=col_improdutiva, ascending=False)
+
+                    with c_tab:
+                        st.markdown(f"##### 🕵️ Detalhe por Analista ({len(df_show_final)} pessoas)")
+                        st.dataframe(
+                            df_show_final,
+                            use_container_width=True,
+                            hide_index=True,
+                            height=500, # Aumentei a altura para ver mais gente
+                            column_config={
+                                "Nome_Analista": st.column_config.TextColumn("Analista", width="medium"),
+                                "Lider": st.column_config.TextColumn("Supervisor", width="small"),
+                                
+                                col_improdutiva: st.column_config.ProgressColumn(
+                                    "Pausa Improdutiva",
+                                    format="%.1f%%",
+                                    min_value=0,
+                                    max_value=0.30, # Barra enche aos 30%
+                                ),
+                                "Pausas_Total": st.column_config.NumberColumn("Min Totais", format="%d min"),
+                                "%Refeicao": st.column_config.NumberColumn("% Refeição", format="%.1f%%"),
+                                "%Pessoal": st.column_config.NumberColumn("% Pessoal", format="%.1f%%")
+                            }
+                        )
+            else:
+                st.info("Sem dados de pausa para este dia.")
