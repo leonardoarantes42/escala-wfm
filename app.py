@@ -796,6 +796,11 @@ if eh_admin and aba_aderencia:
                 [data-testid='stColumn'] {
                     gap: 0rem !important;
                 }
+                /* 7. NOVO: Aumenta o espaço entre o Título Principal e as Abas */
+                [data-baseweb="tab-list"] {
+                    margin-top: 2rem !important; /* <--- AUMENTE AQUI SE QUISER MAIS ESPAÇO */
+                    margin-bottom: 1rem !important; /* Um respiro embaixo da linha também ajuda */
+                }
             </style>
         """, unsafe_allow_html=True)
 
