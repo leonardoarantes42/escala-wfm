@@ -779,10 +779,9 @@ if eh_admin and aba_aderencia:
                 if row_ad is not None:
                     qtd_prevista_pessoas = row_ad['Realizado (T)'] + row_ad['Afastado (AF)']
 
-        # --- CABEÇALHO CENTRALIZADO COM EMOJIS ---
+        # --- CABEÇALHO ---
         st.markdown(f"##### Resultados do Dia: **{texto_busca}**")
         
-        # Usamos 2 colunas iguais para centralizar
         c_desvio, c_pausa = st.columns(2)
         
         # KPI 1: DESVIO %
@@ -816,17 +815,18 @@ if eh_admin and aba_aderencia:
             
         st.divider()
 
-        # --- GRÁFICOS COM LEGENDAS ---
+        # --- GRÁFICOS (SEM TÍTULO NO EIXO X) ---
         st.markdown("#### 📅 Visão Mensal & Detalhe")
         g1, g2 = st.columns(2)
         with g1:
             if df_global is not None:
                  fig_b = px.bar(df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], text_auto='.0f', title="Evolução de Presença", color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
-                 # AJUSTE: showlegend=True e posicionamento na parte inferior
+                 
                  fig_b.update_layout(
                      height=300, 
                      margin=dict(t=30, b=0, l=0, r=0), 
                      showlegend=True,
+                     xaxis_title=None, # <--- REMOVE O TÍTULO "DATA"
                      legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5)
                  )
                  st.plotly_chart(fig_b, use_container_width=True)
@@ -845,13 +845,14 @@ if eh_admin and aba_aderencia:
                         df_trend_gp, x='Data_Curta', y=col_improd, 
                         title="Tendência Pausa (%)", markers=True
                     )
-                    # AJUSTE: Adiciona nome para legenda e ativa a legenda
+                    
                     fig_l.update_traces(line_color='#d32f2f', name="Pausa Improdutiva", showlegend=True)
                     fig_l.update_xaxes(type='category', tickangle=-45)
-                    # AJUSTE: Posicionamento da legenda na parte inferior
+                    
                     fig_l.update_layout(
                         height=300, 
                         margin=dict(t=30, b=0, l=0, r=0),
+                        xaxis_title=None, # <--- REMOVE O TÍTULO "DATA_CURTA"
                         legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5)
                     )
                     st.plotly_chart(fig_l, use_container_width=True)
