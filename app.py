@@ -761,9 +761,8 @@ if eh_admin and aba_aderencia:
         # --- CSS PARA DEIXAR TUDO COMPACTO ---
         st.markdown("""
             <style>
-                /* CONTROLE DE MARGEM AQUI */
                 [data-testid='stVerticalBlock'] {
-                    gap: 0.2rem !important; /* Estava 0.5rem. Diminuí para aproximar os blocos */
+                    gap: 0.2rem !important; 
                 }
                 [data-testid='stColumn'] {
                     gap: 0rem !important;
@@ -810,8 +809,9 @@ if eh_admin and aba_aderencia:
                 f"{pct_desvio:+.1f}%", 
                 f"Real: {horas_realizadas:.1f}h / Previsto: {horas_previstas:.1f}h"
             )
-            # AVISO ADICIONADO AQUI
-            st.caption("⚠️ Os dados do dia vigente podem não estar 100% atualizados.")
+            # AVISO CONDICIONAL: Só aparece se for HOJE
+            if data_sel == pd.Timestamp.now().date():
+                st.caption("⚠️ Os dados do dia vigente podem não estar 100% atualizados.")
 
         # KPI 2: MÉDIA PAUSA
         media_improdutiva = 0
@@ -824,7 +824,7 @@ if eh_admin and aba_aderencia:
         with c_pausa:
             st.metric("🛋️ Média % Pausa Improdutiva", f"{media_improdutiva:.1f}%", delta_color="inverse")
             
-        # DIVISOR MAIS FINO (Substitui st.divider para ocupar menos espaço)
+        # DIVISOR
         st.markdown("<hr style='margin-top: 5px; margin-bottom: 5px;'>", unsafe_allow_html=True)
 
         # --- GRÁFICOS ---
