@@ -833,7 +833,7 @@ if eh_admin and aba_aderencia:
                  fig_b = px.bar(df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], text_auto='.0f', title="Evolução de Presença", color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
                  
                  fig_b.update_layout(
-                     height=350, # Reduzi altura para 250px para ficar mais compacto
+                     height=400, # Reduzi altura para 250px para ficar mais compacto
                      margin=dict(t=30, b=0, l=0, r=0), 
                      showlegend=True,
                      xaxis_title=None,
@@ -862,7 +862,7 @@ if eh_admin and aba_aderencia:
                     fig_l.update_xaxes(type='category', tickangle=30)
                     
                     fig_l.update_layout(
-                        height=350, # Reduzi altura para 250px para ficar mais compacto
+                        height=400, # Reduzi altura para 250px para ficar mais compacto
                         margin=dict(t=30, b=0, l=0, r=0),
                         xaxis_title=None,
                         yaxis_title="Total (menos e-mail e Projeto)",
