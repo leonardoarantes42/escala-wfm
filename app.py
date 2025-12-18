@@ -798,8 +798,8 @@ if eh_admin and aba_aderencia:
                 }
                 /* 7. NOVO: Aumenta o espaço entre o Título Principal e as Abas */
                 [data-baseweb="tab-list"] {
-                    margin-top: 2rem !important; /* <--- AUMENTE AQUI SE QUISER MAIS ESPAÇO */
-                    margin-bottom: 1rem !important; /* Um respiro embaixo da linha também ajuda */
+                    margin-top: 1rem !important; /* <--- AUMENTE AQUI SE QUISER MAIS ESPAÇO */
+                    margin-bottom: 0rem !important; 
                 }
             </style>
         """, unsafe_allow_html=True)
