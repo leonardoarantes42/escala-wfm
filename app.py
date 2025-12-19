@@ -797,20 +797,29 @@ if eh_admin and aba_aderencia:
         data_str_filtro = data_sel.strftime("%d/%m/%Y")
         string_busca_total_pausa = f"{data_str_filtro} Total"
 
-        # --- CÁLCULO DO PREVISTO ---
-        qtd_prevista_pessoas = 0
+        # --- CÁLCULO DO PREVISTO E HEADCOUNT ---
+        qtd_prevista_pessoas = 0 # Para o Desvio (sem TO)
+        qtd_total_hc = 0         # Para a Aderência (com TO)
+        qtd_real_pessoas = 0     # Pessoas trabalhando (T)
+
         if df_global is not None:
             df_ad = gerar_dados_aderencia(df_global)
             cols_d = [c for c in df_global.columns if '/' in c]
             d_sel_fmt = data_sel.strftime("%d/%m")
             d_match = d_sel_fmt if d_sel_fmt in cols_d else (cols_d[0] if cols_d else None)
+            
             if df_ad is not None and d_match:
                 row_ad = df_ad[df_ad['Data'] == d_match].iloc[0] if not df_ad[df_ad['Data'] == d_match].empty else None
                 if row_ad is not None:
+                    # T + AF (Para o Desvio de Horas - Regra antiga)
                     qtd_prevista_pessoas = row_ad['Realizado (T)'] + row_ad['Afastado (AF)']
+                    
+                    # T + AF + TO (Para o novo KPI de Presença - Quadro Full)
+                    qtd_total_hc = row_ad['Realizado (T)'] + row_ad['Afastado (AF)'] + row_ad['Turnover (TO)']
+                    qtd_real_pessoas = row_ad['Realizado (T)']
 
         # --- MÉTRICAS (KPIs) ---
-        c_desvio, c_pausa = st.columns(2)
+        c_desvio, c_presenca, c_pausa = st.columns(3)
         
         # KPI 1: DESVIO %
         horas_previstas = qtd_prevista_pessoas * 9.8
@@ -832,6 +841,15 @@ if eh_admin and aba_aderencia:
             # AVISO CONDICIONAL (Só aparece se for HOJE)
             if data_sel == pd.Timestamp.now().date():
                 st.caption("⚠️ Os dados do dia vigente podem não estar 100% atualizados.")
+                # Cálculo: Pessoas Trabalhando / Total de Pessoas (incluindo TO e AF)
+        pct_presenca = (qtd_real_pessoas / qtd_total_hc * 100) if qtd_total_hc > 0 else 0
+        
+        with c_presenca:
+            st.metric(
+                "👥 Presença (Headcount)", 
+                f"{pct_presenca:.1f}%", 
+                f"Ativos: {qtd_real_pessoas} / Total: {qtd_total_hc}"
+            )
 
         # KPI 2: MÉDIA PAUSA
         media_improdutiva = 0
