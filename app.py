@@ -608,8 +608,20 @@ opcoes_lider, opcoes_ilha = carregar_lista_pessoas()
 # --- SIDEBAR ---
 with st.sidebar:
     st.write(f"👤 **{st.session_state.get('nome', 'Visitante')}**")
+    
+    # BOTÃO DE LOGOUT CORRIGIDO
     if st.button("Sair / Logout", type="secondary"):
-        st.session_state.clear(); st.query_params.clear(); st.rerun()
+        # 1. Manda o navegador deletar o cookie
+        cookie_manager.delete("turbi_token")
+        
+        # 2. Limpa a memória da sessão
+        st.session_state.clear()
+        st.query_params.clear()
+        
+        # 3. Pequeno delay para garantir que o browser processou a deleção antes do rerun
+        time.sleep(0.5)
+        st.rerun()
+
     st.divider()
     
     st.image("logo_turbi.png", width=180) 
@@ -620,7 +632,7 @@ with st.sidebar:
     sel_ilha = st.multiselect("Ilha", options=opcoes_ilha)
     
     busca_nome = st.text_input("Buscar Nome")
-    st.divider()
+    st.markdown("<hr style='margin: 10px 0px;'>", unsafe_allow_html=True)
     st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
     st.markdown('<div class="footer-simple">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
 
