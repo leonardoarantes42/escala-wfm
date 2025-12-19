@@ -22,6 +22,17 @@ st.set_page_config(
 st.markdown("""
     <style>
         /* 1. LAYOUT GERAL */
+        section[data-testid="stSidebar"] .block-container {
+            padding-top: 1.5rem !important;  /* Sobe os elementos para o topo */
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+            padding-bottom: 1rem !important;
+        }
+
+        /* 2. Controla o espaço ENTRE os componentes (Logo, Filtros, Botões) */
+        section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
+            gap: 0.5rem !important; /* Diminui o buraco entre um item e outro */
+        }
         .block-container {
             padding-top: 3.8rem !important;
             padding-bottom: 0rem;
