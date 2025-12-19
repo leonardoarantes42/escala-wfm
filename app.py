@@ -829,7 +829,15 @@ if eh_admin and aba_aderencia:
             mask_val = df_online['Horas_Valor'] > 0
             df_online_filt = df_online[mask_dia & mask_val]
             horas_realizadas = df_online_filt['Horas_Valor'].sum()
-            
+        # Cálculo: Pessoas Trabalhando / Total de Pessoas (incluindo TO e AF)
+        pct_presenca = (qtd_real_pessoas / qtd_total_hc * 100) if qtd_total_hc > 0 else 0
+        
+        with c_presenca:
+            st.metric(
+                "👥 Presença (Headcount)", 
+                f"{pct_presenca:.1f}%", 
+                f"Ativos: {qtd_real_pessoas} / Total: {qtd_total_hc}"
+            )    
         pct_desvio = ((horas_realizadas / horas_previstas) - 1) * 100 if horas_previstas > 0 else 0
         
         with c_desvio:
@@ -841,15 +849,7 @@ if eh_admin and aba_aderencia:
             # AVISO CONDICIONAL (Só aparece se for HOJE)
             if data_sel == pd.Timestamp.now().date():
                 st.caption("⚠️ Os dados do dia vigente podem não estar 100% atualizados.")
-                # Cálculo: Pessoas Trabalhando / Total de Pessoas (incluindo TO e AF)
-        pct_presenca = (qtd_real_pessoas / qtd_total_hc * 100) if qtd_total_hc > 0 else 0
-        
-        with c_presenca:
-            st.metric(
-                "👥 Presença (Headcount)", 
-                f"{pct_presenca:.1f}%", 
-                f"Ativos: {qtd_real_pessoas} / Total: {qtd_total_hc}"
-            )
+                
 
         # KPI 2: MÉDIA PAUSA
         media_improdutiva = 0
