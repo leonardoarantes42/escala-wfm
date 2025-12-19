@@ -934,21 +934,27 @@ if eh_admin and aba_aderencia:
                  st.plotly_chart(fig_b, use_container_width=True)
         with g2:
             if df_pausas is not None and col_improd in df_pausas.columns:
-                
+                # 1. Filtra apenas as linhas que contêm "Total"
                 mask_total = df_pausas['Dia_Str'].astype(str).str.contains("Total", case=False, na=False)
                 df_trend = df_pausas[mask_total].copy()
                 
-                # Filtra pelo mês/ano selecionado
+                # 2. CORREÇÃO: Extrai apenas a parte da data (dd/mm/yyyy) do texto "dd/mm/yyyy Total"
+                # Isso "salva" as datas que estavam como NaT
+                df_trend['Data_Texto'] = df_trend['Dia_Str'].str.extract(r'(\d{2}/\d{2}/\d{4})')
+                df_trend['Dia_Date_Final'] = pd.to_datetime(df_trend['Data_Texto'], format="%d/%m/%Y", errors='coerce')
+                
+                # 3. Filtra pelo mês/ano selecionado usando a data recuperada
+                df_trend = df_trend.dropna(subset=['Dia_Date_Final'])
                 df_trend = df_trend[
-                    (df_trend['Dia_Date'].dt.month == data_sel.month) & 
-                    (df_trend['Dia_Date'].dt.year == data_sel.year)
+                    (df_trend['Dia_Date_Final'].dt.month == data_sel.month) & 
+                    (df_trend['Dia_Date_Final'].dt.year == data_sel.year)
                 ]
                 
                 if not df_trend.empty:
-                    # Ordena por data para o gráfico não ficar bagunçado
-                    df_trend = df_trend.sort_values(by='Dia_Date')
+                    # Ordena por data
+                    df_trend = df_trend.sort_values(by='Dia_Date_Final')
                     
-                    df_trend['Data_Curta'] = df_trend['Dia_Date'].dt.strftime('%d/%m')
+                    df_trend['Data_Curta'] = df_trend['Dia_Date_Final'].dt.strftime('%d/%m')
                     
                     fig_l = px.line(
                         df_trend, x='Data_Curta', y=col_improd, 
