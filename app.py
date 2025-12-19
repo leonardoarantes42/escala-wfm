@@ -203,6 +203,25 @@ def carregar_dados_aba(nome_aba):
         print(f"Erro: {e}")
         return None, None
 
+@st.cache_data(ttl=600, show_spinner=False)
+def carregar_aderencia_real():
+    client = conectar_google_sheets()
+    try:
+        sh = client.open_by_url(URL_PLANILHA)
+        ws = sh.worksheet("Aderencia_Real") # <--- NOME DA ABA QUE VOCÊ VAI CRIAR
+        dados = ws.get_all_records()
+        df = pd.DataFrame(dados)
+        
+        # Garante que as colunas existem e estão limpas
+        if 'DATA' in df.columns:
+            df['DATA'] = pd.to_datetime(df['DATA']).dt.date
+        if 'NOME' in df.columns:
+            df['NOME'] = df['NOME'].astype(str).str.upper().str.strip()
+            
+        return df
+    except:
+        return None
+
 # 2. NOVA FUNÇÃO LEVE (Lê apenas a lista de Pessoas) - Cache de 10 min
 @st.cache_data(ttl=600, show_spinner=False)
 def carregar_lista_pessoas():
@@ -950,11 +969,128 @@ if eh_admin and aba_aderencia:
             mask_no_total = ~df_pausas['Dia_Str'].str.contains("Total", case=False, na=False)
             df_detalhe = df_pausas[mask_dia & mask_no_total].copy()
             
+            # --- CÁLCULO DE ADERÊNCIA (LOGIN/LOGOUT - Lógica Inteligente) ---
+        df_real = carregar_aderencia_real()
+        
+        # --- TABELA DETALHADA ---
+        if df_pausas is not None:
+            mask_dia = df_pausas['Dia_Str'] == data_str_filtro
+            mask_no_total = ~df_pausas['Dia_Str'].str.contains("Total", case=False, na=False)
+            df_detalhe = df_pausas[mask_dia & mask_no_total].copy()
+            
             if not df_detalhe.empty:
+                # 1. Normaliza nomes para o Cruzamento
+                df_detalhe['NOME_KEY'] = df_detalhe['Nome_Analista'].str.upper().str.strip()
+                
+                # 2. Lógica de Janelas Inteligentes
+                if df_real is not None and not df_real.empty:
+                     # Converte colunas de tempo para datetime completo
+                     df_real['SESSAO_INICIO'] = pd.to_datetime(df_real['SESSAO_INICIO'])
+                     df_real['SESSAO_FIM'] = pd.to_datetime(df_real['SESSAO_FIM'])
+                     
+                     # Carrega o planejado (Escala DIM do dia)
+                     aba_dim_nome = next((a for a in listar_abas_dim() if texto_busca in a), None)
+                     
+                     if aba_dim_nome:
+                         df_dim_plan, _ = carregar_dados_aba(aba_dim_nome)
+                         
+                         if df_dim_plan is not None:
+                             # Prepara chaves de cruzamento
+                             df_dim_plan['NOME_KEY'] = df_dim_plan['NOME'].astype(str).str.upper().str.strip()
+                             
+                             # Cruza Escala com Detalhe (Trazendo horários planejados)
+                             df_detalhe = pd.merge(df_detalhe, df_dim_plan[['NOME_KEY', 'ENTRADA', 'SAIDA']], 
+                                                 on='NOME_KEY', how='left')
+
+                             # --- FUNÇÃO DE MATCH (Janela Inteligente) ---
+                             def calcular_atrasos(row):
+                                 nome = row.get('NOME_KEY')
+                                 hora_entrada_plan = row.get('ENTRADA')
+                                 hora_saida_plan = row.get('SAIDA')
+                                 
+                                 # Se não tiver escala ou nome, retorna vazio
+                                 if not nome or not hora_entrada_plan or not hora_saida_plan or pd.isna(hora_entrada_plan):
+                                     return None, None
+                                 
+                                 try:
+                                     # Define a data base como a data selecionada no filtro
+                                     data_base = pd.to_datetime(data_sel)
+                                     
+                                     # Parse Entrada Planejada
+                                     h_ent, m_ent = map(int, str(hora_entrada_plan).split(':')[:2])
+                                     dt_entrada_plan = data_base.replace(hour=h_ent, minute=m_ent, second=0)
+                                     
+                                     # Parse Saída Planejada
+                                     h_sai, m_sai = map(int, str(hora_saida_plan).split(':')[:2])
+                                     dt_saida_plan = data_base.replace(hour=h_sai, minute=m_sai, second=0)
+                                     
+                                     # CORREÇÃO DE MADRUGADA: Se Saída < Entrada, é dia seguinte
+                                     if dt_saida_plan < dt_entrada_plan:
+                                         dt_saida_plan = dt_saida_plan + pd.Timedelta(days=1)
+                                     
+                                     # Janelas de Tolerância (+/- 4 horas)
+                                     janela_ent_inicio = dt_entrada_plan - pd.Timedelta(hours=4)
+                                     janela_ent_fim = dt_entrada_plan + pd.Timedelta(hours=4)
+                                     
+                                     janela_sai_inicio = dt_saida_plan - pd.Timedelta(hours=4)
+                                     janela_sai_fim = dt_saida_plan + pd.Timedelta(hours=4)
+                                     
+                                     # Filtra sessões REAIS dessa pessoa
+                                     sessoes_pessoa = df_real[df_real['NOME'] == nome]
+                                     
+                                     if sessoes_pessoa.empty:
+                                         return None, None
+                                         
+                                     # Encontra o Login Real (MÍNIMO na janela)
+                                     mask_login = (sessoes_pessoa['SESSAO_INICIO'] >= janela_ent_inicio) & \
+                                                  (sessoes_pessoa['SESSAO_INICIO'] <= janela_ent_fim)
+                                     logins_validos = sessoes_pessoa.loc[mask_login, 'SESSAO_INICIO']
+                                     
+                                     # Encontra o Logout Real (MÁXIMO na janela)
+                                     mask_logout = (sessoes_pessoa['SESSAO_FIM'] >= janela_sai_inicio) & \
+                                                   (sessoes_pessoa['SESSAO_FIM'] <= janela_sai_fim)
+                                     logouts_validos = sessoes_pessoa.loc[mask_logout, 'SESSAO_FIM']
+                                     
+                                     # Calcula Deltas (Minutos)
+                                     delta_ent = None
+                                     if not logins_validos.empty:
+                                         primeiro_login = logins_validos.min()
+                                         delta_ent = int((primeiro_login - dt_entrada_plan).total_seconds() / 60)
+                                     
+                                     delta_sai = None
+                                     if not logouts_validos.empty:
+                                         ultimo_logout = logouts_validos.max()
+                                         delta_sai = int((ultimo_logout - dt_saida_plan).total_seconds() / 60)
+                                         
+                                     return delta_ent, delta_sai
+                                 except:
+                                     return None, None
+
+                             # Aplica a função linha a linha
+                             resultados = df_detalhe.apply(calcular_atrasos, axis=1, result_type='expand')
+                             df_detalhe['Dif_Entrada'] = resultados[0]
+                             df_detalhe['Dif_Saida'] = resultados[1]
+
+                # --- EXIBIÇÃO ---
                 col_pessoal = "%Pessoal"         
                 col_prog = "%Programacao"        
-                cols_show = ['Nome_Analista', col_improd, col_pessoal, col_prog]
-                cols_show = [c for c in cols_show if c in df_detalhe.columns]
+                cols_base = ['Nome_Analista', col_improd, col_pessoal, col_prog]
+                
+                col_config = {
+                    "Nome_Analista": st.column_config.TextColumn("Analista", width="medium"),
+                    col_improd: st.column_config.NumberColumn("Total Pausas (%)", format="%.2f"),
+                    col_pessoal: st.column_config.NumberColumn("% Pessoal", format="%.2f"),
+                    col_prog: st.column_config.NumberColumn("% Programação", format="%.2f")
+                }
+
+                # Adiciona colunas de Aderência se existirem
+                if 'Dif_Entrada' in df_detalhe.columns:
+                    cols_base += ['Dif_Entrada', 'Dif_Saida']
+                    # Formatação condicional visual (Negativo = adiantado, Positivo = atrasado)
+                    col_config["Dif_Entrada"] = st.column_config.NumberColumn("⏱️ Atraso Entrada (min)", format="%d")
+                    col_config["Dif_Saida"] = st.column_config.NumberColumn("⏱️ Delta Saída (min)", format="%d")
+
+                cols_show = [c for c in cols_base if c in df_detalhe.columns]
                 
                 if col_improd in df_detalhe.columns:
                     df_detalhe = df_detalhe.sort_values(by=col_improd, ascending=False)
@@ -964,12 +1100,7 @@ if eh_admin and aba_aderencia:
                     df_detalhe[cols_show],
                     use_container_width=True,
                     hide_index=True,
-                    column_config={
-                        "Nome_Analista": st.column_config.TextColumn("Analista", width="medium"),
-                        col_improd: st.column_config.NumberColumn("Total Pausas (%)", format="%.2f"),
-                        col_pessoal: st.column_config.NumberColumn("% Pessoal", format="%.2f"),
-                        col_prog: st.column_config.NumberColumn("% Programação", format="%.2f")
-                    }
+                    column_config=col_config
                 )
             else:
                 st.info(f"Nenhum analista encontrado para o dia {texto_busca}.")
