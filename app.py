@@ -978,12 +978,15 @@ if eh_admin and aba_aderencia:
 
         # --- TABELA DETALHADA ---
         if df_pausas is not None:
+            # 1. CARREGA DADOS REAIS (Correção do NameError)
+            df_real = carregar_aderencia_real()
+            
             mask_dia = df_pausas['Dia_Str'] == data_str_filtro
             mask_no_total = ~df_pausas['Dia_Str'].str.contains("Total", case=False, na=False)
             df_detalhe = df_pausas[mask_dia & mask_no_total].copy()
             
             if not df_detalhe.empty:
-                # 1. Normaliza nomes para o Cruzamento
+                # Normaliza nomes para o Cruzamento
                 df_detalhe['NOME_KEY'] = df_detalhe['Nome_Analista'].str.upper().str.strip()
                 
                 # --- CARREGA PLANEJADO + ILHA PARA FILTRO ---
@@ -999,7 +1002,6 @@ if eh_admin and aba_aderencia:
                          # Localiza colunas dinamicamente
                          col_entrada_real = next((c for c in df_dim_plan.columns if 'ENTRADA' in c), None)
                          col_saida_real = next((c for c in df_dim_plan.columns if 'SAIDA' in c), None)
-                         # Tenta achar coluna de Ilha/Squad
                          col_ilha_real = next((c for c in df_dim_plan.columns if 'ILHA' in c or 'SQUAD' in c), None)
 
                          # Renomeia para padrão
@@ -1011,19 +1013,18 @@ if eh_admin and aba_aderencia:
                          if rename_map:
                              df_dim_plan = df_dim_plan.rename(columns=rename_map)
 
-                         # Prepara chaves e Cruza (Agora trazendo ILHA também)
+                         # Prepara chaves e Cruza
                          df_dim_plan['NOME_KEY'] = df_dim_plan['NOME'].astype(str).str.upper().str.strip()
                          
                          cols_to_merge = ['NOME_KEY']
                          if 'ENTRADA' in df_dim_plan.columns: cols_to_merge.append('ENTRADA')
                          if 'SAIDA' in df_dim_plan.columns: cols_to_merge.append('SAIDA')
-                         if 'ILHA' in df_dim_plan.columns: cols_to_merge.append('ILHA') # <--- TRAZENDO A ILHA
+                         if 'ILHA' in df_dim_plan.columns: cols_to_merge.append('ILHA')
                          
                          df_detalhe = pd.merge(df_detalhe, df_dim_plan[cols_to_merge], on='NOME_KEY', how='left')
 
                          # --- LÓGICA DE JANELAS (Cálculo de Atraso) ---
                          if df_real is not None and not df_real.empty and 'ENTRADA' in df_detalhe.columns and 'SAIDA' in df_detalhe.columns:
-                             # (Código da Janela Inteligente - Exatamente como estava antes)
                              df_real['SESSAO_INICIO'] = pd.to_datetime(df_real['SESSAO_INICIO'])
                              df_real['SESSAO_FIM'] = pd.to_datetime(df_real['SESSAO_FIM'])
 
@@ -1066,9 +1067,7 @@ if eh_admin and aba_aderencia:
                              df_detalhe['Dif_Saida'] = resultados[1]
 
                 # --- FILTROS VISUAIS ---
-                
-                # Checkbox para filtrar Suporte/Emergência
-                st.markdown("###") # Espaço pequeno
+                st.markdown("###")
                 apenas_sup_emerg = st.checkbox("🔍 Exibir apenas Suporte & Emergência", value=True)
                 
                 if apenas_sup_emerg and 'ILHA' in df_detalhe.columns:
@@ -1095,11 +1094,11 @@ if eh_admin and aba_aderencia:
                 cols_show = [c for c in cols_base if c in df_detalhe.columns]
                 
                 if col_improd in df_detalhe.columns:
-                    # Remove 100% e ordena
                     df_detalhe = df_detalhe[df_detalhe[col_improd] < 99.9]
                     df_detalhe = df_detalhe.sort_values(by=col_improd, ascending=False)
                 
                 st.markdown(f"##### 🕵️ Detalhe por Analista ({len(df_detalhe)} pessoas)")
+                
                 if 'Dif_Entrada' in df_detalhe.columns:
                     st.caption("ℹ️ Dica: Passe o mouse sobre os títulos das colunas **⏱️ (min)** para entender o cálculo.")
                 
