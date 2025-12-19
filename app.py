@@ -1100,7 +1100,7 @@ if eh_admin and aba_aderencia:
                 # Adiciona colunas de Aderência se existirem
                 if 'Dif_Entrada' in df_detalhe.columns:
                     cols_base += ['Dif_Entrada', 'Dif_Saida']
-                    # Formatação condicional visual (Negativo = adiantado, Positivo = atrasado)
+                    # Formatação condicional visual
                     col_config["Dif_Entrada"] = st.column_config.NumberColumn("⏱️ Atraso Entrada (min)", format="%d")
                     col_config["Dif_Saida"] = st.column_config.NumberColumn("⏱️ Delta Saída (min)", format="%d")
 
@@ -1110,8 +1110,13 @@ if eh_admin and aba_aderencia:
                     df_detalhe = df_detalhe.sort_values(by=col_improd, ascending=False)
                 
                 st.markdown(f"##### 🕵️ Detalhe por Analista ({len(df_detalhe)} pessoas)")
+                
+                # --- APLICANDO ESTILO DE CENTRALIZAÇÃO ---
+                # Nota: Isso centraliza o CONTEÚDO. Cabeçalhos seguem o padrão do Streamlit (texto esq, numero dir).
+                st_df_styled = df_detalhe[cols_show].style.set_properties(**{'text-align': 'center'})
+
                 st.dataframe(
-                    df_detalhe[cols_show],
+                    st_df_styled,
                     use_container_width=True,
                     hide_index=True,
                     column_config=col_config
