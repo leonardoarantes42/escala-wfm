@@ -1143,7 +1143,8 @@ if eh_admin and aba_aderencia:
                 # --- LEGENDA EXPLICATIVA (NOVIDADE) ---
                 if 'Dif_Entrada' in df_detalhe.columns:
                     st.caption("""
-                    **Entenda os Números:** 🟢 **Entrada Negativa (-):** Logou antecipado.  
+                    **Entenda os Números:** 
+                    🟢 **Entrada Negativa (-):** Logou antecipado.  
                     🔴 **Entrada Positiva (+):** Atraso no login.  
                     🔴 **Saída Negativa (-):** Deslogou antes do horário.  
                     🟢 **Saída Positiva (+):** Ficou além do horário.
