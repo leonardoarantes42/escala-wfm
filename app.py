@@ -873,7 +873,7 @@ if eh_admin and aba_aderencia:
         # COLUNA 1: PRESENÇA (HEADCOUNT)
         with c_presenca:
             st.metric(
-                "👥 Presença (Headcount)", 
+                "👥 Presença(Sup & Emerg)", 
                 f"{pct_presenca:.1f}%", 
                 f"Ativos: {qtd_real_pessoas} / Total: {qtd_total_hc}"
             )
