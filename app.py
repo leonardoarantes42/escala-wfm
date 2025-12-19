@@ -1103,6 +1103,7 @@ if eh_admin and aba_aderencia:
                 col_prog = "%Programacao"        
                 cols_base = ['Nome_Analista', col_improd, col_pessoal, col_prog]
                 
+                # Configuração das Colunas
                 col_config = {
                     "Nome_Analista": st.column_config.TextColumn("Analista", width="medium"),
                     col_improd: st.column_config.NumberColumn("Total Pausas (%)", format="%.2f"),
@@ -1110,22 +1111,45 @@ if eh_admin and aba_aderencia:
                     col_prog: st.column_config.NumberColumn("% Programação", format="%.2f")
                 }
 
-                # Adiciona colunas de Aderência se existirem
+                # Adiciona colunas de Aderência se o cálculo rolou
                 if 'Dif_Entrada' in df_detalhe.columns:
-                    cols_base += ['Dif_Entrada', 'Dif_Saida']
-                    # Formatação condicional visual
-                    col_config["Dif_Entrada"] = st.column_config.NumberColumn("⏱️ Atraso Entrada (min)", format="%d")
-                    col_config["Dif_Saida"] = st.column_config.NumberColumn("⏱️ Delta Saída (min)", format="%d")
+                    cols_base = ['Nome_Analista', 'Dif_Entrada', 'Dif_Saida'] + [col_improd, col_pessoal, col_prog]
+                    
+                    col_config["Dif_Entrada"] = st.column_config.NumberColumn(
+                        "⏱️ Entrada (min)", 
+                        # AQUI: Adicionei a explicação do "Vazio" no final
+                        help="Negativo: Antecipado | Positivo: Atrasado | Vazio: Sem registro ou Folga",
+                        format="%d"
+                    )
+                    col_config["Dif_Saida"] = st.column_config.NumberColumn(
+                        "⏱️ Saída (min)", 
+                        # AQUI TAMBÉM
+                        help="Negativo: Saiu Antes | Positivo: Hora Extra | Vazio: Sem registro ou Folga",
+                        format="%d"
+                    )
 
+                # Filtra colunas que realmente existem no DF
                 cols_show = [c for c in cols_base if c in df_detalhe.columns]
                 
+                # --- FILTRO DO 100% (NOVIDADE) ---
                 if col_improd in df_detalhe.columns:
+                    # Remove quem tem 100% (ou mais) de pausa improdutiva
+                    df_detalhe = df_detalhe[df_detalhe[col_improd] < 99.9]
+                    # Ordena: Quem pausou mais aparece primeiro
                     df_detalhe = df_detalhe.sort_values(by=col_improd, ascending=False)
                 
                 st.markdown(f"##### 🕵️ Detalhe por Analista ({len(df_detalhe)} pessoas)")
+
+                # --- LEGENDA EXPLICATIVA (NOVIDADE) ---
+                if 'Dif_Entrada' in df_detalhe.columns:
+                    st.caption("""
+                    **Entenda os Números:** 🟢 **Entrada Negativa (-):** Logou antecipado.  
+                    🔴 **Entrada Positiva (+):** Atraso no login.  
+                    🔴 **Saída Negativa (-):** Deslogou antes do horário.  
+                    🟢 **Saída Positiva (+):** Ficou além do horário.
+                    """)
                 
-                # --- APLICANDO ESTILO DE CENTRALIZAÇÃO ---
-                # Nota: Isso centraliza o CONTEÚDO. Cabeçalhos seguem o padrão do Streamlit (texto esq, numero dir).
+                # Aplica estilo centralizado
                 st_df_styled = df_detalhe[cols_show].style.set_properties(**{'text-align': 'center'})
 
                 st.dataframe(
