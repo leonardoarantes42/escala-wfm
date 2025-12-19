@@ -819,9 +819,15 @@ if eh_admin and aba_aderencia:
                     qtd_real_pessoas = row_ad['Realizado (T)']
 
         # --- MÉTRICAS (KPIs) ---
-        c_desvio, c_presenca, c_pausa = st.columns(3)
+        # Definição das 3 colunas na ordem desejada: [Presença] [Desvio] [Pausa]
+        c_presenca, c_desvio, c_pausa = st.columns(3)
         
-        # KPI 1: DESVIO %
+        # 1. CÁLCULOS PRÉVIOS (Garantindo que todas as variáveis existam antes de exibir)
+        
+        # A) Cálculo Presença (Headcount)
+        pct_presenca = (qtd_real_pessoas / qtd_total_hc * 100) if qtd_total_hc > 0 else 0
+        
+        # B) Cálculo Desvio (Horas)
         horas_previstas = qtd_prevista_pessoas * 9.8
         horas_realizadas = 0.0
         if df_online is not None and 'Dia_Str' in df_online.columns:
@@ -829,36 +835,38 @@ if eh_admin and aba_aderencia:
             mask_val = df_online['Horas_Valor'] > 0
             df_online_filt = df_online[mask_dia & mask_val]
             horas_realizadas = df_online_filt['Horas_Valor'].sum()
-        # Cálculo: Pessoas Trabalhando / Total de Pessoas (incluindo TO e AF)
-        pct_presenca = (qtd_real_pessoas / qtd_total_hc * 100) if qtd_total_hc > 0 else 0
-        
-        with c_presenca:
-            st.metric(
-                "👥 Presença (Headcount)", 
-                f"{pct_presenca:.1f}%", 
-                f"Ativos: {qtd_real_pessoas} / Total: {qtd_total_hc}"
-            )    
         pct_desvio = ((horas_realizadas / horas_previstas) - 1) * 100 if horas_previstas > 0 else 0
-        
-        with c_desvio:
-            st.metric(
-                "🎯 Desvio % (Real vs Previsto)", 
-                f"{pct_desvio:+.1f}%", 
-                f"Real: {horas_realizadas:.1f}h / Previsto: {horas_previstas:.1f}h"
-            )
-            # AVISO CONDICIONAL (Só aparece se for HOJE)
-            if data_sel == pd.Timestamp.now().date():
-                st.caption("⚠️ Os dados do dia vigente podem não estar 100% atualizados.")
-                
 
-        # KPI 2: MÉDIA PAUSA
+        # C) Cálculo Pausa
         media_improdutiva = 0
         col_improd = "Total (menos e-mail e Projeto)" 
         if df_pausas is not None and 'Dia_Str' in df_pausas.columns:
             row_total = df_pausas[df_pausas['Dia_Str'] == string_busca_total_pausa]
             if not row_total.empty and col_improd in df_pausas.columns:
                 media_improdutiva = row_total.iloc[0][col_improd]
-        
+
+        # --- EXIBIÇÃO NA ORDEM PEDIDA ---
+
+        # COLUNA 1: PRESENÇA (HEADCOUNT)
+        with c_presenca:
+            st.metric(
+                "👥 Presença (Headcount)", 
+                f"{pct_presenca:.1f}%", 
+                f"Ativos: {qtd_real_pessoas} / Total: {qtd_total_hc}"
+            )
+
+        # COLUNA 2: DESVIO (HORAS)
+        with c_desvio:
+            st.metric(
+                "🎯 Desvio % (Real vs Previsto)", 
+                f"{pct_desvio:+.1f}%", 
+                f"Real: {horas_realizadas:.1f}h / Previsto: {horas_previstas:.1f}h"
+            )
+            # Aviso condicional fica aqui junto com o Desvio
+            if data_sel == pd.Timestamp.now().date():
+                st.caption("⚠️ Os dados do dia vigente podem não estar 100% atualizados.")
+
+        # COLUNA 3: MÉDIA PAUSAS
         with c_pausa:
             st.metric("🛋️ Média % Pausas", f"{media_improdutiva:.1f}%", delta_color="inverse")
             
