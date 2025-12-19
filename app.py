@@ -982,128 +982,104 @@ if eh_admin and aba_aderencia:
             mask_no_total = ~df_pausas['Dia_Str'].str.contains("Total", case=False, na=False)
             df_detalhe = df_pausas[mask_dia & mask_no_total].copy()
             
-            # --- CÁLCULO DE ADERÊNCIA (LOGIN/LOGOUT - Lógica Inteligente) ---
-        df_real = carregar_aderencia_real()
-        
-        # --- TABELA DETALHADA ---
-        if df_pausas is not None:
-            mask_dia = df_pausas['Dia_Str'] == data_str_filtro
-            mask_no_total = ~df_pausas['Dia_Str'].str.contains("Total", case=False, na=False)
-            df_detalhe = df_pausas[mask_dia & mask_no_total].copy()
-            
             if not df_detalhe.empty:
                 # 1. Normaliza nomes para o Cruzamento
                 df_detalhe['NOME_KEY'] = df_detalhe['Nome_Analista'].str.upper().str.strip()
                 
-                # 2. Lógica de Janelas Inteligentes
-                if df_real is not None and not df_real.empty:
-                     # Converte colunas de tempo para datetime completo
-                     df_real['SESSAO_INICIO'] = pd.to_datetime(df_real['SESSAO_INICIO'])
-                     df_real['SESSAO_FIM'] = pd.to_datetime(df_real['SESSAO_FIM'])
+                # --- CARREGA PLANEJADO + ILHA PARA FILTRO ---
+                aba_dim_nome = next((a for a in listar_abas_dim() if texto_busca in a), None)
+                
+                if aba_dim_nome:
+                     df_dim_plan, _ = carregar_dados_aba(aba_dim_nome)
                      
-                     # Carrega o planejado (Escala DIM do dia)
-                     aba_dim_nome = next((a for a in listar_abas_dim() if texto_busca in a), None)
-                     
-                     if aba_dim_nome:
-                         df_dim_plan, _ = carregar_dados_aba(aba_dim_nome)
+                     if df_dim_plan is not None:
+                         # Padroniza colunas
+                         df_dim_plan.columns = [str(c).upper().strip() for c in df_dim_plan.columns]
                          
-                         if df_dim_plan is not None:
-                             # 1. Padroniza colunas para Maiúsculo
-                             df_dim_plan.columns = [str(c).upper().strip() for c in df_dim_plan.columns]
+                         # Localiza colunas dinamicamente
+                         col_entrada_real = next((c for c in df_dim_plan.columns if 'ENTRADA' in c), None)
+                         col_saida_real = next((c for c in df_dim_plan.columns if 'SAIDA' in c), None)
+                         # Tenta achar coluna de Ilha/Squad
+                         col_ilha_real = next((c for c in df_dim_plan.columns if 'ILHA' in c or 'SQUAD' in c), None)
 
-                             # 2. Localiza colunas de horário dinamicamente (Busca "ENTRADA" e "SAIDA" no nome)
-                             col_entrada_real = next((c for c in df_dim_plan.columns if 'ENTRADA' in c), None)
-                             col_saida_real = next((c for c in df_dim_plan.columns if 'SAIDA' in c), None)
-                             
-                             # Se achou as colunas (ex: "HORARIO ENTRADA"), renomeia para o padrão "ENTRADA"
-                             if col_entrada_real and col_saida_real:
-                                 df_dim_plan = df_dim_plan.rename(columns={
-                                     col_entrada_real: 'ENTRADA', 
-                                     col_saida_real: 'SAIDA'
-                                 })
+                         # Renomeia para padrão
+                         rename_map = {}
+                         if col_entrada_real: rename_map[col_entrada_real] = 'ENTRADA'
+                         if col_saida_real: rename_map[col_saida_real] = 'SAIDA'
+                         if col_ilha_real: rename_map[col_ilha_real] = 'ILHA'
+                         
+                         if rename_map:
+                             df_dim_plan = df_dim_plan.rename(columns=rename_map)
 
-                                 # Prepara chaves de cruzamento
-                                 df_dim_plan['NOME_KEY'] = df_dim_plan['NOME'].astype(str).str.upper().str.strip()
+                         # Prepara chaves e Cruza (Agora trazendo ILHA também)
+                         df_dim_plan['NOME_KEY'] = df_dim_plan['NOME'].astype(str).str.upper().str.strip()
+                         
+                         cols_to_merge = ['NOME_KEY']
+                         if 'ENTRADA' in df_dim_plan.columns: cols_to_merge.append('ENTRADA')
+                         if 'SAIDA' in df_dim_plan.columns: cols_to_merge.append('SAIDA')
+                         if 'ILHA' in df_dim_plan.columns: cols_to_merge.append('ILHA') # <--- TRAZENDO A ILHA
+                         
+                         df_detalhe = pd.merge(df_detalhe, df_dim_plan[cols_to_merge], on='NOME_KEY', how='left')
+
+                         # --- LÓGICA DE JANELAS (Cálculo de Atraso) ---
+                         if df_real is not None and not df_real.empty and 'ENTRADA' in df_detalhe.columns and 'SAIDA' in df_detalhe.columns:
+                             # (Código da Janela Inteligente - Exatamente como estava antes)
+                             df_real['SESSAO_INICIO'] = pd.to_datetime(df_real['SESSAO_INICIO'])
+                             df_real['SESSAO_FIM'] = pd.to_datetime(df_real['SESSAO_FIM'])
+
+                             def calcular_atrasos(row):
+                                 nome = row.get('NOME_KEY')
+                                 hora_entrada_plan = row.get('ENTRADA')
+                                 hora_saida_plan = row.get('SAIDA')
                                  
-                                 # Cruza Escala com Detalhe
-                                 df_detalhe = pd.merge(df_detalhe, df_dim_plan[['NOME_KEY', 'ENTRADA', 'SAIDA']], 
-                                                     on='NOME_KEY', how='left')
-
-                                 # --- FUNÇÃO DE MATCH (Janela Inteligente) ---
-                                 def calcular_atrasos(row):
-                                     nome = row.get('NOME_KEY')
-                                     hora_entrada_plan = row.get('ENTRADA')
-                                     hora_saida_plan = row.get('SAIDA')
+                                 if not nome or not hora_entrada_plan or not hora_saida_plan or pd.isna(hora_entrada_plan): return None, None
+                                 try:
+                                     data_base = pd.to_datetime(data_sel)
+                                     h_ent, m_ent = map(int, str(hora_entrada_plan).split(':')[:2])
+                                     dt_entrada_plan = data_base.replace(hour=h_ent, minute=m_ent, second=0)
+                                     h_sai, m_sai = map(int, str(hora_saida_plan).split(':')[:2])
+                                     dt_saida_plan = data_base.replace(hour=h_sai, minute=m_sai, second=0)
                                      
-                                     # Se não tiver escala ou nome, retorna vazio
-                                     if not nome or not hora_entrada_plan or not hora_saida_plan or pd.isna(hora_entrada_plan):
-                                         return None, None
+                                     if dt_saida_plan < dt_entrada_plan: dt_saida_plan += pd.Timedelta(days=1)
                                      
-                                     try:
-                                         # Define a data base como a data selecionada no filtro
-                                         data_base = pd.to_datetime(data_sel)
+                                     janela_ent_inicio = dt_entrada_plan - pd.Timedelta(hours=4)
+                                     janela_ent_fim = dt_entrada_plan + pd.Timedelta(hours=4)
+                                     janela_sai_inicio = dt_saida_plan - pd.Timedelta(hours=4)
+                                     janela_sai_fim = dt_saida_plan + pd.Timedelta(hours=4)
+                                     
+                                     sessoes_pessoa = df_real[df_real['NOME'] == nome]
+                                     if sessoes_pessoa.empty: return None, None
                                          
-                                         # Parse Entrada Planejada
-                                         h_ent, m_ent = map(int, str(hora_entrada_plan).split(':')[:2])
-                                         dt_entrada_plan = data_base.replace(hour=h_ent, minute=m_ent, second=0)
-                                         
-                                         # Parse Saída Planejada
-                                         h_sai, m_sai = map(int, str(hora_saida_plan).split(':')[:2])
-                                         dt_saida_plan = data_base.replace(hour=h_sai, minute=m_sai, second=0)
-                                         
-                                         # CORREÇÃO DE MADRUGADA
-                                         if dt_saida_plan < dt_entrada_plan:
-                                             dt_saida_plan = dt_saida_plan + pd.Timedelta(days=1)
-                                         
-                                         # Janelas de Tolerância (+/- 4 horas)
-                                         janela_ent_inicio = dt_entrada_plan - pd.Timedelta(hours=4)
-                                         janela_ent_fim = dt_entrada_plan + pd.Timedelta(hours=4)
-                                         
-                                         janela_sai_inicio = dt_saida_plan - pd.Timedelta(hours=4)
-                                         janela_sai_fim = dt_saida_plan + pd.Timedelta(hours=4)
-                                         
-                                         # Filtra sessões REAIS dessa pessoa
-                                         sessoes_pessoa = df_real[df_real['NOME'] == nome]
-                                         
-                                         if sessoes_pessoa.empty:
-                                             return None, None
-                                             
-                                         # Encontra Login Real
-                                         mask_login = (sessoes_pessoa['SESSAO_INICIO'] >= janela_ent_inicio) & \
-                                                      (sessoes_pessoa['SESSAO_INICIO'] <= janela_ent_fim)
-                                         logins_validos = sessoes_pessoa.loc[mask_login, 'SESSAO_INICIO']
-                                         
-                                         # Encontra Logout Real
-                                         mask_logout = (sessoes_pessoa['SESSAO_FIM'] >= janela_sai_inicio) & \
-                                                       (sessoes_pessoa['SESSAO_FIM'] <= janela_sai_fim)
-                                         logouts_validos = sessoes_pessoa.loc[mask_logout, 'SESSAO_FIM']
-                                         
-                                         # Calcula Deltas
-                                         delta_ent = None
-                                         if not logins_validos.empty:
-                                             primeiro_login = logins_validos.min()
-                                             delta_ent = int((primeiro_login - dt_entrada_plan).total_seconds() / 60)
-                                         
-                                         delta_sai = None
-                                         if not logouts_validos.empty:
-                                             ultimo_logout = logouts_validos.max()
-                                             delta_sai = int((ultimo_logout - dt_saida_plan).total_seconds() / 60)
-                                             
-                                         return delta_ent, delta_sai
-                                     except:
-                                         return None, None
+                                     mask_login = (sessoes_pessoa['SESSAO_INICIO'] >= janela_ent_inicio) & (sessoes_pessoa['SESSAO_INICIO'] <= janela_ent_fim)
+                                     logins_validos = sessoes_pessoa.loc[mask_login, 'SESSAO_INICIO']
+                                     
+                                     mask_logout = (sessoes_pessoa['SESSAO_FIM'] >= janela_sai_inicio) & (sessoes_pessoa['SESSAO_FIM'] <= janela_sai_fim)
+                                     logouts_validos = sessoes_pessoa.loc[mask_logout, 'SESSAO_FIM']
+                                     
+                                     delta_ent = int((logins_validos.min() - dt_entrada_plan).total_seconds() / 60) if not logins_validos.empty else None
+                                     delta_sai = int((logouts_validos.max() - dt_saida_plan).total_seconds() / 60) if not logouts_validos.empty else None
+                                     return delta_ent, delta_sai
+                                 except: return None, None
 
-                                 # Aplica a função
-                                 resultados = df_detalhe.apply(calcular_atrasos, axis=1, result_type='expand')
-                                 df_detalhe['Dif_Entrada'] = resultados[0]
-                                 df_detalhe['Dif_Saida'] = resultados[1]
+                             resultados = df_detalhe.apply(calcular_atrasos, axis=1, result_type='expand')
+                             df_detalhe['Dif_Entrada'] = resultados[0]
+                             df_detalhe['Dif_Saida'] = resultados[1]
+
+                # --- FILTROS VISUAIS ---
+                
+                # Checkbox para filtrar Suporte/Emergência
+                st.markdown("###") # Espaço pequeno
+                apenas_sup_emerg = st.checkbox("🔍 Exibir apenas Suporte & Emergência", value=True)
+                
+                if apenas_sup_emerg and 'ILHA' in df_detalhe.columns:
+                    mask_ilha = df_detalhe['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
+                    df_detalhe = df_detalhe[mask_ilha]
 
                 # --- EXIBIÇÃO ---
                 col_pessoal = "%Pessoal"         
                 col_prog = "%Programacao"        
                 cols_base = ['Nome_Analista', col_improd, col_pessoal, col_prog]
                 
-                # Configuração das Colunas
                 col_config = {
                     "Nome_Analista": st.column_config.TextColumn("Analista", width="medium"),
                     col_improd: st.column_config.NumberColumn("Total Pausas (%)", format="%.2f"),
@@ -1111,39 +1087,22 @@ if eh_admin and aba_aderencia:
                     col_prog: st.column_config.NumberColumn("% Programação", format="%.2f")
                 }
 
-                # Adiciona colunas de Aderência se o cálculo rolou
                 if 'Dif_Entrada' in df_detalhe.columns:
                     cols_base = ['Nome_Analista', 'Dif_Entrada', 'Dif_Saida'] + [col_improd, col_pessoal, col_prog]
-                    
-                    # Tooltips detalhados (aparecem ao passar o mouse)
-                    col_config["Dif_Entrada"] = st.column_config.NumberColumn(
-                        "⏱️ Entrada (min)", 
-                        help="➖ Negativo: Logou ANTES do horário (Antecipado)\n➕ Positivo: Logou DEPOIS (Atraso)\n⬜ Vazio: Folga ou Atraso +4 horas",
-                        format="%d"
-                    )
-                    col_config["Dif_Saida"] = st.column_config.NumberColumn(
-                        "⏱️ Saída (min)", 
-                        help="➖ Negativo: Saiu ANTES do horário (Devendo)\n➕ Positivo: Saiu DEPOIS (Hora Extra)\n⬜ Vazio: Folga ou Atraso +4 horas",
-                        format="%d"
-                    )
+                    col_config["Dif_Entrada"] = st.column_config.NumberColumn("⏱️ Entrada (min)", help="➖ Negativo: Logou ANTES do horário (Antecipado)\n➕ Positivo: Logou DEPOIS (Atraso)\n⬜ Vazio: Folga ou Sem registro", format="%d")
+                    col_config["Dif_Saida"] = st.column_config.NumberColumn("⏱️ Saída (min)", help="➖ Negativo: Saiu ANTES do horário (Devendo)\n➕ Positivo: Saiu DEPOIS (Hora Extra)\n⬜ Vazio: Folga ou Sem registro", format="%d")
 
-                # Filtra colunas que realmente existem no DF
                 cols_show = [c for c in cols_base if c in df_detalhe.columns]
                 
-                # --- FILTRO DO 100% ---
                 if col_improd in df_detalhe.columns:
-                    # Remove quem tem 100% (ou mais) de pausa improdutiva
+                    # Remove 100% e ordena
                     df_detalhe = df_detalhe[df_detalhe[col_improd] < 99.9]
-                    # Ordena: Quem pausou mais aparece primeiro
                     df_detalhe = df_detalhe.sort_values(by=col_improd, ascending=False)
                 
                 st.markdown(f"##### 🕵️ Detalhe por Analista ({len(df_detalhe)} pessoas)")
-
-                # --- AVISO DISCRETO (SUBSTITUI A LEGENDA GRANDE) ---
                 if 'Dif_Entrada' in df_detalhe.columns:
-                    st.caption("ℹ️ Dica: Passe o mouse sobre os títulos das colunas **⏱️ (min)** para entender o cálculo de atraso/extra.")
+                    st.caption("ℹ️ Dica: Passe o mouse sobre os títulos das colunas **⏱️ (min)** para entender o cálculo.")
                 
-                # Aplica estilo centralizado
                 st_df_styled = df_detalhe[cols_show].style.set_properties(**{'text-align': 'center'})
 
                 st.dataframe(
