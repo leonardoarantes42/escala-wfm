@@ -537,10 +537,11 @@ senha_url = params.get("k")
 # 2. TENTA LOGIN VIA COOKIE
 token_cookie = cookies.get("turbi_token")
 
-# --- Verifica se acabou de deslogar ---
-ignorar_cookie_antigo = st.session_state.get("logout_just_happened", False)
+# Verifica se a trava de logout existe
+ignorar_cookie = st.session_state.get("logout_just_happened", False)
 
-if token_cookie and not st.session_state.get("logado", False) and not ignorar_cookie_antigo:
+# Só loga se NÃO tiver acabado de sair
+if token_cookie and not st.session_state.get("logado", False) and not ignorar_cookie:
     try:
         email_cookie = token_cookie.split("|")[0]
         if email_cookie in st.secrets["credentials"]["usernames"]:
@@ -612,16 +613,22 @@ opcoes_lider, opcoes_ilha = carregar_lista_pessoas()
 with st.sidebar:
     st.write(f"👤 **{st.session_state.get('nome', 'Visitante')}**")
     
-    # BOTÃO DE LOGOUT CORRIGIDO
+    # BOTÃO DE LOGOUT (v2)
     if st.button("Sair / Logout", type="secondary"):
-        # 1. Manda o navegador deletar o cookie
-        cookie_manager.delete("turbi_token")
+        # 1. Tenta mandar deletar o cookie (Se der erro na linha 618, ele ignora e segue)
+        try:
+            cookie_manager.delete("turbi_token")
+        except:
+            pass
         
         # 2. Limpa a memória da sessão
         st.session_state.clear()
-        st.query_params.clear()
         
-        # 3. Pequeno delay para garantir que o browser processou a deleção antes do rerun
+        # 3. RECOLOCA A TRAVA DE SEGURANÇA (O clear apagou ela, então colocamos de novo)
+        # Isso diz para o sistema: "Acabei de sair, ignora qualquer cookie que você ache"
+        st.session_state["logout_just_happened"] = True
+        
+        st.query_params.clear()
         time.sleep(0.5)
         st.rerun()
 
