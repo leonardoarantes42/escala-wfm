@@ -1118,12 +1118,12 @@ if eh_admin and aba_aderencia:
                     # Tooltips detalhados (aparecem ao passar o mouse)
                     col_config["Dif_Entrada"] = st.column_config.NumberColumn(
                         "⏱️ Entrada (min)", 
-                        help="➖ Negativo: Logou ANTES do horário (Antecipado)\n➕ Positivo: Logou DEPOIS (Atraso)\n⬜ Vazio: Folga ou Sem registro",
+                        help="➖ Negativo: Logou ANTES do horário (Antecipado)\n➕ Positivo: Logou DEPOIS (Atraso)\n⬜ Vazio: Folga ou Atraso +4 horas",
                         format="%d"
                     )
                     col_config["Dif_Saida"] = st.column_config.NumberColumn(
                         "⏱️ Saída (min)", 
-                        help="➖ Negativo: Saiu ANTES do horário (Devendo)\n➕ Positivo: Saiu DEPOIS (Hora Extra)\n⬜ Vazio: Folga ou Sem registro",
+                        help="➖ Negativo: Saiu ANTES do horário (Devendo)\n➕ Positivo: Saiu DEPOIS (Hora Extra)\n⬜ Vazio: Folga ou Atraso +4 horas",
                         format="%d"
                     )
 
