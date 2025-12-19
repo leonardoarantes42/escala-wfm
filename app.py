@@ -958,10 +958,10 @@ if eh_admin and aba_aderencia:
                     
                     fig_l = px.line(
                         df_trend, x='Data_Curta', y=col_improd, 
-                        title="Tendência Pausa (%) - Visão Gerencial", markers=True
+                        title="Tendência Pausas (%) - Visão Gerencial", markers=True
                     )
                     
-                    fig_l.update_traces(line_color='#d32f2f', name="Pausa Improdutiva", showlegend=True)
+                    fig_l.update_traces(line_color='#d32f2f', name="Pausas", showlegend=True)
                     fig_l.update_xaxes(type='category', tickangle=-45)
                     
                     fig_l.update_layout(
