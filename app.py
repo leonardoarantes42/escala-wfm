@@ -521,12 +521,20 @@ def impor_sessao_unica(email):
 cookie_manager = get_cookie_manager()
 cookies = cookie_manager.get_all()
 
+# 1. LOADING INICIAL (Resolve o "Flash" do Login)
+# Se não estiver logado e for a primeira renderização, espera o cookie chegar
+if not st.session_state.get("logado", False) and "startup_check" not in st.session_state:
+    with st.spinner("🔄 Iniciando sistema..."):
+        time.sleep(1) # Dá tempo do navegador entregar o cookie
+        st.session_state["startup_check"] = True
+        st.rerun()
+
 # Tenta pegar login da URL
 params = st.query_params
 usuario_url = params.get("u")
 senha_url = params.get("k")
 
-# 1. TENTA LOGIN VIA COOKIE (Recuperação de F5)
+# 2. TENTA LOGIN VIA COOKIE
 token_cookie = cookies.get("turbi_token")
 
 if token_cookie and not st.session_state.get("logado", False):
@@ -544,15 +552,7 @@ if token_cookie and not st.session_state.get("logado", False):
     except:
         pass 
 
-# 2. ANTI-FLASH
-if not st.session_state.get("logado", False):
-    if "auth_check_completed" not in st.session_state:
-        with st.spinner("Verificando credenciais..."):
-            st.session_state["auth_check_completed"] = True
-            time.sleep(1)
-            st.rerun()
-
-# 3. Se ainda não logou, mostra Login
+# 3. Se ainda não logou (mesmo após esperar), mostra Login
 if not st.session_state.get("logado", False):
     login_aprovado = False
     email_login = ""
@@ -567,6 +567,7 @@ if not st.session_state.get("logado", False):
             st.query_params.clear()
 
     if not login_aprovado:
+        # Layout centralizado do Login
         c1, c2, c3 = st.columns([1, 2, 1])
         with c2:
             st.markdown("### 🔒 Acesso Sistema de Escalas Turbi")
