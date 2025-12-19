@@ -931,7 +931,7 @@ if eh_admin and aba_aderencia:
                     hide_index=True,
                     column_config={
                         "Nome_Analista": st.column_config.TextColumn("Analista", width="medium"),
-                        col_improd: st.column_config.NumberColumn("Total Improdutivo (%)", format="%.2f"),
+                        col_improd: st.column_config.NumberColumn("Total Pausas (%)", format="%.2f"),
                         col_pessoal: st.column_config.NumberColumn("% Pessoal", format="%.2f"),
                         col_prog: st.column_config.NumberColumn("% Programação", format="%.2f")
                     }
