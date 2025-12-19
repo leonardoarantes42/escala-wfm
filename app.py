@@ -965,7 +965,7 @@ if eh_admin and aba_aderencia:
                     fig_l.update_xaxes(type='category', tickangle=-45)
                     
                     fig_l.update_layout(
-                        height=300, 
+                        height=400, 
                         margin=dict(t=30, b=0, l=0, r=0),
                         xaxis_title=None,
                         yaxis_title="Total (menos e-mail e Projeto)",
@@ -1088,8 +1088,8 @@ if eh_admin and aba_aderencia:
 
                 if 'Dif_Entrada' in df_detalhe.columns:
                     cols_base = ['Nome_Analista', 'Dif_Entrada', 'Dif_Saida'] + [col_improd, col_pessoal, col_prog]
-                    col_config["Dif_Entrada"] = st.column_config.NumberColumn("⏱️ Entrada (min)", help="➖ Negativo: Logou ANTES do horário (Antecipado)\n➕ Positivo: Logou DEPOIS (Atraso)\n⬜ Vazio: Folga ou Sem registro", format="%d")
-                    col_config["Dif_Saida"] = st.column_config.NumberColumn("⏱️ Saída (min)", help="➖ Negativo: Saiu ANTES do horário (Devendo)\n➕ Positivo: Saiu DEPOIS (Hora Extra)\n⬜ Vazio: Folga ou Sem registro", format="%d")
+                    col_config["Dif_Entrada"] = st.column_config.NumberColumn("⏱️ Entrada (min)", help="➖ Negativo: Logou ANTES do horário (Antecipado)\n➕ Positivo: Logou DEPOIS (Atraso)\n⬜ Vazio: Folga ou Atraso maior que 4 horas", format="%d")
+                    col_config["Dif_Saida"] = st.column_config.NumberColumn("⏱️ Saída (min)", help="➖ Negativo: Saiu ANTES do horário (Devendo)\n➕ Positivo: Saiu DEPOIS (Hora Extra)\n⬜ Vazio: Folga ou Atraso maior que 4 horas", format="%d")
 
                 cols_show = [c for c in cols_base if c in df_detalhe.columns]
                 
