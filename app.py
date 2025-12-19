@@ -934,25 +934,32 @@ if eh_admin and aba_aderencia:
                  st.plotly_chart(fig_b, use_container_width=True)
         with g2:
             if df_pausas is not None and col_improd in df_pausas.columns:
-                df_trend = df_pausas.dropna(subset=['Dia_Date']).copy()
+                
+                mask_total = df_pausas['Dia_Str'].astype(str).str.contains("Total", case=False, na=False)
+                df_trend = df_pausas[mask_total].copy()
+                
+                # Filtra pelo mês/ano selecionado
                 df_trend = df_trend[
                     (df_trend['Dia_Date'].dt.month == data_sel.month) & 
                     (df_trend['Dia_Date'].dt.year == data_sel.year)
                 ]
+                
                 if not df_trend.empty:
-                    df_trend_gp = df_trend.groupby('Dia_Date')[col_improd].mean().reset_index()
-                    df_trend_gp['Data_Curta'] = df_trend_gp['Dia_Date'].dt.strftime('%d/%m')
+                    # Ordena por data para o gráfico não ficar bagunçado
+                    df_trend = df_trend.sort_values(by='Dia_Date')
+                    
+                    df_trend['Data_Curta'] = df_trend['Dia_Date'].dt.strftime('%d/%m')
                     
                     fig_l = px.line(
-                        df_trend_gp, x='Data_Curta', y=col_improd, 
-                        title="Tendência Pausas (%)", markers=True
+                        df_trend, x='Data_Curta', y=col_improd, 
+                        title="Tendência Pausa (%) - Visão Gerencial", markers=True
                     )
                     
-                    fig_l.update_traces(line_color='#d32f2f', name="Pausas", showlegend=True)
+                    fig_l.update_traces(line_color='#d32f2f', name="Pausa Improdutiva", showlegend=True)
                     fig_l.update_xaxes(type='category', tickangle=-45)
                     
                     fig_l.update_layout(
-                        height=400, 
+                        height=300, 
                         margin=dict(t=30, b=0, l=0, r=0),
                         xaxis_title=None,
                         yaxis_title="Total (menos e-mail e Projeto)",
@@ -961,7 +968,7 @@ if eh_admin and aba_aderencia:
                     )
                     st.plotly_chart(fig_l, use_container_width=True)
                 else:
-                    st.info("Sem dados de pausa para este mês.")
+                    st.info("Sem dados de totais para este mês.")
 
         # --- TABELA DETALHADA ---
         if df_pausas is not None:
