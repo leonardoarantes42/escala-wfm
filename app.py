@@ -866,10 +866,10 @@ if eh_admin and aba_aderencia:
                     
                     fig_l = px.line(
                         df_trend_gp, x='Data_Curta', y=col_improd, 
-                        title="Tendência Pausa (%)", markers=True
+                        title="Tendência Pausas (%)", markers=True
                     )
                     
-                    fig_l.update_traces(line_color='#d32f2f', name="Pausa Improdutiva", showlegend=True)
+                    fig_l.update_traces(line_color='#d32f2f', name="Pausas", showlegend=True)
                     fig_l.update_xaxes(type='category', tickangle=-45)
                     
                     fig_l.update_layout(
@@ -906,7 +906,7 @@ if eh_admin and aba_aderencia:
                     hide_index=True,
                     column_config={
                         "Nome_Analista": st.column_config.TextColumn("Analista", width="medium"),
-                        col_improd: st.column_config.NumberColumn("Total Improdutivo (%)", format="%.2f"),
+                        col_improd: st.column_config.NumberColumn("Total Pausas (%)", format="%.2f"),
                         col_pessoal: st.column_config.NumberColumn("% Pessoal", format="%.2f"),
                         col_prog: st.column_config.NumberColumn("% Programação", format="%.2f")
                     }
