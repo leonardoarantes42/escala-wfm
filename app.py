@@ -1115,23 +1115,22 @@ if eh_admin and aba_aderencia:
                 if 'Dif_Entrada' in df_detalhe.columns:
                     cols_base = ['Nome_Analista', 'Dif_Entrada', 'Dif_Saida'] + [col_improd, col_pessoal, col_prog]
                     
+                    # Tooltips detalhados (aparecem ao passar o mouse)
                     col_config["Dif_Entrada"] = st.column_config.NumberColumn(
                         "⏱️ Entrada (min)", 
-                        # AQUI: Adicionei a explicação do "Vazio" no final
-                        help="Negativo: Antecipado | Positivo: Atrasado | Vazio: Sem registro ou Folga",
+                        help="➖ Negativo: Logou ANTES do horário (Antecipado)\n➕ Positivo: Logou DEPOIS (Atraso)\n⬜ Vazio: Folga ou Sem registro",
                         format="%d"
                     )
                     col_config["Dif_Saida"] = st.column_config.NumberColumn(
                         "⏱️ Saída (min)", 
-                        # AQUI TAMBÉM
-                        help="Negativo: Saiu Antes | Positivo: Hora Extra | Vazio: Sem registro ou Folga",
+                        help="➖ Negativo: Saiu ANTES do horário (Devendo)\n➕ Positivo: Saiu DEPOIS (Hora Extra)\n⬜ Vazio: Folga ou Sem registro",
                         format="%d"
                     )
 
                 # Filtra colunas que realmente existem no DF
                 cols_show = [c for c in cols_base if c in df_detalhe.columns]
                 
-                # --- FILTRO DO 100% (NOVIDADE) ---
+                # --- FILTRO DO 100% ---
                 if col_improd in df_detalhe.columns:
                     # Remove quem tem 100% (ou mais) de pausa improdutiva
                     df_detalhe = df_detalhe[df_detalhe[col_improd] < 99.9]
@@ -1140,15 +1139,9 @@ if eh_admin and aba_aderencia:
                 
                 st.markdown(f"##### 🕵️ Detalhe por Analista ({len(df_detalhe)} pessoas)")
 
-                # --- LEGENDA EXPLICATIVA (NOVIDADE) ---
+                # --- AVISO DISCRETO (SUBSTITUI A LEGENDA GRANDE) ---
                 if 'Dif_Entrada' in df_detalhe.columns:
-                    st.caption("""
-                    **Entenda os Números:** 
-                    🟢 **Entrada Negativa (-):** Logou antecipado.  
-                    🔴 **Entrada Positiva (+):** Atraso no login.  
-                    🔴 **Saída Negativa (-):** Deslogou antes do horário.  
-                    🟢 **Saída Positiva (+):** Ficou além do horário.
-                    """)
+                    st.caption("ℹ️ Dica: Passe o mouse sobre os títulos das colunas **⏱️ (min)** para entender o cálculo de atraso/extra.")
                 
                 # Aplica estilo centralizado
                 st_df_styled = df_detalhe[cols_show].style.set_properties(**{'text-align': 'center'})
