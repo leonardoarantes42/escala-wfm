@@ -537,7 +537,10 @@ senha_url = params.get("k")
 # 2. TENTA LOGIN VIA COOKIE
 token_cookie = cookies.get("turbi_token")
 
-if token_cookie and not st.session_state.get("logado", False):
+# --- Verifica se acabou de deslogar ---
+ignorar_cookie_antigo = st.session_state.get("logout_just_happened", False)
+
+if token_cookie and not st.session_state.get("logado", False) and not ignorar_cookie_antigo:
     try:
         email_cookie = token_cookie.split("|")[0]
         if email_cookie in st.secrets["credentials"]["usernames"]:
