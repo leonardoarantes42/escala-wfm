@@ -1102,7 +1102,12 @@ if eh_admin and aba_aderencia:
                 if 'Dif_Entrada' in df_detalhe.columns:
                     st.caption("ℹ️ Dica: Passe o mouse sobre os títulos das colunas **⏱️ (min)** para entender o cálculo.")
                 
-                st_df_styled = df_detalhe[cols_show].style.set_properties(**{'text-align': 'center'})
+                st_df_styled = df_detalhe[cols_show].style.set_properties(**{
+                    'text-align': 'center',
+                    'color': '#fafafa',           # Força Texto Branco
+                    'background-color': '#0e1117', # Força Fundo Escuro (Mesmo do seu tema)
+                    'border-color': '#262730'      # Cor da borda sutil
+                })
 
                 st.dataframe(
                     st_df_styled,
