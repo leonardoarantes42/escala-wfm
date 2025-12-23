@@ -1086,10 +1086,12 @@ if eh_admin and aba_aderencia:
                     col_prog: st.column_config.NumberColumn("% Programação", format="%.2f")
                 }
 
+                # --- EXIBIÇÃO COM FORÇAMENTO DE DARK MODE ---
+                
+                # 1. Configurações das colunas (mantém igual)
                 if 'Dif_Entrada' in df_detalhe.columns:
-                    cols_base = ['Nome_Analista', 'Dif_Entrada', 'Dif_Saida'] + [col_improd, col_pessoal, col_prog]
-                    col_config["Dif_Entrada"] = st.column_config.NumberColumn("⏱️ Entrada (min)", help="➖ Negativo: Logou ANTES do horário (Antecipado)\n➕ Positivo: Logou DEPOIS (Atraso)\n⬜ Vazio: Folga ou Atraso maior que 4 horas", format="%d")
-                    col_config["Dif_Saida"] = st.column_config.NumberColumn("⏱️ Saída (min)", help="➖ Negativo: Saiu ANTES do horário (Devendo)\n➕ Positivo: Saiu DEPOIS (Hora Extra)\n⬜ Vazio: Folga ou Atraso maior que 4 horas", format="%d")
+                    col_config["Dif_Entrada"] = st.column_config.NumberColumn("⏱️ Entrada (min)", help="➖ Negativo: Logou ANTES do horário (Antecipado)\n➕ Positivo: Logou DEPOIS (Atraso)\n⬜ Vazio: Folga ou Sem registro", format="%d")
+                    col_config["Dif_Saida"] = st.column_config.NumberColumn("⏱️ Saída (min)", help="➖ Negativo: Saiu ANTES do horário (Devendo)\n➕ Positivo: Saiu DEPOIS (Hora Extra)\n⬜ Vazio: Folga ou Sem registro", format="%d")
 
                 cols_show = [c for c in cols_base if c in df_detalhe.columns]
                 
@@ -1102,8 +1104,15 @@ if eh_admin and aba_aderencia:
                 if 'Dif_Entrada' in df_detalhe.columns:
                     st.caption("ℹ️ Dica: Passe o mouse sobre os títulos das colunas **⏱️ (min)** para entender o cálculo.")
                 
-                # --- ESTILO LIMPO (Apenas centralização) ---
-                st_df_styled = df_detalhe[cols_show].style.set_properties(**{'text-align': 'center'})
+                # --- AQUI ESTÁ A CORREÇÃO BLINDADA ---
+                # Adicionamos background-color e color manuais. 
+                # Isso atropela qualquer configuração de tema "Light" que o usuário tenha.
+                st_df_styled = df_detalhe[cols_show].style.set_properties(**{
+                    'text-align': 'center',
+                    'background-color': '#0e1117',  # <--- Força Fundo ESCURO (igual ao seu tema)
+                    'color': '#fafafa',             # <--- Força Texto BRANCO
+                    'border-color': '#262730'       # <--- Borda sutil para combinar
+                })
 
                 st.dataframe(
                     st_df_styled,
