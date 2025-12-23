@@ -79,15 +79,6 @@ st.markdown("""
         }
         thead th:first-child { z-index: 7; background-color: #0e1117; }
 
-        @media (prefers-color-scheme: light) {
-            .table-container { border: 1px solid #ddd; }
-            th, td { border-bottom: 1px solid #ddd; border-right: 1px solid #ddd; }
-            thead th { background-color: #f0f2f6; color: black; border-bottom: 2px solid #ccc; }
-            table td:first-child, table th:first-child { background-color: #ffffff; border-right: 2px solid #ccc;}
-            thead th:first-child { background-color: #f0f2f6; }
-            [data-testid="metric-container"] { background-color: #f8f9fa; border: 1px solid #ddd; }
-        }
-
         /* 3. KPIS */
         [data-testid="metric-container"] { padding: 4px 8px; height: 60px; border-radius: 6px; border: 1px solid #333; background-color: #1c1e24; justify-content: center !important; }
         [data-testid="stMetricLabel"] { font-size: 10px !important; margin-bottom: 0 !important; }
