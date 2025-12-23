@@ -1133,9 +1133,7 @@ if eh_admin and aba_aderencia:
                 # Isso atropela qualquer configuração de tema "Light" que o usuário tenha.
                 st_df_styled = df_detalhe[cols_show].style.set_properties(**{
                     'text-align': 'center',
-                    'background-color': '#0e1117 !important',  # Força bruta no fundo
-                    'color': '#fafafa !important',              # Força bruta na cor
-                    'border-color': '#262730 !important'
+                    'border-color': '#444' # Borda sutil que funciona nos dois modos
                 })
 
                 st.dataframe(
