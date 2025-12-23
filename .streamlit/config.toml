@@ -1,7 +1,4 @@
 [theme]
-base="dark"
-primaryColor="#1e3a8a"
-backgroundColor="#0e1117"
-secondaryBackgroundColor="#262730"
-textColor="#fafafa"
+base="dark"                  # Sua preferência padrão é ESCURO
+primaryColor="#1e3a8a"       # Azul da Turbi
 font="sans serif"
