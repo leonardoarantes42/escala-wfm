@@ -107,6 +107,30 @@ st.markdown("""
         [data-testid="stStatusWidget"] {
             visibility: hidden;
         }
+        :root {
+            --primary-color: #1e3a8a !important;
+            --background-color: #0e1117 !important;
+            --secondary-background-color: #262730 !important;
+            --text-color: #fafafa !important;
+        }
+        
+        /* Força o fundo da aplicação inteira */
+        .stApp {
+            background-color: #0e1117 !important;
+            color: #fafafa !important;
+        }
+        
+        /* Correção específica para a Tabela (Dataframe) */
+        /* Isso remove o fundo branco forçado das colunas fixas em Light Mode */
+        [data-testid="stDataFrame"] {
+            background-color: #0e1117 !important;
+        }
+        
+        /* Garante que o texto dentro das tabelas seja legível */
+        div[data-testid="stDataFrame"] * {
+            color: #fafafa !important;
+            background-color: #0e1117 !important;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -1109,9 +1133,9 @@ if eh_admin and aba_aderencia:
                 # Isso atropela qualquer configuração de tema "Light" que o usuário tenha.
                 st_df_styled = df_detalhe[cols_show].style.set_properties(**{
                     'text-align': 'center',
-                    'background-color': '#0e1117',  # <--- Força Fundo ESCURO (igual ao seu tema)
-                    'color': '#fafafa',             # <--- Força Texto BRANCO
-                    'border-color': '#262730'       # <--- Borda sutil para combinar
+                    'background-color': '#0e1117 !important',  # Força bruta no fundo
+                    'color': '#fafafa !important',              # Força bruta na cor
+                    'border-color': '#262730 !important'
                 })
 
                 st.dataframe(
