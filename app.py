@@ -335,14 +335,19 @@ def carregar_dados_pausas():
         dados = ws.get_all_values()
         if len(dados) > 0:
             headers = [str(h).strip() for h in dados[0]]
+            # Cria o DF
             df = pd.DataFrame(dados[1:], columns=headers)
+            
+            # --- FIX: REMOVE COLUNAS DUPLICADAS NA ORIGEM ---
+            df = df.loc[:, ~df.columns.duplicated()]
+            # -----------------------------------------------
         else:
             return None
 
         # Colunas Alvo
         cols_alvo = [
             'Total (menos e-mail e Projeto)', 
-            '%Pessoal',                       
+            '%Pessoal',                        
             '%Programacao',
             '%Pausas_Total'
         ]
@@ -374,6 +379,7 @@ def carregar_dados_pausas():
 
         return df
     except Exception as e:
+        print(f"Erro Pausas: {e}") # Bom para debug no console
         return None
         
 # A função 'carregar_mapa_lideres' foi removida pois não era utilizada.
