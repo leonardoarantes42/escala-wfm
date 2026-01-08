@@ -1045,51 +1045,52 @@ if eh_admin and aba_aderencia:
                          df_detalhe = pd.merge(df_detalhe, df_dim_plan[cols_to_merge], on='NOME_KEY', how='left')
 
                          # --- LÓGICA DE JANELAS (Cálculo de Atraso) ---
-                          if df_real is not None and not df_real.empty and 'ENTRADA' in df_detalhe.columns and 'SAIDA' in df_detalhe.columns:
+                         if df_real is not None and not df_real.empty and 'ENTRADA' in df_detalhe.columns and 'SAIDA' in df_detalhe.columns:
                               
+                              # Converte para data ignorando erros (viram NaT)
                               df_real['SESSAO_INICIO'] = pd.to_datetime(df_real['SESSAO_INICIO'], errors='coerce', dayfirst=True)
                               df_real['SESSAO_FIM'] = pd.to_datetime(df_real['SESSAO_FIM'], errors='coerce', dayfirst=True)
 
-                              # 3. Limpa linhas onde a data falhou (está NaT) para não quebrar o cálculo matemático depois
+                              # Remove linhas com datas inválidas para não quebrar a conta
                               df_real = df_real.dropna(subset=['SESSAO_INICIO', 'SESSAO_FIM'])
 
-                             def calcular_atrasos(row):
-                                 nome = row.get('NOME_KEY')
-                                 hora_entrada_plan = row.get('ENTRADA')
-                                 hora_saida_plan = row.get('SAIDA')
-                                 
-                                 if not nome or not hora_entrada_plan or not hora_saida_plan or pd.isna(hora_entrada_plan): return None, None
-                                 try:
-                                     data_base = pd.to_datetime(data_sel)
-                                     h_ent, m_ent = map(int, str(hora_entrada_plan).split(':')[:2])
-                                     dt_entrada_plan = data_base.replace(hour=h_ent, minute=m_ent, second=0)
-                                     h_sai, m_sai = map(int, str(hora_saida_plan).split(':')[:2])
-                                     dt_saida_plan = data_base.replace(hour=h_sai, minute=m_sai, second=0)
-                                     
-                                     if dt_saida_plan < dt_entrada_plan: dt_saida_plan += pd.Timedelta(days=1)
-                                     
-                                     janela_ent_inicio = dt_entrada_plan - pd.Timedelta(hours=4)
-                                     janela_ent_fim = dt_entrada_plan + pd.Timedelta(hours=4)
-                                     janela_sai_inicio = dt_saida_plan - pd.Timedelta(hours=4)
-                                     janela_sai_fim = dt_saida_plan + pd.Timedelta(hours=4)
-                                     
-                                     sessoes_pessoa = df_real[df_real['NOME'] == nome]
-                                     if sessoes_pessoa.empty: return None, None
-                                         
-                                     mask_login = (sessoes_pessoa['SESSAO_INICIO'] >= janela_ent_inicio) & (sessoes_pessoa['SESSAO_INICIO'] <= janela_ent_fim)
-                                     logins_validos = sessoes_pessoa.loc[mask_login, 'SESSAO_INICIO']
-                                     
-                                     mask_logout = (sessoes_pessoa['SESSAO_FIM'] >= janela_sai_inicio) & (sessoes_pessoa['SESSAO_FIM'] <= janela_sai_fim)
-                                     logouts_validos = sessoes_pessoa.loc[mask_logout, 'SESSAO_FIM']
-                                     
-                                     delta_ent = int((logins_validos.min() - dt_entrada_plan).total_seconds() / 60) if not logins_validos.empty else None
-                                     delta_sai = int((logouts_validos.max() - dt_saida_plan).total_seconds() / 60) if not logouts_validos.empty else None
-                                     return delta_ent, delta_sai
-                                 except: return None, None
+                              def calcular_atrasos(row):
+                                  nome = row.get('NOME_KEY')
+                                  hora_entrada_plan = row.get('ENTRADA')
+                                  hora_saida_plan = row.get('SAIDA')
+                                  
+                                  if not nome or not hora_entrada_plan or not hora_saida_plan or pd.isna(hora_entrada_plan): return None, None
+                                  try:
+                                      data_base = pd.to_datetime(data_sel)
+                                      h_ent, m_ent = map(int, str(hora_entrada_plan).split(':')[:2])
+                                      dt_entrada_plan = data_base.replace(hour=h_ent, minute=m_ent, second=0)
+                                      h_sai, m_sai = map(int, str(hora_saida_plan).split(':')[:2])
+                                      dt_saida_plan = data_base.replace(hour=h_sai, minute=m_sai, second=0)
+                                      
+                                      if dt_saida_plan < dt_entrada_plan: dt_saida_plan += pd.Timedelta(days=1)
+                                      
+                                      janela_ent_inicio = dt_entrada_plan - pd.Timedelta(hours=4)
+                                      janela_ent_fim = dt_entrada_plan + pd.Timedelta(hours=4)
+                                      janela_sai_inicio = dt_saida_plan - pd.Timedelta(hours=4)
+                                      janela_sai_fim = dt_saida_plan + pd.Timedelta(hours=4)
+                                      
+                                      sessoes_pessoa = df_real[df_real['NOME'] == nome]
+                                      if sessoes_pessoa.empty: return None, None
+                                          
+                                      mask_login = (sessoes_pessoa['SESSAO_INICIO'] >= janela_ent_inicio) & (sessoes_pessoa['SESSAO_INICIO'] <= janela_ent_fim)
+                                      logins_validos = sessoes_pessoa.loc[mask_login, 'SESSAO_INICIO']
+                                      
+                                      mask_logout = (sessoes_pessoa['SESSAO_FIM'] >= janela_sai_inicio) & (sessoes_pessoa['SESSAO_FIM'] <= janela_sai_fim)
+                                      logouts_validos = sessoes_pessoa.loc[mask_logout, 'SESSAO_FIM']
+                                      
+                                      delta_ent = int((logins_validos.min() - dt_entrada_plan).total_seconds() / 60) if not logins_validos.empty else None
+                                      delta_sai = int((logouts_validos.max() - dt_saida_plan).total_seconds() / 60) if not logouts_validos.empty else None
+                                      return delta_ent, delta_sai
+                                  except: return None, None
 
-                             resultados = df_detalhe.apply(calcular_atrasos, axis=1, result_type='expand')
-                             df_detalhe['Dif_Entrada'] = resultados[0]
-                             df_detalhe['Dif_Saida'] = resultados[1]
+                              resultados = df_detalhe.apply(calcular_atrasos, axis=1, result_type='expand')
+                              df_detalhe['Dif_Entrada'] = resultados[0]
+                              df_detalhe['Dif_Saida'] = resultados[1]
 
                 # --- FILTROS VISUAIS ---
                 st.markdown("###")
