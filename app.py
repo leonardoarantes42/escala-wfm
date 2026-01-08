@@ -1045,9 +1045,13 @@ if eh_admin and aba_aderencia:
                          df_detalhe = pd.merge(df_detalhe, df_dim_plan[cols_to_merge], on='NOME_KEY', how='left')
 
                          # --- LÓGICA DE JANELAS (Cálculo de Atraso) ---
-                         if df_real is not None and not df_real.empty and 'ENTRADA' in df_detalhe.columns and 'SAIDA' in df_detalhe.columns:
-                             df_real['SESSAO_INICIO'] = pd.to_datetime(df_real['SESSAO_INICIO'])
-                             df_real['SESSAO_FIM'] = pd.to_datetime(df_real['SESSAO_FIM'])
+                          if df_real is not None and not df_real.empty and 'ENTRADA' in df_detalhe.columns and 'SAIDA' in df_detalhe.columns:
+                              
+                              df_real['SESSAO_INICIO'] = pd.to_datetime(df_real['SESSAO_INICIO'], errors='coerce', dayfirst=True)
+                              df_real['SESSAO_FIM'] = pd.to_datetime(df_real['SESSAO_FIM'], errors='coerce', dayfirst=True)
+
+                              # 3. Limpa linhas onde a data falhou (está NaT) para não quebrar o cálculo matemático depois
+                              df_real = df_real.dropna(subset=['SESSAO_INICIO', 'SESSAO_FIM'])
 
                              def calcular_atrasos(row):
                                  nome = row.get('NOME_KEY')
