@@ -223,7 +223,7 @@ def carregar_aderencia_real():
     client = conectar_google_sheets()
     try:
         sh = client.open_by_url(URL_PLANILHA)
-        ws = sh.worksheet("Aderencia_Real") # <--- NOME DA ABA QUE VOCÊ VAI CRIAR
+        ws = sh.worksheet("Aderencia_Real")
         dados = ws.get_all_records()
         df = pd.DataFrame(dados)
         
@@ -275,7 +275,7 @@ def carregar_lista_pessoas():
         return [], []
 
 # ==========================================
-# 1. FUNÇÃO ONLINE (Recupera Coluna M)
+# 1. FUNÇÃO ONLINE E PAUSAS
 # ==========================================
 @st.cache_data(ttl=600, show_spinner=False)
 def carregar_dados_online():
@@ -319,9 +319,6 @@ def carregar_dados_online():
     except Exception as e:
         return None
 
-# ==========================================
-# 2. FUNÇÃO PAUSAS (Recupera Porcentagens)
-# ==========================================
 @st.cache_data(ttl=600, show_spinner=False)
 def carregar_dados_pausas():
     client = conectar_google_sheets()
@@ -340,7 +337,6 @@ def carregar_dados_pausas():
             
             # --- FIX: REMOVE COLUNAS DUPLICADAS NA ORIGEM ---
             df = df.loc[:, ~df.columns.duplicated()]
-            # -----------------------------------------------
         else:
             return None
 
@@ -379,11 +375,46 @@ def carregar_dados_pausas():
 
         return df
     except Exception as e:
-        print(f"Erro Pausas: {e}") # Bom para debug no console
+        print(f"Erro Pausas: {e}") 
         return None
-        
-# A função 'carregar_mapa_lideres' foi removida pois não era utilizada.
 
+# ==========================================
+# NOVIDADE: FUNÇÃO PARA LER PLANTÃO FDS
+# ==========================================
+@st.cache_data(ttl=600, show_spinner=False)
+def carregar_plantao_dia(data_str):
+    client = conectar_google_sheets()
+    try:
+        sh = client.open_by_url(URL_PLANILHA)
+        try:
+            ws = sh.worksheet("ESCALA 26 STAFF")
+        except:
+            return None
+            
+        dados = ws.get_all_values()
+        if not dados or len(dados) < 3: return None
+        
+        # Percorre as linhas procurando a data exata (ex: 01/01/2026) na Coluna B
+        for linha in dados:
+            if len(linha) >= 7: # Garante que tem colunas suficientes
+                data_planilha = str(linha[1]).strip() # Coluna B (Index 1)
+                
+                if data_planilha == data_str:
+                    staff = str(linha[2]).strip()     # Coluna C (Index 2)
+                    urgencia = str(linha[5]).strip()  # Coluna F (Index 5)
+                    telefone = str(linha[6]).strip()  # Coluna G (Index 6)
+                    
+                    # Se achou pelo menos a urgência ou o staff preenchido, retorna
+                    if staff or urgencia:
+                        return {"staff": staff, "urgencia": urgencia, "telefone": telefone}
+        return None
+    except Exception as e:
+        print(f"Erro Plantão: {e}")
+        return None
+
+# ==========================================
+# FUNÇÕES DE CÁLCULO
+# ==========================================
 def calcular_picos_vales_mensal(df_mensal):
     cols_data = [c for c in df_mensal.columns if '/' in c]
     if not cols_data: return None
@@ -457,15 +488,9 @@ def filtrar_e_ordenar_dim(df, modo):
     return df_f.drop(columns=['SORT_TEMP'])
 
 def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria'):
-    # Função que analisa a LINHA INTEIRA (row)
     def style_row(row):
         styles = []
-        
-        # 1. Verifica se é uma LINHA DE CABEÇALHO/DIVISÃO (Olhando a coluna NOME)
-        # Se a coluna NOME tiver um desses valores, a linha toda fica preta
         nome_linha = str(row['NOME']).upper().strip() if 'NOME' in row else ''
-        
-        # Lista de divisores visuais
         eh_cabecalho = nome_linha in [
             'FINANCEIRO', 'E-MAIL', 'FINANCEIRO ASSÍNCRONO', 
             'PLENO', 'STAFF', 'N2'
@@ -475,51 +500,38 @@ def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria
             val_str = str(val).upper().strip()
             style = ''
             
-            # --- REGRA 1: CABEÇALHOS (Linha Preta) ---
             if eh_cabecalho:
                 style = 'background-color: #000000; color: white; font-weight: bold;'
-            
-            # --- REGRA 2: SLOTS NORMAIS (Coloridos) ---
             else:
-                # Regras Gerais (Valem para Mensal e Diário)
                 if val_str == 'FR': 
-                    style = 'background-color: #ffffff; color: black' # Branco pedido
+                    style = 'background-color: #ffffff; color: black'
                 elif val_str == 'AF': 
-                    style = 'background-color: #f4cccc; color: black' # Vermelho claro
+                    style = 'background-color: #f4cccc; color: black'
 
-                # Regras Específicas
                 if modo_cores == 'mensal':
                     if val_str == 'T': style = 'background-color: #c9daf8; color: black'
                     elif val_str == 'F': style = 'background-color: #93c47d; color: black'
                 else:
-                    # Cores Diárias
                     if val_str == 'F': style = 'background-color: #002060; color: white'
-                    elif val_str == 'RT': style = 'background-color: #e6cff2; color: black' # Lilás pedido
-                    elif val_str == 'REEMBOLSOS': style = 'background-color: #d4edbc; color: black' # Verde claro pedido
-                    
+                    elif val_str == 'RT': style = 'background-color: #e6cff2; color: black'
+                    elif val_str == 'REEMBOLSOS': style = 'background-color: #d4edbc; color: black'
                     elif 'CHAT' in val_str: style = 'background-color: #d9ead3; color: black'
                     elif 'PAUSA' in val_str or val_str == 'P': style = 'background-color: #fce5cd; color: black'
-                    
-                    # Aqui resolvemos a "Separação":
-                    # Como já passamos pelo 'if eh_cabecalho', se caiu aqui é porque é SLOT de horário
-                    elif 'EMAIL' in val_str or 'E-MAIL' in val_str: style = 'background-color: #bfe1f6; color: black' # Azul claro
-                    elif 'FINANCEIRO' in val_str: style = 'background-color: #11734b; color: white' # Verde escuro
+                    elif 'EMAIL' in val_str or 'E-MAIL' in val_str: style = 'background-color: #bfe1f6; color: black'
+                    elif 'FINANCEIRO' in val_str: style = 'background-color: #11734b; color: white'
                     elif 'BACKOFFICE' in val_str: style = 'background-color: #5a3286; color: white'
             
             styles.append(style)
         return styles
 
-    # Aplica o estilo linha por linha
     styler = df.style.apply(style_row, axis=1)
     return f'<div class="table-container {classe_altura}">{styler.hide(axis="index").to_html()}</div>'
 
 # ================= SISTEMA DE LOGIN (VIA COOKIES 🍪) =================
 
-# 1. Gerenciador de Cookies (Sem cache para evitar erros de widget)
 def get_cookie_manager():
     return stx.CookieManager(key="turbi_cookie_manager_v2")
 
-# 2. Gerenciador de Sessões Ativas (Memória do Servidor)
 @st.cache_resource(show_spinner=False)
 def get_session_manager():
     return {}
@@ -541,7 +553,6 @@ def validar_senha(usuario, senha_digitada):
     except Exception: return False, None
 
 def impor_sessao_unica(email):
-    """Garante apenas 1 aba ativa por email"""
     manager = get_session_manager()
     
     if "session_id" not in st.session_state:
@@ -561,26 +572,19 @@ def impor_sessao_unica(email):
 cookie_manager = get_cookie_manager()
 cookies = cookie_manager.get_all()
 
-# 1. LOADING INICIAL (Resolve o "Flash" do Login)
-# Se não estiver logado e for a primeira renderização, espera o cookie chegar
 if not st.session_state.get("logado", False) and "startup_check" not in st.session_state:
     with st.spinner("🔄 Iniciando sistema..."):
-        time.sleep(1) # Dá tempo do navegador entregar o cookie
+        time.sleep(1)
         st.session_state["startup_check"] = True
         st.rerun()
 
-# Tenta pegar login da URL
 params = st.query_params
 usuario_url = params.get("u")
 senha_url = params.get("k")
 
-# 2. TENTA LOGIN VIA COOKIE
 token_cookie = cookies.get("turbi_token")
-
-# Verifica se a trava de logout existe
 ignorar_cookie = st.session_state.get("logout_just_happened", False)
 
-# Só loga se NÃO tiver acabado de sair
 if token_cookie and not st.session_state.get("logado", False) and not ignorar_cookie:
     try:
         email_cookie = token_cookie.split("|")[0]
@@ -610,22 +614,29 @@ if not st.session_state.get("logado", False):
             dados_login = dados
             st.query_params.clear()
 
+    # --- CORREÇÃO GHOSTING: Container Vazio para o Login ---
+    login_container = st.empty()
+
     if not login_aprovado:
-        # Layout centralizado do Login
-        c1, c2, c3 = st.columns([1, 2, 1])
-        with c2:
-            st.markdown("### 🔒 Acesso Sistema de Escalas Turbi")
-            i_user = st.text_input("E-mail", placeholder="ex: nome@turbi.com.br")
-            i_pass = st.text_input("Senha", type="password")
-            if st.button("Entrar", type="primary", use_container_width=True):
-                val, dados = validar_senha(i_user.strip(), i_pass)
-                if val:
-                    login_aprovado = True
-                    email_login = i_user.strip()
-                    dados_login = dados
-                else: st.error("Acesso negado.")
+        # Colocamos tudo do login DENTRO desse container
+        with login_container.container():
+            c1, c2, c3 = st.columns([1, 2, 1])
+            with c2:
+                st.markdown("### 🔒 Acesso Sistema de Escalas Turbi")
+                i_user = st.text_input("E-mail", placeholder="ex: nome@turbi.com.br")
+                i_pass = st.text_input("Senha", type="password")
+                if st.button("Entrar", type="primary", use_container_width=True):
+                    val, dados = validar_senha(i_user.strip(), i_pass)
+                    if val:
+                        login_aprovado = True
+                        email_login = i_user.strip()
+                        dados_login = dados
+                    else: st.error("Acesso negado.")
     
     if login_aprovado:
+        # --- LIMPADOR ATIVADO: Apaga a tela de login fisicamente antes de avançar ---
+        login_container.empty()
+        
         st.session_state.update({
             "logado": True, 
             "usuario": email_login, 
@@ -641,31 +652,23 @@ if not st.session_state.get("logado", False):
     
     st.stop() 
 
-# Se passou, está logado. Ativa guardião.
 impor_sessao_unica(st.session_state["usuario"])
 
 # ================= APP PRINCIPAL =================
 
-# 1. Carrega APENAS as listas leves para os filtros (Muito mais rápido!)
 opcoes_lider, opcoes_ilha = carregar_lista_pessoas()
 
 # --- SIDEBAR ---
 with st.sidebar:
     st.write(f"👤 **{st.session_state.get('nome', 'Visitante')}**")
     
-    # BOTÃO DE LOGOUT (v2)
     if st.button("Sair / Logout", type="secondary"):
-        # 1. Tenta mandar deletar o cookie (Se der erro na linha 618, ele ignora e segue)
         try:
             cookie_manager.delete("turbi_token")
         except:
             pass
         
-        # 2. Limpa a memória da sessão
         st.session_state.clear()
-        
-        # 3. RECOLOCA A TRAVA DE SEGURANÇA (O clear apagou ela, então colocamos de novo)
-        # Isso diz para o sistema: "Acabei de sair, ignora qualquer cookie que você ache"
         st.session_state["logout_just_happened"] = True
         
         st.query_params.clear()
@@ -700,7 +703,6 @@ abas = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária", "📊 Aderência"
 aba_mensal, aba_diaria = abas[0], abas[1]
 aba_aderencia = abas[2] if eh_admin else None
 
-# --- CONTEÚDO ABAS ---
 MAPA_MESES = {
     1: "JANEIRO", 2: "FEVEREIRO", 3: "MARÇO", 4: "ABRIL",
     5: "MAIO", 6: "JUNHO", 7: "JULHO", 8: "AGOSTO",
@@ -708,7 +710,6 @@ MAPA_MESES = {
 }
 
 with aba_mensal:
-    # 1. Carregamento Dinâmico (Mês correto)
     mes_num = data_sel.month
     nome_aba_oficial = MAPA_MESES.get(mes_num)
     
@@ -755,14 +756,27 @@ with aba_mensal:
             st.warning("Não encontrei colunas de data nesta aba.")
 
 with aba_diaria:
-    abas_dim = listar_abas_dim()
+    # =================================================================
+    # --- NOVIDADE: ALERTA DE PLANTÃO NA VISÃO DIÁRIA ---
+    # =================================================================
+    data_plantao_str = data_sel.strftime("%d/%m/%Y")
+    plantao_hoje = carregar_plantao_dia(data_plantao_str)
     
-    # Formata a busca para bater com o nome da aba (Ex: "16/12")
-    # Tenta achar uma aba que contenha a data filtrada
+    if plantao_hoje:
+        st.markdown(f"""
+        <div style="background-color: #1c1e24; border: 1px solid #333; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; text-align: center;">
+            <span style="font-size: 14px;">🚨 <b>PLANTÃO DE HOJE</b> &nbsp;|&nbsp; 
+            <b>Staff:</b> {plantao_hoje['staff']} &nbsp;|&nbsp; 
+            <b>Urgência:</b> {plantao_hoje['urgencia']} &nbsp;|&nbsp; 
+            <b>📞 Telefone:</b> {plantao_hoje['telefone']}</span>
+        </div>
+        """, unsafe_allow_html=True)
+    # =================================================================
+
+    abas_dim = listar_abas_dim()
     aba_encontrada = next((a for a in abas_dim if texto_busca in a), None)
     
     if aba_encontrada:
-        # SE ACHAR, CARREGA NORMALMENTE
         df_dim, _ = carregar_dados_aba(aba_encontrada)
         
         if df_dim is not None:
@@ -792,7 +806,6 @@ with aba_diaria:
             st.markdown(renderizar_tabela_html(df_exibicao[cols_v], 'diario', 'height-diaria'), unsafe_allow_html=True)
             
     else:
-        # SE NÃO ACHAR A ABA (MOSTRA O AVISO)
         st.warning(f"⚠️ A aba diária para **{texto_busca}** não foi encontrada.")
         st.markdown(f"""
             <div style="background-color: #1e1e1e; padding: 15px; border-radius: 5px; border-left: 5px solid #ffbd45;">
@@ -806,64 +819,27 @@ with aba_diaria:
 
 if eh_admin and aba_aderencia:
     with aba_aderencia:
-        # --- CSS SUPER COMPACTO (EXATAMENTE COMO VOCÊ MANDOU) ---
         st.markdown("""
             <style>
-                /* 1. Remove o espaço gigante do topo da página inteira */
-                .block-container {
-                    padding-top: 4rem !important;
-                    padding-bottom: 1rem !important;
-                }
-                
-                /* 2. Remove o espaço interno logo abaixo da aba selecionada */
-                [data-baseweb="tab-panel"] {
-                    padding-top: 1rem !important;
-                    gap: 0rem !important;
-                }
-                
-                /* 3. Aproxima os blocos verticais */
-                [data-testid='stVerticalBlock'] {
-                    gap: 0.1rem !important; 
-                }
-                
-                /* 4. Tira a margem gorda do Título H4 ("Visão Mensal & Detalhe") */
-                h4 {
-                    margin-top: 2rem !important;
-                    margin-bottom: 1rem !important;
-                    padding-top: 0rem !important;
-                    padding-bottom: 0rem !important;
-                }
-                
-                /* 5. Ajusta a Linha Divisória para ser fina e sem margem */
-                hr {
-                    margin-top: 1rem !important;
-                    margin-bottom: 1rem !important;
-                }
-                
-                /* 6. Remove gaps laterais das colunas */
-                [data-testid='stColumn'] {
-                    gap: 0rem !important;
-                }
-                
-                /* 7. NOVO: Aumenta o espaço entre o Título Principal e as Abas */
-                [data-baseweb="tab-list"] {
-                    margin-top: 1rem !important; 
-                    margin-bottom: 0rem !important; 
-                }
+                .block-container { padding-top: 4rem !important; padding-bottom: 1rem !important; }
+                [data-baseweb="tab-panel"] { padding-top: 1rem !important; gap: 0rem !important; }
+                [data-testid='stVerticalBlock'] { gap: 0.1rem !important; }
+                h4 { margin-top: 2rem !important; margin-bottom: 1rem !important; padding-top: 0rem !important; padding-bottom: 0rem !important; }
+                hr { margin-top: 1rem !important; margin-bottom: 1rem !important; }
+                [data-testid='stColumn'] { gap: 0rem !important; }
+                [data-baseweb="tab-list"] { margin-top: 1rem !important; margin-bottom: 0rem !important; }
             </style>
         """, unsafe_allow_html=True)
 
-        # --- CARREGAMENTO ---
         df_pausas = carregar_dados_pausas()
         df_online = carregar_dados_online()
         
         data_str_filtro = data_sel.strftime("%d/%m/%Y")
         string_busca_total_pausa = f"{data_str_filtro} Total"
 
-        # --- CÁLCULO DO PREVISTO E HEADCOUNT ---
-        qtd_prevista_pessoas = 0 # Para o Desvio (sem TO)
-        qtd_total_hc = 0         # Para a Aderência (com TO)
-        qtd_real_pessoas = 0     # Pessoas trabalhando (T)
+        qtd_prevista_pessoas = 0 
+        qtd_total_hc = 0         
+        qtd_real_pessoas = 0     
 
         if df_global is not None:
             df_ad = gerar_dados_aderencia(df_global)
@@ -874,23 +850,14 @@ if eh_admin and aba_aderencia:
             if df_ad is not None and d_match:
                 row_ad = df_ad[df_ad['Data'] == d_match].iloc[0] if not df_ad[df_ad['Data'] == d_match].empty else None
                 if row_ad is not None:
-                    # T + AF (Para o Desvio de Horas - Regra antiga)
                     qtd_prevista_pessoas = row_ad['Realizado (T)'] + row_ad['Afastado (AF)']
-                    
-                    # T + AF + TO (Para o novo KPI de Presença - Quadro Full)
                     qtd_total_hc = row_ad['Realizado (T)'] + row_ad['Afastado (AF)'] + row_ad['Turnover (TO)']
                     qtd_real_pessoas = row_ad['Realizado (T)']
 
-        # --- MÉTRICAS (KPIs) ---
-        # Definição das 3 colunas na ordem desejada: [Presença] [Desvio] [Pausa]
         c_presenca, c_desvio, c_pausa = st.columns(3)
         
-        # 1. CÁLCULOS PRÉVIOS (Garantindo que todas as variáveis existam antes de exibir)
-        
-        # A) Cálculo Presença (Headcount)
         pct_presenca = (qtd_real_pessoas / qtd_total_hc * 100) if qtd_total_hc > 0 else 0
         
-        # B) Cálculo Desvio (Horas)
         horas_previstas = qtd_prevista_pessoas * 9.8
         horas_realizadas = 0.0
         if df_online is not None and 'Dia_Str' in df_online.columns:
@@ -900,7 +867,6 @@ if eh_admin and aba_aderencia:
             horas_realizadas = df_online_filt['Horas_Valor'].sum()
         pct_desvio = ((horas_realizadas / horas_previstas) - 1) * 100 if horas_previstas > 0 else 0
 
-        # C) Cálculo Pausa
         media_improdutiva = 0
         col_improd = "Total (menos e-mail e Projeto)" 
         if df_pausas is not None and 'Dia_Str' in df_pausas.columns:
@@ -908,98 +874,51 @@ if eh_admin and aba_aderencia:
             if not row_total.empty and col_improd in df_pausas.columns:
                 media_improdutiva = row_total.iloc[0][col_improd]
 
-        # --- EXIBIÇÃO NA ORDEM PEDIDA ---
-
-        # COLUNA 1: PRESENÇA (HEADCOUNT)
         with c_presenca:
-            st.metric(
-                "👥 Presença(Sup & Emerg)", 
-                f"{pct_presenca:.1f}%", 
-                f"Ativos: {qtd_real_pessoas} / Total: {qtd_total_hc}"
-            )
+            st.metric("👥 Presença(Sup & Emerg)", f"{pct_presenca:.1f}%", f"Ativos: {qtd_real_pessoas} / Total: {qtd_total_hc}")
 
-        # COLUNA 2: DESVIO (HORAS)
         with c_desvio:
-            st.metric(
-                "🎯 Desvio % (Real vs Previsto)", 
-                f"{pct_desvio:+.1f}%", 
-                f"Real: {horas_realizadas:.1f}h / Previsto: {horas_previstas:.1f}h"
-            )
-            # Aviso condicional fica aqui junto com o Desvio
+            st.metric("🎯 Desvio % (Real vs Previsto)", f"{pct_desvio:+.1f}%", f"Real: {horas_realizadas:.1f}h / Previsto: {horas_previstas:.1f}h")
             if data_sel == pd.Timestamp.now().date():
                 st.caption("⚠️ Os dados do dia vigente podem não estar 100% atualizados.")
 
-        # COLUNA 3: MÉDIA PAUSAS
         with c_pausa:
             st.metric("🛋️ Média % Pausas", f"{media_improdutiva:.1f}%", delta_color="inverse")
             
-        # DIVISOR ULTRA FINO
         st.markdown("<hr style='margin-top: 5px; margin-bottom: 5px;'>", unsafe_allow_html=True)
 
-        # --- GRÁFICOS ---
         st.markdown("#### 📅 Visão Mensal & Detalhe")
         g1, g2 = st.columns(2)
         with g1:
             if df_global is not None:
                  fig_b = px.bar(df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], text_auto='.0f', title="Evolução de Presença", color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
                  
-                 fig_b.update_layout(
-                     height=400, 
-                     margin=dict(t=30, b=0, l=0, r=0), 
-                     showlegend=True,
-                     xaxis_title=None,
-                     yaxis_title="Headcount", 
-                     legend_title_text=None,
-                     legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5)
-                 )
+                 fig_b.update_layout(height=400, margin=dict(t=30, b=0, l=0, r=0), showlegend=True, xaxis_title=None, yaxis_title="Headcount", legend_title_text=None, legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5))
                  st.plotly_chart(fig_b, use_container_width=True)
         with g2:
             if df_pausas is not None and col_improd in df_pausas.columns:
-                # 1. Filtra apenas as linhas que contêm "Total"
                 mask_total = df_pausas['Dia_Str'].astype(str).str.contains("Total", case=False, na=False)
                 df_trend = df_pausas[mask_total].copy()
                 
-                # 2. CORREÇÃO: Extrai apenas a parte da data (dd/mm/yyyy) do texto "dd/mm/yyyy Total"
-                # Isso "salva" as datas que estavam como NaT
                 df_trend['Data_Texto'] = df_trend['Dia_Str'].str.extract(r'(\d{2}/\d{2}/\d{4})')
                 df_trend['Dia_Date_Final'] = pd.to_datetime(df_trend['Data_Texto'], format="%d/%m/%Y", errors='coerce')
                 
-                # 3. Filtra pelo mês/ano selecionado usando a data recuperada
                 df_trend = df_trend.dropna(subset=['Dia_Date_Final'])
-                df_trend = df_trend[
-                    (df_trend['Dia_Date_Final'].dt.month == data_sel.month) & 
-                    (df_trend['Dia_Date_Final'].dt.year == data_sel.year)
-                ]
+                df_trend = df_trend[(df_trend['Dia_Date_Final'].dt.month == data_sel.month) & (df_trend['Dia_Date_Final'].dt.year == data_sel.year)]
                 
                 if not df_trend.empty:
-                    # Ordena por data
                     df_trend = df_trend.sort_values(by='Dia_Date_Final')
-                    
                     df_trend['Data_Curta'] = df_trend['Dia_Date_Final'].dt.strftime('%d/%m')
                     
-                    fig_l = px.line(
-                        df_trend, x='Data_Curta', y=col_improd, 
-                        title="Tendência Pausas (%) - Visão Gerencial", markers=True
-                    )
-                    
+                    fig_l = px.line(df_trend, x='Data_Curta', y=col_improd, title="Tendência Pausas (%) - Visão Gerencial", markers=True)
                     fig_l.update_traces(line_color='#d32f2f', name="Pausas", showlegend=True)
                     fig_l.update_xaxes(type='category', tickangle=-45)
-                    
-                    fig_l.update_layout(
-                        height=400, 
-                        margin=dict(t=30, b=0, l=0, r=0),
-                        xaxis_title=None,
-                        yaxis_title="Total (menos e-mail e Projeto)",
-                        legend_title_text=None,
-                        legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5)
-                    )
+                    fig_l.update_layout(height=400, margin=dict(t=30, b=0, l=0, r=0), xaxis_title=None, yaxis_title="Total (menos e-mail e Projeto)", legend_title_text=None, legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5))
                     st.plotly_chart(fig_l, use_container_width=True)
                 else:
                     st.info("Sem dados de totais para este mês.")
 
-        # --- TABELA DETALHADA ---
         if df_pausas is not None:
-            # 1. CARREGA DADOS REAIS (Correção do NameError)
             df_real = carregar_aderencia_real()
             
             mask_dia = df_pausas['Dia_Str'] == data_str_filtro
@@ -1007,34 +926,27 @@ if eh_admin and aba_aderencia:
             df_detalhe = df_pausas[mask_dia & mask_no_total].copy()
             
             if not df_detalhe.empty:
-                # Normaliza nomes para o Cruzamento
                 df_detalhe['NOME_KEY'] = df_detalhe['Nome_Analista'].str.upper().str.strip()
                 
-                # --- CARREGA PLANEJADO + ILHA PARA FILTRO ---
                 aba_dim_nome = next((a for a in listar_abas_dim() if texto_busca in a), None)
                 
                 if aba_dim_nome:
                      df_dim_plan, _ = carregar_dados_aba(aba_dim_nome)
                      
                      if df_dim_plan is not None:
-                         # Padroniza colunas
                          df_dim_plan.columns = [str(c).upper().strip() for c in df_dim_plan.columns]
                          
-                         # Localiza colunas dinamicamente
                          col_entrada_real = next((c for c in df_dim_plan.columns if 'ENTRADA' in c), None)
                          col_saida_real = next((c for c in df_dim_plan.columns if 'SAIDA' in c), None)
                          col_ilha_real = next((c for c in df_dim_plan.columns if 'ILHA' in c or 'SQUAD' in c), None)
 
-                         # Renomeia para padrão
                          rename_map = {}
                          if col_entrada_real: rename_map[col_entrada_real] = 'ENTRADA'
                          if col_saida_real: rename_map[col_saida_real] = 'SAIDA'
                          if col_ilha_real: rename_map[col_ilha_real] = 'ILHA'
                          
-                         if rename_map:
-                             df_dim_plan = df_dim_plan.rename(columns=rename_map)
+                         if rename_map: df_dim_plan = df_dim_plan.rename(columns=rename_map)
 
-                         # Prepara chaves e Cruza
                          df_dim_plan['NOME_KEY'] = df_dim_plan['NOME'].astype(str).str.upper().str.strip()
                          
                          cols_to_merge = ['NOME_KEY']
@@ -1044,14 +956,11 @@ if eh_admin and aba_aderencia:
                          
                          df_detalhe = pd.merge(df_detalhe, df_dim_plan[cols_to_merge], on='NOME_KEY', how='left')
 
-                         # --- LÓGICA DE JANELAS (Cálculo de Atraso) ---
                          if df_real is not None and not df_real.empty and 'ENTRADA' in df_detalhe.columns and 'SAIDA' in df_detalhe.columns:
                               
-                              # Converte para data ignorando erros (viram NaT)
                               df_real['SESSAO_INICIO'] = pd.to_datetime(df_real['SESSAO_INICIO'], errors='coerce', dayfirst=True)
                               df_real['SESSAO_FIM'] = pd.to_datetime(df_real['SESSAO_FIM'], errors='coerce', dayfirst=True)
 
-                              # Remove linhas com datas inválidas para não quebrar a conta
                               df_real = df_real.dropna(subset=['SESSAO_INICIO', 'SESSAO_FIM'])
 
                               def calcular_atrasos(row):
@@ -1092,7 +1001,6 @@ if eh_admin and aba_aderencia:
                               df_detalhe['Dif_Entrada'] = resultados[0]
                               df_detalhe['Dif_Saida'] = resultados[1]
 
-                # --- FILTROS VISUAIS ---
                 st.markdown("###")
                 apenas_sup_emerg = st.checkbox("🔍 Exibir apenas Suporte & Emergência", value=True)
                 
@@ -1100,7 +1008,6 @@ if eh_admin and aba_aderencia:
                     mask_ilha = df_detalhe['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
                     df_detalhe = df_detalhe[mask_ilha]
 
-                # --- EXIBIÇÃO ---
                 col_pessoal = "%Pessoal"         
                 col_prog = "%Programacao"        
                 cols_base = ['Nome_Analista', col_improd, col_pessoal, col_prog]
@@ -1112,9 +1019,6 @@ if eh_admin and aba_aderencia:
                     col_prog: st.column_config.NumberColumn("% Programação", format="%.2f")
                 }
 
-                # --- EXIBIÇÃO COM FORÇAMENTO DE DARK MODE ---
-                
-                # 1. Configurações das colunas (mantém igual)
                 if 'Dif_Entrada' in df_detalhe.columns:
                     col_config["Dif_Entrada"] = st.column_config.NumberColumn("⏱️ Entrada (min)", help="➖ Negativo: Logou ANTES do horário (Antecipado)\n➕ Positivo: Logou DEPOIS (Atraso)\n⬜ Vazio: Folga ou Sem registro", format="%d")
                     col_config["Dif_Saida"] = st.column_config.NumberColumn("⏱️ Saída (min)", help="➖ Negativo: Saiu ANTES do horário (Devendo)\n➕ Positivo: Saiu DEPOIS (Hora Extra)\n⬜ Vazio: Folga ou Sem registro", format="%d")
@@ -1130,12 +1034,9 @@ if eh_admin and aba_aderencia:
                 if 'Dif_Entrada' in df_detalhe.columns:
                     st.caption("ℹ️ Dica: Passe o mouse sobre os títulos das colunas **⏱️ (min)** para entender o cálculo.")
                 
-                # --- AQUI ESTÁ A CORREÇÃO BLINDADA ---
-                # Adicionamos background-color e color manuais. 
-                # Isso atropela qualquer configuração de tema "Light" que o usuário tenha.
                 st_df_styled = df_detalhe[cols_show].style.set_properties(**{
                     'text-align': 'center',
-                    'border-color': '#444' # Borda sutil que funciona nos dois modos
+                    'border-color': '#444' 
                 })
 
                 st.dataframe(
