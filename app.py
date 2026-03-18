@@ -756,11 +756,12 @@ with aba_mensal:
             st.warning("Não encontrei colunas de data nesta aba.")
 
 with aba_diaria:
-    # =================================================================
-    # --- NOVIDADE: ALERTA DE PLANTÃO NA VISÃO DIÁRIA ---
-    # =================================================================
+    # 1. Verifica se tem plantão hoje
     data_plantao_str = data_sel.strftime("%d/%m/%Y")
     plantao_hoje = carregar_plantao_dia(data_plantao_str)
+    
+    # 2. DECIDE A ALTURA DA TABELA: Se tem plantão, usa a classe menor
+    classe_altura_dinamica = 'height-diaria-plantao' if plantao_hoje else 'height-diaria'
     
     if plantao_hoje:
         st.markdown(f"""
@@ -803,7 +804,7 @@ with aba_diaria:
             df_exibicao = df_dim_f if tipo == "▦ Grade" else filtrar_e_ordenar_dim(df_dim_f, tipo)
             
             cols_v = [c for c in df_exibicao.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ILHA', 'Z']]
-            st.markdown(renderizar_tabela_html(df_exibicao[cols_v], 'diario', 'height-diaria'), unsafe_allow_html=True)
+            st.markdown(renderizar_tabela_html(df_exibicao[cols_v], 'diario', classe_altura_dinamica), unsafe_allow_html=True)
             
     else:
         st.warning(f"⚠️ A aba diária para **{texto_busca}** não foi encontrada.")
