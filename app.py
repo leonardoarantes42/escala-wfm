@@ -54,6 +54,7 @@ st.markdown("""
         }
         .height-mensal { height: calc(100vh - 250px); }
         .height-diaria { height: calc(100vh - 265px); }
+        .height-diaria-plantao { height: calc(100vh - 325px); } /* <--- NOVA CLASSE AQUI */
         .height-aderencia {
             height: calc(100vh - 1000px); 
             overflow-y: auto; position: relative;
