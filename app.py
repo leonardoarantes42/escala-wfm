@@ -768,7 +768,7 @@ with aba_diaria:
         st.markdown(f"""
         <div style="background-color: #1c1e24; border: 1px solid #333; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; text-align: center;">
             <span style="font-size: 14px;">🚨 <b>PLANTÃO DE HOJE</b> &nbsp;|&nbsp; 
-            <b>Staff:</b> {plantao_hoje['staff']} &nbsp;|&nbsp; 
+            <b>Supervisão:</b> {plantao_hoje['staff']} &nbsp;|&nbsp; 
             <b>Urgência:</b> {plantao_hoje['urgencia']} &nbsp;|&nbsp; 
             <b>📞 Telefone:</b> {plantao_hoje['telefone']}</span>
         </div>
