@@ -407,7 +407,7 @@ def carregar_plantao_dia(data_str):
                     
                     # Se achou pelo menos a urgência ou o staff preenchido, retorna
                     if staff or urgencia:
-                        return {"staff": staff, "urgencia": urgencia, "telefone": telefone}
+                        return {"Supervisão": staff, "urgencia": urgencia, "telefone": telefone}
         return None
     except Exception as e:
         print(f"Erro Plantão: {e}")
