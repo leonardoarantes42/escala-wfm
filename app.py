@@ -129,6 +129,7 @@ st.markdown("""
 # --- CONSTANTES ---
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1L1WbR0rQcIra7J8S9AUX0yhwT-2RO-O4GMxAjaaBqr8/edit?gid=1076760569#gid=1076760569"
 LINK_FORMULARIO = "https://docs.google.com/forms/u/0/d/e/1FAIpQLScWvMZ60ISW6RqF0_ZxN_hD5ugOCITUQRlqiFi249EvmLbXyQ/formResponse"
+LINK_FORM_FERIAS = "https://docs.google.com/forms/d/e/1FAIpQLSfojdNvqnBvvMBHD6rkLyjXySQ8PJFT4qcI3_8FKzG2wVmQwQ/viewform"
 
 # --- FUNÇÕES DE DADOS ---
 @st.cache_resource
@@ -687,6 +688,10 @@ with st.sidebar:
     
     busca_nome = st.text_input("Buscar Nome")
     st.markdown("<hr style='margin: 10px 0px;'>", unsafe_allow_html=True)
+    
+    # Novo botão de Férias adicionado aqui
+    st.markdown(f'<a href="{LINK_FORM_FERIAS}" target="_blank" class="custom-link-btn">🏖️ Solicitação de Férias</a>', unsafe_allow_html=True)
+    
     st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
     st.markdown('<div class="footer-simple">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
 
