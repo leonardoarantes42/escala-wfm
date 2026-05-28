@@ -131,9 +131,9 @@ LINK_FORMULARIO = "https://docs.google.com/forms/u/0/d/e/1FAIpQLScWvMZ60ISW6RqF0
 LINK_FORM_FERIAS = "https://docs.google.com/forms/d/e/1FAIpQLSfojdNvqnBvvMBHD6rkLyjXySQ8PJFT4qcI3_8FKzG2wVmQwQ/viewform"
 LINK_FORM_DAYOFF = "https://docs.google.com/forms/d/e/1FAIpQLSfEJV517mWxn7lY5hduClsErjK39lIz_YNTcpQVq_HZBm4gvg/viewform"
 
-# ATENÇÃO: Substitua pelas suas credenciais ou use st.secrets!
-GIST_ID = "a5555cac425cce9ba4820e74fc0ab0d1"
-GITHUB_TOKEN = "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"
+# O Streamlit vai puxar do cofre invisível
+GIST_ID = st.secrets["GIST_ID"]
+GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 
 # ==========================================
 # 🚀 O NOVO MOTOR DE DADOS (PULL DO GITHUB)
