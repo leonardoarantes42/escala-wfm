@@ -127,43 +127,67 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- CONSTANTES ---
-URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1L1WbR0rQcIra7J8S9AUX0yhwT-2RO-O4GMxAjaaBqr8/edit?gid=1076760569#gid=1076760569"
 LINK_FORMULARIO = "https://docs.google.com/forms/u/0/d/e/1FAIpQLScWvMZ60ISW6RqF0_ZxN_hD5ugOCITUQRlqiFi249EvmLbXyQ/formResponse"
 LINK_FORM_FERIAS = "https://docs.google.com/forms/d/e/1FAIpQLSfojdNvqnBvvMBHD6rkLyjXySQ8PJFT4qcI3_8FKzG2wVmQwQ/viewform"
 LINK_FORM_DAYOFF = "https://docs.google.com/forms/d/e/1FAIpQLSfEJV517mWxn7lY5hduClsErjK39lIz_YNTcpQVq_HZBm4gvg/viewform"
 
-# --- FUNÇÕES DE DADOS ---
-@st.cache_resource
-def conectar_google_sheets():
-    scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    credentials = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scopes)
-    return gspread.authorize(credentials)
+# ATENÇÃO: Substitua pelas suas credenciais ou use st.secrets!
+GIST_ID = "a5555cac425cce9ba4820e74fc0ab0d1"
+GITHUB_TOKEN = "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"
 
-@st.cache_data(ttl=300)
-def listar_abas_dim():
-    client = conectar_google_sheets()
-    sh = client.open_by_url(URL_PLANILHA)
-    todas_abas = [ws.title for ws in sh.worksheets()]
-    return sorted([aba for aba in todas_abas if aba.startswith("DIM")])
+# ==========================================
+# 🚀 O NOVO MOTOR DE DADOS (PULL DO GITHUB)
+# ==========================================
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_master_json():
+    """Baixa o Data Lake inteiro em uma única requisição ultrarrápida."""
+    url = f"https://api.github.com/gists/{GIST_ID}"
+    headers = {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json"
+    }
+    try:
+        resposta = requests.get(url, headers=headers)
+        if resposta.status_code == 200:
+            dados_gist = resposta.json()
+            conteudo_str = dados_gist["files"]["escala_cx.json"]["content"]
+            return json.loads(conteudo_str)
+        else:
+            print(f"Erro Github: {resposta.status_code}")
+            return {}
+    except Exception as e:
+        print(f"Falha ao conectar: {e}")
+        return {}
 
 def normalizar_texto(texto):
     """Remove acentos e deixa maiúsculo (ex: LÍDER -> LIDER)"""
     return ''.join(c for c in unicodedata.normalize('NFD', str(texto))
                   if unicodedata.category(c) != 'Mn').upper().strip()
 
-# 1. FUNÇÃO PESADA (Lê a planilha mensal/diária) - Cache de 10 min
+@st.cache_data(ttl=600, show_spinner=False)
+def listar_abas_dim():
+    data = fetch_master_json()
+    dims = data.get("DIMs", {})
+    return sorted(list(dims.keys()))
+
+# 1. FUNÇÃO PESADA (Refatorada para ler da memória)
 @st.cache_data(ttl=600, show_spinner=False)
 def carregar_dados_aba(nome_aba):
-    client = conectar_google_sheets()
+    data = fetch_master_json()
+    
+    # Identifica se a requisição é de um Mês ou de um DIM
+    dados = []
+    if nome_aba in data.get("Meses", {}):
+        dados = data["Meses"][nome_aba]
+    elif nome_aba in data.get("DIMs", {}):
+        dados = data["DIMs"][nome_aba]
+    else:
+        return None, None
+
+    if not dados:
+        return None, None
+
     try:
-        sh = client.open_by_url(URL_PLANILHA)
-        try:
-            worksheet = sh.worksheet(nome_aba)
-        except gspread.WorksheetNotFound:
-            return None, None 
-            
-        dados = worksheet.get_all_values()
-        
         # 1. Localizar Cabeçalho
         indice_cabecalho = -1
         cabecalho_bruto = []
@@ -215,7 +239,7 @@ def carregar_dados_aba(nome_aba):
         if len(df.columns) > 35: 
             df = df.iloc[:, :40] 
             
-        return df, worksheet
+        return df, None # Removido o retorno do worksheet do gspread
 
     except Exception as e:
         print(f"Erro: {e}")
@@ -223,89 +247,63 @@ def carregar_dados_aba(nome_aba):
 
 @st.cache_data(ttl=600, show_spinner=False)
 def carregar_aderencia_real():
-    client = conectar_google_sheets()
+    data = fetch_master_json()
+    dados = data.get("Aderencia_Real", [])
+    if not dados: return None
+    
     try:
-        sh = client.open_by_url(URL_PLANILHA)
-        ws = sh.worksheet("Aderencia_Real")
-        dados = ws.get_all_records()
         df = pd.DataFrame(dados)
-        
-        # Garante que as colunas existem e estão limpas
         if 'DATA' in df.columns:
             df['DATA'] = pd.to_datetime(df['DATA']).dt.date
         if 'NOME' in df.columns:
             df['NOME'] = df['NOME'].astype(str).str.upper().str.strip()
-            
         return df
     except:
         return None
 
-# 2. NOVA FUNÇÃO LEVE (Lê apenas a lista de Pessoas) - Cache de 10 min
+# 2. FUNÇÃO LEVE (Lê Pessoas)
 @st.cache_data(ttl=600, show_spinner=False)
 def carregar_lista_pessoas():
-    client = conectar_google_sheets()
+    data = fetch_master_json()
+    dados = data.get("Pessoas", [])
+    if not dados: return [], []
+    
     try:
-        sh = client.open_by_url(URL_PLANILHA)
-        try:
-            ws = sh.worksheet("Pessoas")
-        except:
-            return [], []
-        
-        # Pega todos os dados
-        dados = ws.get_all_records()
         df = pd.DataFrame(dados)
-        
-        # Normaliza nomes das colunas
         df.columns = [str(c).upper().strip() for c in df.columns]
         
         lideres = []
         ilhas = []
         
-        # Procura coluna de Líder (aceita "LIDER ATUAL" ou "LIDER")
         col_lider = next((c for c in df.columns if 'LIDER' in c), None)
         if col_lider:
             lideres = sorted([str(x).strip() for x in df[col_lider].unique() if str(x).strip() != ''])
             
-        # Procura coluna de Ilha
         col_ilha = next((c for c in df.columns if 'ILHA' in c), None)
         if col_ilha:
             ilhas = sorted([str(x).strip() for x in df[col_ilha].unique() if str(x).strip() != ''])
             
         return lideres, ilhas
-        
     except Exception as e:
         print(f"Erro ao ler Pessoas: {e}")
         return [], []
 
 # ==========================================
-# 1. FUNÇÃO ONLINE E PAUSAS
+# FUNÇÕES ONLINE E PAUSAS
 # ==========================================
 @st.cache_data(ttl=600, show_spinner=False)
 def carregar_dados_online():
-    client = conectar_google_sheets()
+    data = fetch_master_json()
+    dados = data.get("Online", [])
+    if not dados or len(dados) < 2: return None
+    
     try:
-        sh = client.open_by_url(URL_PLANILHA)
-        try:
-            ws = sh.worksheet("Online")
-        except:
-            return None
-            
-        # Pega tudo como texto bruto (matriz)
-        dados = ws.get_all_values()
-        if not dados or len(dados) < 2: return None
-        
-        # Cria DataFrame ignorando cabeçalho original para usar índices
         df = pd.DataFrame(dados[1:])
-        
-        # SELEÇÃO POSICIONAL RÍGIDA
-        if len(df.columns) <= 12:
-            return None
+        if len(df.columns) <= 12: return None
             
-        # Renomeia para facilitar
         df = df.rename(columns={1: 'Dia_Fixo', 12: 'Total_M'})
-        
-        # Tratamento da Coluna M (Valor)
         df['Total_M'] = df['Total_M'].astype(str).str.replace(',', '.', regex=False)
+        
         def limpar_valor(x):
             try:
                 x = str(x).strip()
@@ -313,222 +311,71 @@ def carregar_dados_online():
                 return float(x)
             except:
                 return 0.0
+                
         df['Horas_Valor'] = df['Total_M'].apply(limpar_valor)
-        
-        # Tratamento da Coluna B (Data Texto)
         df['Dia_Str'] = df['Dia_Fixo'].astype(str).str.strip()
-        
         return df
     except Exception as e:
         return None
 
 @st.cache_data(ttl=600, show_spinner=False)
 def carregar_dados_pausas():
-    client = conectar_google_sheets()
+    data = fetch_master_json()
+    dados = data.get("Pausas", [])
+    if not dados or len(dados) < 2: return None
+    
     try:
-        sh = client.open_by_url(URL_PLANILHA)
-        try:
-            ws = sh.worksheet("Pausas")
-        except:
-            return None
-            
-        dados = ws.get_all_values()
-        if len(dados) > 0:
-            headers = [str(h).strip() for h in dados[0]]
-            # Cria o DF
-            df = pd.DataFrame(dados[1:], columns=headers)
-            
-            # --- FIX: REMOVE COLUNAS DUPLICADAS NA ORIGEM ---
-            df = df.loc[:, ~df.columns.duplicated()]
-        else:
-            return None
+        headers = [str(h).strip() for h in dados[0]]
+        df = pd.DataFrame(dados[1:], columns=headers)
+        df = df.loc[:, ~df.columns.duplicated()]
 
-        # Colunas Alvo
-        cols_alvo = [
-            'Total (menos e-mail e Projeto)', 
-            '%Pessoal',                        
-            '%Programacao',
-            '%Pausas_Total'
-        ]
+        cols_alvo = ['Total (menos e-mail e Projeto)', '%Pessoal', '%Programacao', '%Pausas_Total']
         
         for c in cols_alvo:
             if c in df.columns:
                 def limpar_e_multiplicar(x):
                     x_str = str(x).strip()
                     if not x_str: return 0.0
-                    
-                    # Remove % e troca vírgula
                     clean = x_str.replace('%', '').replace(',', '.')
-                    
                     try:
                         val = float(clean)
-                        # Se for decimal pequeno (ex: 0.14), multiplica por 100
-                        if val <= 1.0 and val != 0.0:
-                            return val * 100
+                        if val <= 1.0 and val != 0.0: return val * 100
                         return val
                     except:
                         return 0.0
-                
                 df[c] = df[c].apply(limpar_e_multiplicar)
 
-        # Prepara a Data
         if 'Dia' in df.columns:
              df['Dia_Str'] = df['Dia'].astype(str).str.strip()
              df['Dia_Date'] = pd.to_datetime(df['Dia'], format="%d/%m/%Y", errors='coerce')
 
         return df
     except Exception as e:
-        print(f"Erro Pausas: {e}") 
         return None
 
 # ==========================================
-# NOVIDADE: FUNÇÃO PARA LER PLANTÃO FDS
+# FUNÇÃO PARA LER PLANTÃO FDS
 # ==========================================
 @st.cache_data(ttl=600, show_spinner=False)
 def carregar_plantao_dia(data_str):
-    client = conectar_google_sheets()
+    data = fetch_master_json()
+    dados = data.get("ESCALA 26 STAFF", [])
+    if not dados or len(dados) < 3: return None
+    
     try:
-        sh = client.open_by_url(URL_PLANILHA)
-        try:
-            ws = sh.worksheet("ESCALA 26 STAFF")
-        except:
-            return None
-            
-        dados = ws.get_all_values()
-        if not dados or len(dados) < 3: return None
-        
-        # Percorre as linhas procurando a data exata (ex: 01/01/2026) na Coluna B
         for linha in dados:
-            if len(linha) >= 7: # Garante que tem colunas suficientes
-                data_planilha = str(linha[1]).strip() # Coluna B (Index 1)
-                
+            if len(linha) >= 7: 
+                data_planilha = str(linha[1]).strip() 
                 if data_planilha == data_str:
-                    staff = str(linha[2]).strip()     # Coluna C (Index 2)
-                    urgencia = str(linha[5]).strip()  # Coluna F (Index 5)
-                    telefone = str(linha[6]).strip()  # Coluna G (Index 6)
+                    staff = str(linha[2]).strip()     
+                    urgencia = str(linha[5]).strip()  
+                    telefone = str(linha[6]).strip()  
                     
-                    # Se achou pelo menos a urgência ou o staff preenchido, retorna
                     if staff or urgencia:
                         return {"staff": staff, "urgencia": urgencia, "telefone": telefone}
         return None
     except Exception as e:
-        print(f"Erro Plantão: {e}")
         return None
-
-# ==========================================
-# FUNÇÕES DE CÁLCULO
-# ==========================================
-def calcular_picos_vales_mensal(df_mensal):
-    cols_data = [c for c in df_mensal.columns if '/' in c]
-    if not cols_data: return None
-    if 'ILHA' in df_mensal.columns:
-        mask = df_mensal['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
-        df_filtrado = df_mensal[mask]
-    else: df_filtrado = df_mensal
-    max_val = -1; max_dia = "-"; min_val = 9999; min_dia = "-"
-    for dia in cols_data:
-        qtd_t = df_filtrado[dia].astype(str).str.upper().str.strip().value_counts().get("T", 0)
-        if qtd_t > max_val: max_val = qtd_t; max_dia = dia
-        if qtd_t < min_val: min_val = qtd_t; min_dia = dia
-    return {"max_dia": max_dia, "max_val": max_val, "min_dia": min_dia, "min_val": min_val}
-
-def gerar_dados_aderencia(df_mensal):
-    cols_data = [c for c in df_mensal.columns if '/' in c]
-    dados_lista = []
-    if 'ILHA' in df_mensal.columns:
-        mask = df_mensal['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
-        df_proc = df_mensal[mask]
-    else: df_proc = df_mensal
-    for dia in cols_data:
-        counts = df_proc[dia].astype(str).str.upper().str.strip().value_counts()
-        qtd_t = counts.get("T", 0); qtd_af = counts.get("AF", 0); qtd_to = counts.get("TO", 0)
-        dados_lista.append({"Data": dia, "Realizado (T)": qtd_t, "Afastado (AF)": qtd_af, "Turnover (TO)": qtd_to, "Planejado": qtd_t + qtd_af + qtd_to})
-    return pd.DataFrame(dados_lista)
-
-def calcular_kpis_mensal_detalhado(df_mensal, data_escolhida):
-    metrics = {"NoChat": 0, "Folga": 0, "Suporte": 0, "Emergencia": 0}
-    if data_escolhida in df_mensal.columns:
-        metrics["Folga"] = df_mensal[data_escolhida].value_counts().get("F", 0)
-        if 'ILHA' in df_mensal.columns:
-            mask_trabalhando = df_mensal[data_escolhida] == 'T'
-            mask_ilhas_chat = df_mensal['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
-            metrics["NoChat"] = len(df_mensal[mask_trabalhando & mask_ilhas_chat])
-            df_t = df_mensal[mask_trabalhando]
-            metrics["Suporte"] = df_t[df_t['ILHA'].str.contains("Suporte", case=False, na=False)].shape[0]
-            metrics["Emergencia"] = df_t[df_t['ILHA'].str.contains("Emergência|Emergencia", case=False, na=False)].shape[0]
-    return metrics
-
-def calcular_resumo_dia_dim(df_dim):
-    cols_horarios = [c for c in df_dim.columns if ':' in c]
-    if not cols_horarios: return {"Trabalhando": 0, "Folga": 0}
-    resumo = df_dim[cols_horarios].apply(lambda row: "".join([str(val).upper() for val in row]), axis=1)
-    eh_sup_emerg = df_dim['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
-    tem_trabalho = resumo.str.contains('CHAT|EMAIL|E-MAIL|P|TREINO|1:1|FINANCEIRO')
-    return {"Trabalhando": resumo.str.contains('CHAT').sum(), "Folga": ((resumo.str.contains('F')) & (~tem_trabalho) & (eh_sup_emerg)).sum()}
-
-def analisar_gargalos_dim(df_dim):
-    cols_horarios = [c for c in df_dim.columns if ':' in c]
-    cols_horarios = [c for c in cols_horarios if 9 <= int(c.split(':')[0]) <= 22]
-    if not cols_horarios: return None
-    min_chat = 9999; min_h = "-"; max_pausa = -1; max_h = "-"
-    for hora in cols_horarios:
-        col = df_dim[hora].astype(str).str.upper().str.strip()
-        qt_chat = col.eq('CHAT').sum(); qt_pausa = col.isin(['P', 'PAUSA']).sum()
-        if qt_chat < min_chat: min_chat = qt_chat; min_h = hora
-        if qt_pausa > max_pausa: max_pausa = qt_pausa; max_h = hora
-    return {"min_chat_hora": min_h, "min_chat_valor": min_chat, "max_pausa_hora": max_h, "max_pausa_valor": max_pausa}
-
-def filtrar_e_ordenar_dim(df, modo):
-    df_f = df.copy()
-    cols_h = [c for c in df.columns if ':' in c]
-    df_f['SORT_TEMP'] = pd.to_datetime(df_f['ENTRADA'], format='%H:%M', errors='coerce') if 'ENTRADA' in df_f.columns else pd.NaT
-    if modo == "💬 Apenas Chat":
-        mask = df_f[cols_h].apply(lambda row: row.astype(str).str.upper().str.contains('CHAT').any(), axis=1)
-        df_f = df_f[mask].sort_values(by='SORT_TEMP', na_position='last')
-    elif modo == "🚫 Apenas Folgas":
-        mask = df_f[cols_h].apply(lambda row: 'F' in "".join([str(v).upper() for v in row]) and not any(x in "".join([str(v).upper() for v in row]) for x in ['CHAT', 'P', 'TREINO']), axis=1)
-        df_f = df_f[mask].sort_values(by='SORT_TEMP', na_position='last')
-    return df_f.drop(columns=['SORT_TEMP'])
-
-def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria'):
-    def style_row(row):
-        styles = []
-        nome_linha = str(row['NOME']).upper().strip() if 'NOME' in row else ''
-        eh_cabecalho = nome_linha in [
-            'FINANCEIRO', 'E-MAIL', 'FINANCEIRO ASSÍNCRONO', 
-            'PLENO', 'STAFF', 'N2'
-        ]
-        
-        for col, val in row.items():
-            val_str = str(val).upper().strip()
-            style = ''
-            
-            if eh_cabecalho:
-                style = 'background-color: #000000; color: white; font-weight: bold;'
-            else:
-                if val_str == 'FR': 
-                    style = 'background-color: #ffffff; color: black'
-                elif val_str == 'AF': 
-                    style = 'background-color: #f4cccc; color: black'
-
-                if modo_cores == 'mensal':
-                    if val_str == 'T': style = 'background-color: #c9daf8; color: black'
-                    elif val_str == 'F': style = 'background-color: #93c47d; color: black'
-                else:
-                    if val_str == 'F': style = 'background-color: #002060; color: white'
-                    elif val_str == 'RT': style = 'background-color: #e6cff2; color: black'
-                    elif val_str == 'REEMBOLSOS': style = 'background-color: #d4edbc; color: black'
-                    elif 'CHAT' in val_str: style = 'background-color: #d9ead3; color: black'
-                    elif 'PAUSA' in val_str or val_str == 'P': style = 'background-color: #fce5cd; color: black'
-                    elif 'EMAIL' in val_str or 'E-MAIL' in val_str: style = 'background-color: #bfe1f6; color: black'
-                    elif 'FINANCEIRO' in val_str: style = 'background-color: #11734b; color: white'
-                    elif 'BACKOFFICE' in val_str: style = 'background-color: #5a3286; color: white'
-            
-            styles.append(style)
-        return styles
-
-    styler = df.style.apply(style_row, axis=1)
-    return f'<div class="table-container {classe_altura}">{styler.hide(axis="index").to_html()}</div>'
 
 # ================= SISTEMA DE LOGIN (VIA COOKIES 🍪) =================
 
