@@ -1,7 +1,5 @@
 import streamlit as st
 import pandas as pd
-import gspread
-from google.oauth2.service_account import Credentials
 from datetime import datetime
 import plotly.express as px
 import bcrypt
@@ -9,6 +7,8 @@ import time
 import uuid
 import unicodedata
 import extra_streamlit_components as stx
+import requests
+import json
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
