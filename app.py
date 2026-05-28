@@ -54,12 +54,7 @@ st.markdown("""
         }
         .height-mensal { height: calc(100vh - 250px); }
         .height-diaria { height: calc(100vh - 265px); }
-        .height-diaria-plantao { height: calc(100vh - 315px); } /* <--- NOVA CLASSE AQUI */
-        .height-aderencia {
-            height: calc(100vh - 1000px); 
-            overflow-y: auto; position: relative;
-            top: -30px; margin-bottom: -30px;
-        }
+        .height-diaria-plantao { height: calc(100vh - 315px); }
         table { width: 100%; border-collapse: separate; border-spacing: 0; font-family: sans-serif; font-size: 11px; }
         
         /* AJUSTE DE LARGURA: min-width garante que as colunas do final não fiquem espremidas */
@@ -67,7 +62,7 @@ st.markdown("""
             padding: 4px 6px; text-align: center; 
             border-bottom: 1px solid #444; border-right: 1px solid #444; 
             white-space: nowrap; 
-            min-width: 70px; /* <--- NOVO: Largura mínima para todas as células */
+            min-width: 70px; 
         }
         
         thead th { position: sticky; top: 0; background-color: #0e1117; color: white; z-index: 5; border-bottom: 2px solid #666; height: 35px; font-size: 11px; }
@@ -76,7 +71,7 @@ st.markdown("""
         table td:first-child, table th:first-child { 
             position: sticky; left: 0; background-color: #1c1e24; z-index: 6; 
             border-right: 2px solid #666; font-weight: bold; text-align: left; 
-            min-width: 160px; /* <--- NOVO: Largura fixa maior para nomes */
+            min-width: 160px; 
         }
         thead th:first-child { z-index: 7; background-color: #0e1117; }
 
@@ -168,7 +163,6 @@ def fetch_master_json():
             st.error(f"Erro ao conectar no GitHub: {resposta.status_code}")
             return {}
     except Exception as e:
-        # 3. Agora o erro não é mais silencioso. Se der falha, você verá na tela!
         st.error(f"🚨 Falha interna ao processar o banco de dados: {e}")
         return {}
 
@@ -252,27 +246,11 @@ def carregar_dados_aba(nome_aba):
         if len(df.columns) > 35: 
             df = df.iloc[:, :40] 
             
-        return df, None # Removido o retorno do worksheet do gspread
+        return df, None
 
     except Exception as e:
         print(f"Erro: {e}")
         return None, None
-
-@st.cache_data(ttl=600, show_spinner=False)
-def carregar_aderencia_real():
-    data = fetch_master_json()
-    dados = data.get("Aderencia_Real", [])
-    if not dados: return None
-    
-    try:
-        df = pd.DataFrame(dados)
-        if 'DATA' in df.columns:
-            df['DATA'] = pd.to_datetime(df['DATA']).dt.date
-        if 'NOME' in df.columns:
-            df['NOME'] = df['NOME'].astype(str).str.upper().str.strip()
-        return df
-    except:
-        return None
 
 # 2. FUNÇÃO LEVE (Lê Pessoas)
 @st.cache_data(ttl=600, show_spinner=False)
@@ -300,71 +278,6 @@ def carregar_lista_pessoas():
     except Exception as e:
         print(f"Erro ao ler Pessoas: {e}")
         return [], []
-
-# ==========================================
-# FUNÇÕES ONLINE E PAUSAS
-# ==========================================
-@st.cache_data(ttl=600, show_spinner=False)
-def carregar_dados_online():
-    data = fetch_master_json()
-    dados = data.get("Online", [])
-    if not dados or len(dados) < 2: return None
-    
-    try:
-        df = pd.DataFrame(dados[1:])
-        if len(df.columns) <= 12: return None
-            
-        df = df.rename(columns={1: 'Dia_Fixo', 12: 'Total_M'})
-        df['Total_M'] = df['Total_M'].astype(str).str.replace(',', '.', regex=False)
-        
-        def limpar_valor(x):
-            try:
-                x = str(x).strip()
-                if not x: return 0.0
-                return float(x)
-            except:
-                return 0.0
-                
-        df['Horas_Valor'] = df['Total_M'].apply(limpar_valor)
-        df['Dia_Str'] = df['Dia_Fixo'].astype(str).str.strip()
-        return df
-    except Exception as e:
-        return None
-
-@st.cache_data(ttl=600, show_spinner=False)
-def carregar_dados_pausas():
-    data = fetch_master_json()
-    dados = data.get("Pausas", [])
-    if not dados or len(dados) < 2: return None
-    
-    try:
-        headers = [str(h).strip() for h in dados[0]]
-        df = pd.DataFrame(dados[1:], columns=headers)
-        df = df.loc[:, ~df.columns.duplicated()]
-
-        cols_alvo = ['Total (menos e-mail e Projeto)', '%Pessoal', '%Programacao', '%Pausas_Total']
-        
-        for c in cols_alvo:
-            if c in df.columns:
-                def limpar_e_multiplicar(x):
-                    x_str = str(x).strip()
-                    if not x_str: return 0.0
-                    clean = x_str.replace('%', '').replace(',', '.')
-                    try:
-                        val = float(clean)
-                        if val <= 1.0 and val != 0.0: return val * 100
-                        return val
-                    except:
-                        return 0.0
-                df[c] = df[c].apply(limpar_e_multiplicar)
-
-        if 'Dia' in df.columns:
-             df['Dia_Str'] = df['Dia'].astype(str).str.strip()
-             df['Dia_Date'] = pd.to_datetime(df['Dia'], format="%d/%m/%Y", errors='coerce')
-
-        return df
-    except Exception as e:
-        return None
 
 # ==========================================
 # FUNÇÃO PARA LER PLANTÃO FDS
@@ -406,19 +319,6 @@ def calcular_picos_vales_mensal(df_mensal):
         if qtd_t > max_val: max_val = qtd_t; max_dia = dia
         if qtd_t < min_val: min_val = qtd_t; min_dia = dia
     return {"max_dia": max_dia, "max_val": max_val, "min_dia": min_dia, "min_val": min_val}
-
-def gerar_dados_aderencia(df_mensal):
-    cols_data = [c for c in df_mensal.columns if '/' in c]
-    dados_lista = []
-    if 'ILHA' in df_mensal.columns:
-        mask = df_mensal['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
-        df_proc = df_mensal[mask]
-    else: df_proc = df_mensal
-    for dia in cols_data:
-        counts = df_proc[dia].astype(str).str.upper().str.strip().value_counts()
-        qtd_t = counts.get("T", 0); qtd_af = counts.get("AF", 0); qtd_to = counts.get("TO", 0)
-        dados_lista.append({"Data": dia, "Realizado (T)": qtd_t, "Afastado (AF)": qtd_af, "Turnover (TO)": qtd_to, "Planejado": qtd_t + qtd_af + qtd_to})
-    return pd.DataFrame(dados_lista)
 
 def calcular_kpis_mensal_detalhado(df_mensal, data_escolhida):
     metrics = {"NoChat": 0, "Folga": 0, "Suporte": 0, "Emergencia": 0}
@@ -665,7 +565,6 @@ with st.sidebar:
     busca_nome = st.text_input("Buscar Nome")
     st.markdown("<hr style='margin: 10px 0px;'>", unsafe_allow_html=True)
     
-    # Novo botão de Férias adicionado aqui
     st.markdown(f'<a href="{LINK_FORM_FERIAS}" target="_blank" class="custom-link-btn">🏖️ Solicitação de Férias</a>', unsafe_allow_html=True)
     st.markdown(f'<a href="{LINK_FORM_DAYOFF}" target="_blank" class="custom-link-btn">🎂 Solicitação de Day Off (Aniversário)</a>', unsafe_allow_html=True)
     st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
@@ -680,10 +579,8 @@ with c_search:
     st.caption(f"Filtrando: {texto_busca}")
 
 # --- ABAS INTELIGENTES ---
-eh_admin = 'admin' in st.session_state.get('roles', [])
-abas = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária", "📊 Aderência"] if eh_admin else ["📅 Visão Mensal", "⏱️ Visão Diária"])
+abas = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária"])
 aba_mensal, aba_diaria = abas[0], abas[1]
-aba_aderencia = abas[2] if eh_admin else None
 
 MAPA_MESES = {
     1: "JANEIRO", 2: "FEVEREIRO", 3: "MARÇO", 4: "ABRIL",
@@ -754,7 +651,6 @@ with aba_diaria:
             <b>📞 Telefone:</b> {plantao_hoje['telefone']}</span>
         </div>
         """, unsafe_allow_html=True)
-    # =================================================================
 
     abas_dim = listar_abas_dim()
     aba_encontrada = next((a for a in abas_dim if texto_busca in a), None)
@@ -799,236 +695,3 @@ with aba_diaria:
                 </a>
             </div>
         """, unsafe_allow_html=True)
-
-if eh_admin and aba_aderencia:
-    with aba_aderencia:
-        st.markdown("""
-            <style>
-                .block-container { padding-top: 4rem !important; padding-bottom: 1rem !important; }
-                [data-baseweb="tab-panel"] { padding-top: 1rem !important; gap: 0rem !important; }
-                [data-testid='stVerticalBlock'] { gap: 0.1rem !important; }
-                h4 { margin-top: 2rem !important; margin-bottom: 1rem !important; padding-top: 0rem !important; padding-bottom: 0rem !important; }
-                hr { margin-top: 1rem !important; margin-bottom: 1rem !important; }
-                [data-testid='stColumn'] { gap: 0rem !important; }
-                [data-baseweb="tab-list"] { margin-top: 1rem !important; margin-bottom: 0rem !important; }
-            </style>
-        """, unsafe_allow_html=True)
-
-        df_pausas = carregar_dados_pausas()
-        df_online = carregar_dados_online()
-        
-        data_str_filtro = data_sel.strftime("%d/%m/%Y")
-        string_busca_total_pausa = f"{data_str_filtro} Total"
-
-        qtd_prevista_pessoas = 0 
-        qtd_total_hc = 0         
-        qtd_real_pessoas = 0     
-
-        if df_global is not None:
-            df_ad = gerar_dados_aderencia(df_global)
-            cols_d = [c for c in df_global.columns if '/' in c]
-            d_sel_fmt = data_sel.strftime("%d/%m")
-            d_match = d_sel_fmt if d_sel_fmt in cols_d else (cols_d[0] if cols_d else None)
-            
-            if df_ad is not None and d_match:
-                row_ad = df_ad[df_ad['Data'] == d_match].iloc[0] if not df_ad[df_ad['Data'] == d_match].empty else None
-                if row_ad is not None:
-                    qtd_prevista_pessoas = row_ad['Realizado (T)'] + row_ad['Afastado (AF)']
-                    qtd_total_hc = row_ad['Realizado (T)'] + row_ad['Afastado (AF)'] + row_ad['Turnover (TO)']
-                    qtd_real_pessoas = row_ad['Realizado (T)']
-
-        c_presenca, c_desvio, c_pausa = st.columns(3)
-        
-        pct_presenca = (qtd_real_pessoas / qtd_total_hc * 100) if qtd_total_hc > 0 else 0
-        
-        horas_previstas = qtd_prevista_pessoas * 9.8
-        horas_realizadas = 0.0
-        if df_online is not None and 'Dia_Str' in df_online.columns:
-            mask_dia = df_online['Dia_Str'] == data_str_filtro
-            mask_val = df_online['Horas_Valor'] > 0
-            df_online_filt = df_online[mask_dia & mask_val]
-            horas_realizadas = df_online_filt['Horas_Valor'].sum()
-        pct_desvio = ((horas_realizadas / horas_previstas) - 1) * 100 if horas_previstas > 0 else 0
-
-        media_improdutiva = 0
-        col_improd = "Total (menos e-mail e Projeto)" 
-        if df_pausas is not None and 'Dia_Str' in df_pausas.columns:
-            row_total = df_pausas[df_pausas['Dia_Str'] == string_busca_total_pausa]
-            if not row_total.empty and col_improd in df_pausas.columns:
-                media_improdutiva = row_total.iloc[0][col_improd]
-
-        with c_presenca:
-            st.metric("👥 Presença(Sup & Emerg)", f"{pct_presenca:.1f}%", f"Ativos: {qtd_real_pessoas} / Total: {qtd_total_hc}")
-
-        with c_desvio:
-            st.metric("🎯 Desvio % (Real vs Previsto)", f"{pct_desvio:+.1f}%", f"Real: {horas_realizadas:.1f}h / Previsto: {horas_previstas:.1f}h")
-            if data_sel == pd.Timestamp.now().date():
-                st.caption("⚠️ Os dados do dia vigente podem não estar 100% atualizados.")
-
-        with c_pausa:
-            st.metric("🛋️ Média % Pausas", f"{media_improdutiva:.1f}%", delta_color="inverse")
-            
-        st.markdown("<hr style='margin-top: 5px; margin-bottom: 5px;'>", unsafe_allow_html=True)
-
-        st.markdown("#### 📅 Visão Mensal & Detalhe")
-        g1, g2 = st.columns(2)
-        with g1:
-            if df_global is not None:
-                 fig_b = px.bar(df_ad, x='Data', y=['Realizado (T)', 'Afastado (AF)', 'Turnover (TO)'], text_auto='.0f', title="Evolução de Presença", color_discrete_map={'Realizado (T)': '#1e3a8a', 'Afastado (AF)': '#d32f2f', 'Turnover (TO)': '#000000'})
-                 
-                 fig_b.update_layout(height=400, margin=dict(t=30, b=0, l=0, r=0), showlegend=True, xaxis_title=None, yaxis_title="Headcount", legend_title_text=None, legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5))
-                 st.plotly_chart(fig_b, use_container_width=True)
-        with g2:
-            if df_pausas is not None and col_improd in df_pausas.columns:
-                mask_total = df_pausas['Dia_Str'].astype(str).str.contains("Total", case=False, na=False)
-                df_trend = df_pausas[mask_total].copy()
-                
-                df_trend['Data_Texto'] = df_trend['Dia_Str'].str.extract(r'(\d{2}/\d{2}/\d{4})')
-                df_trend['Dia_Date_Final'] = pd.to_datetime(df_trend['Data_Texto'], format="%d/%m/%Y", errors='coerce')
-                
-                df_trend = df_trend.dropna(subset=['Dia_Date_Final'])
-                df_trend = df_trend[(df_trend['Dia_Date_Final'].dt.month == data_sel.month) & (df_trend['Dia_Date_Final'].dt.year == data_sel.year)]
-                
-                if not df_trend.empty:
-                    df_trend = df_trend.sort_values(by='Dia_Date_Final')
-                    df_trend['Data_Curta'] = df_trend['Dia_Date_Final'].dt.strftime('%d/%m')
-                    
-                    fig_l = px.line(df_trend, x='Data_Curta', y=col_improd, title="Tendência Pausas (%) - Visão Gerencial", markers=True)
-                    fig_l.update_traces(line_color='#d32f2f', name="Pausas", showlegend=True)
-                    fig_l.update_xaxes(type='category', tickangle=-45)
-                    fig_l.update_layout(height=400, margin=dict(t=30, b=0, l=0, r=0), xaxis_title=None, yaxis_title="Total (menos e-mail e Projeto)", legend_title_text=None, legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5))
-                    st.plotly_chart(fig_l, use_container_width=True)
-                else:
-                    st.info("Sem dados de totais para este mês.")
-
-        if df_pausas is not None:
-            df_real = carregar_aderencia_real()
-            
-            mask_dia = df_pausas['Dia_Str'] == data_str_filtro
-            mask_no_total = ~df_pausas['Dia_Str'].str.contains("Total", case=False, na=False)
-            df_detalhe = df_pausas[mask_dia & mask_no_total].copy()
-            
-            if not df_detalhe.empty:
-                df_detalhe['NOME_KEY'] = df_detalhe['Nome_Analista'].str.upper().str.strip()
-                
-                aba_dim_nome = next((a for a in listar_abas_dim() if texto_busca in a), None)
-                
-                if aba_dim_nome:
-                     df_dim_plan, _ = carregar_dados_aba(aba_dim_nome)
-                     
-                     if df_dim_plan is not None:
-                         df_dim_plan.columns = [str(c).upper().strip() for c in df_dim_plan.columns]
-                         
-                         col_entrada_real = next((c for c in df_dim_plan.columns if 'ENTRADA' in c), None)
-                         col_saida_real = next((c for c in df_dim_plan.columns if 'SAIDA' in c), None)
-                         col_ilha_real = next((c for c in df_dim_plan.columns if 'ILHA' in c or 'SQUAD' in c), None)
-
-                         rename_map = {}
-                         if col_entrada_real: rename_map[col_entrada_real] = 'ENTRADA'
-                         if col_saida_real: rename_map[col_saida_real] = 'SAIDA'
-                         if col_ilha_real: rename_map[col_ilha_real] = 'ILHA'
-                         
-                         if rename_map: df_dim_plan = df_dim_plan.rename(columns=rename_map)
-
-                         df_dim_plan['NOME_KEY'] = df_dim_plan['NOME'].astype(str).str.upper().str.strip()
-                         
-                         cols_to_merge = ['NOME_KEY']
-                         if 'ENTRADA' in df_dim_plan.columns: cols_to_merge.append('ENTRADA')
-                         if 'SAIDA' in df_dim_plan.columns: cols_to_merge.append('SAIDA')
-                         if 'ILHA' in df_dim_plan.columns: cols_to_merge.append('ILHA')
-                         
-                         df_detalhe = pd.merge(df_detalhe, df_dim_plan[cols_to_merge], on='NOME_KEY', how='left')
-
-                         if df_real is not None and not df_real.empty and 'ENTRADA' in df_detalhe.columns and 'SAIDA' in df_detalhe.columns:
-                              
-                              df_real['SESSAO_INICIO'] = pd.to_datetime(df_real['SESSAO_INICIO'], errors='coerce', dayfirst=True)
-                              df_real['SESSAO_FIM'] = pd.to_datetime(df_real['SESSAO_FIM'], errors='coerce', dayfirst=True)
-
-                              df_real = df_real.dropna(subset=['SESSAO_INICIO', 'SESSAO_FIM'])
-
-                              def calcular_atrasos(row):
-                                  nome = row.get('NOME_KEY')
-                                  hora_entrada_plan = row.get('ENTRADA')
-                                  hora_saida_plan = row.get('SAIDA')
-                                  
-                                  if not nome or not hora_entrada_plan or not hora_saida_plan or pd.isna(hora_entrada_plan): return None, None
-                                  try:
-                                      data_base = pd.to_datetime(data_sel)
-                                      h_ent, m_ent = map(int, str(hora_entrada_plan).split(':')[:2])
-                                      dt_entrada_plan = data_base.replace(hour=h_ent, minute=m_ent, second=0)
-                                      h_sai, m_sai = map(int, str(hora_saida_plan).split(':')[:2])
-                                      dt_saida_plan = data_base.replace(hour=h_sai, minute=m_sai, second=0)
-                                      
-                                      if dt_saida_plan < dt_entrada_plan: dt_saida_plan += pd.Timedelta(days=1)
-                                      
-                                      janela_ent_inicio = dt_entrada_plan - pd.Timedelta(hours=4)
-                                      janela_ent_fim = dt_entrada_plan + pd.Timedelta(hours=4)
-                                      janela_sai_inicio = dt_saida_plan - pd.Timedelta(hours=4)
-                                      janela_sai_fim = dt_saida_plan + pd.Timedelta(hours=4)
-                                      
-                                      sessoes_pessoa = df_real[df_real['NOME'] == nome]
-                                      if sessoes_pessoa.empty: return None, None
-                                          
-                                      mask_login = (sessoes_pessoa['SESSAO_INICIO'] >= janela_ent_inicio) & (sessoes_pessoa['SESSAO_INICIO'] <= janela_ent_fim)
-                                      logins_validos = sessoes_pessoa.loc[mask_login, 'SESSAO_INICIO']
-                                      
-                                      mask_logout = (sessoes_pessoa['SESSAO_FIM'] >= janela_sai_inicio) & (sessoes_pessoa['SESSAO_FIM'] <= janela_sai_fim)
-                                      logouts_validos = sessoes_pessoa.loc[mask_logout, 'SESSAO_FIM']
-                                      
-                                      delta_ent = int((logins_validos.min() - dt_entrada_plan).total_seconds() / 60) if not logins_validos.empty else None
-                                      delta_sai = int((logouts_validos.max() - dt_saida_plan).total_seconds() / 60) if not logouts_validos.empty else None
-                                      return delta_ent, delta_sai
-                                  except: return None, None
-
-                              resultados = df_detalhe.apply(calcular_atrasos, axis=1, result_type='expand')
-                              df_detalhe['Dif_Entrada'] = resultados[0]
-                              df_detalhe['Dif_Saida'] = resultados[1]
-
-                st.markdown("###")
-                apenas_sup_emerg = st.checkbox("🔍 Exibir apenas Suporte & Emergência", value=True)
-                
-                if apenas_sup_emerg and 'ILHA' in df_detalhe.columns:
-                    mask_ilha = df_detalhe['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
-                    df_detalhe = df_detalhe[mask_ilha]
-
-                col_pessoal = "%Pessoal"         
-                col_prog = "%Programacao"        
-                cols_base = ['Nome_Analista', col_improd, col_pessoal, col_prog]
-                
-                col_config = {
-                    "Nome_Analista": st.column_config.TextColumn("Analista", width="medium"),
-                    col_improd: st.column_config.NumberColumn("Total Pausas (%)", format="%.2f"),
-                    col_pessoal: st.column_config.NumberColumn("% Pessoal", format="%.2f"),
-                    col_prog: st.column_config.NumberColumn("% Programação", format="%.2f")
-                }
-
-                if 'Dif_Entrada' in df_detalhe.columns:
-                    col_config["Dif_Entrada"] = st.column_config.NumberColumn("⏱️ Entrada (min)", help="➖ Negativo: Logou ANTES do horário (Antecipado)\n➕ Positivo: Logou DEPOIS (Atraso)\n⬜ Vazio: Folga ou Sem registro", format="%d")
-                    col_config["Dif_Saida"] = st.column_config.NumberColumn("⏱️ Saída (min)", help="➖ Negativo: Saiu ANTES do horário (Devendo)\n➕ Positivo: Saiu DEPOIS (Hora Extra)\n⬜ Vazio: Folga ou Sem registro", format="%d")
-
-                cols_show = [c for c in cols_base if c in df_detalhe.columns]
-                
-                if col_improd in df_detalhe.columns:
-                    df_detalhe = df_detalhe[df_detalhe[col_improd] < 99.9]
-                    df_detalhe = df_detalhe.sort_values(by=col_improd, ascending=False)
-                
-                st.markdown(f"##### 🕵️ Detalhe por Analista ({len(df_detalhe)} pessoas)")
-                
-                if 'Dif_Entrada' in df_detalhe.columns:
-                    st.caption("ℹ️ Dica: Passe o mouse sobre os títulos das colunas **⏱️ (min)** para entender o cálculo.")
-                
-                st_df_styled = df_detalhe[cols_show].style.set_properties(**{
-                    'text-align': 'center',
-                    'border-color': '#444' 
-                })
-
-                st.dataframe(
-                    st_df_styled,
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config=col_config
-                )
-            else:
-                st.info(f"Nenhum analista encontrado para o dia {texto_busca}.")
-        else:
-            st.error("Erro ao carregar dados de Pausa.")
