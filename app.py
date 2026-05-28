@@ -390,6 +390,121 @@ def carregar_plantao_dia(data_str):
     except Exception as e:
         return None
 
+# ==========================================
+# FUNÇÕES DE CÁLCULO
+# ==========================================
+def calcular_picos_vales_mensal(df_mensal):
+    cols_data = [c for c in df_mensal.columns if '/' in c]
+    if not cols_data: return None
+    if 'ILHA' in df_mensal.columns:
+        mask = df_mensal['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
+        df_filtrado = df_mensal[mask]
+    else: df_filtrado = df_mensal
+    max_val = -1; max_dia = "-"; min_val = 9999; min_dia = "-"
+    for dia in cols_data:
+        qtd_t = df_filtrado[dia].astype(str).str.upper().str.strip().value_counts().get("T", 0)
+        if qtd_t > max_val: max_val = qtd_t; max_dia = dia
+        if qtd_t < min_val: min_val = qtd_t; min_dia = dia
+    return {"max_dia": max_dia, "max_val": max_val, "min_dia": min_dia, "min_val": min_val}
+
+def gerar_dados_aderencia(df_mensal):
+    cols_data = [c for c in df_mensal.columns if '/' in c]
+    dados_lista = []
+    if 'ILHA' in df_mensal.columns:
+        mask = df_mensal['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
+        df_proc = df_mensal[mask]
+    else: df_proc = df_mensal
+    for dia in cols_data:
+        counts = df_proc[dia].astype(str).str.upper().str.strip().value_counts()
+        qtd_t = counts.get("T", 0); qtd_af = counts.get("AF", 0); qtd_to = counts.get("TO", 0)
+        dados_lista.append({"Data": dia, "Realizado (T)": qtd_t, "Afastado (AF)": qtd_af, "Turnover (TO)": qtd_to, "Planejado": qtd_t + qtd_af + qtd_to})
+    return pd.DataFrame(dados_lista)
+
+def calcular_kpis_mensal_detalhado(df_mensal, data_escolhida):
+    metrics = {"NoChat": 0, "Folga": 0, "Suporte": 0, "Emergencia": 0}
+    if data_escolhida in df_mensal.columns:
+        metrics["Folga"] = df_mensal[data_escolhida].value_counts().get("F", 0)
+        if 'ILHA' in df_mensal.columns:
+            mask_trabalhando = df_mensal[data_escolhida] == 'T'
+            mask_ilhas_chat = df_mensal['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
+            metrics["NoChat"] = len(df_mensal[mask_trabalhando & mask_ilhas_chat])
+            df_t = df_mensal[mask_trabalhando]
+            metrics["Suporte"] = df_t[df_t['ILHA'].str.contains("Suporte", case=False, na=False)].shape[0]
+            metrics["Emergencia"] = df_t[df_t['ILHA'].str.contains("Emergência|Emergencia", case=False, na=False)].shape[0]
+    return metrics
+
+def calcular_resumo_dia_dim(df_dim):
+    cols_horarios = [c for c in df_dim.columns if ':' in c]
+    if not cols_horarios: return {"Trabalhando": 0, "Folga": 0}
+    resumo = df_dim[cols_horarios].apply(lambda row: "".join([str(val).upper() for val in row]), axis=1)
+    eh_sup_emerg = df_dim['ILHA'].astype(str).str.contains('Suporte|Emergência|Emergencia', case=False, na=False)
+    tem_trabalho = resumo.str.contains('CHAT|EMAIL|E-MAIL|P|TREINO|1:1|FINANCEIRO')
+    return {"Trabalhando": resumo.str.contains('CHAT').sum(), "Folga": ((resumo.str.contains('F')) & (~tem_trabalho) & (eh_sup_emerg)).sum()}
+
+def analisar_gargalos_dim(df_dim):
+    cols_horarios = [c for c in df_dim.columns if ':' in c]
+    cols_horarios = [c for c in cols_horarios if 9 <= int(c.split(':')[0]) <= 22]
+    if not cols_horarios: return None
+    min_chat = 9999; min_h = "-"; max_pausa = -1; max_h = "-"
+    for hora in cols_horarios:
+        col = df_dim[hora].astype(str).str.upper().str.strip()
+        qt_chat = col.eq('CHAT').sum(); qt_pausa = col.isin(['P', 'PAUSA']).sum()
+        if qt_chat < min_chat: min_chat = qt_chat; min_h = hora
+        if qt_pausa > max_pausa: max_pausa = qt_pausa; max_h = hora
+    return {"min_chat_hora": min_h, "min_chat_valor": min_chat, "max_pausa_hora": max_h, "max_pausa_valor": max_pausa}
+
+def filtrar_e_ordenar_dim(df, modo):
+    df_f = df.copy()
+    cols_h = [c for c in df.columns if ':' in c]
+    df_f['SORT_TEMP'] = pd.to_datetime(df_f['ENTRADA'], format='%H:%M', errors='coerce') if 'ENTRADA' in df_f.columns else pd.NaT
+    if modo == "💬 Apenas Chat":
+        mask = df_f[cols_h].apply(lambda row: row.astype(str).str.upper().str.contains('CHAT').any(), axis=1)
+        df_f = df_f[mask].sort_values(by='SORT_TEMP', na_position='last')
+    elif modo == "🚫 Apenas Folgas":
+        mask = df_f[cols_h].apply(lambda row: 'F' in "".join([str(v).upper() for v in row]) and not any(x in "".join([str(v).upper() for v in row]) for x in ['CHAT', 'P', 'TREINO']), axis=1)
+        df_f = df_f[mask].sort_values(by='SORT_TEMP', na_position='last')
+    return df_f.drop(columns=['SORT_TEMP'])
+
+def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria'):
+    def style_row(row):
+        styles = []
+        nome_linha = str(row['NOME']).upper().strip() if 'NOME' in row else ''
+        eh_cabecalho = nome_linha in [
+            'FINANCEIRO', 'E-MAIL', 'FINANCEIRO ASSÍNCRONO', 
+            'PLENO', 'STAFF', 'N2'
+        ]
+        
+        for col, val in row.items():
+            val_str = str(val).upper().strip()
+            style = ''
+            
+            if eh_cabecalho:
+                style = 'background-color: #000000; color: white; font-weight: bold;'
+            else:
+                if val_str == 'FR': 
+                    style = 'background-color: #ffffff; color: black'
+                elif val_str == 'AF': 
+                    style = 'background-color: #f4cccc; color: black'
+
+                if modo_cores == 'mensal':
+                    if val_str == 'T': style = 'background-color: #c9daf8; color: black'
+                    elif val_str == 'F': style = 'background-color: #93c47d; color: black'
+                else:
+                    if val_str == 'F': style = 'background-color: #002060; color: white'
+                    elif val_str == 'RT': style = 'background-color: #e6cff2; color: black'
+                    elif val_str == 'REEMBOLSOS': style = 'background-color: #d4edbc; color: black'
+                    elif 'CHAT' in val_str: style = 'background-color: #d9ead3; color: black'
+                    elif 'PAUSA' in val_str or val_str == 'P': style = 'background-color: #fce5cd; color: black'
+                    elif 'EMAIL' in val_str or 'E-MAIL' in val_str: style = 'background-color: #bfe1f6; color: black'
+                    elif 'FINANCEIRO' in val_str: style = 'background-color: #11734b; color: white'
+                    elif 'BACKOFFICE' in val_str: style = 'background-color: #5a3286; color: white'
+        
+            styles.append(style)
+        return styles
+
+    styler = df.style.apply(style_row, axis=1)
+    return f'<div class="table-container {classe_altura}">{styler.hide(axis="index").to_html()}</div>'
+
 # ================= SISTEMA DE LOGIN (VIA COOKIES 🍪) =================
 
 def get_cookie_manager():
