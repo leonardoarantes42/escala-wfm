@@ -150,13 +150,26 @@ def fetch_master_json():
         resposta = requests.get(url, headers=headers)
         if resposta.status_code == 200:
             dados_gist = resposta.json()
-            conteudo_str = dados_gist["files"]["escala_cx.json"]["content"]
+            
+            # 1. Pega dinamicamente o primeiro arquivo (ignora o nome que você digitou no Gist)
+            nome_arquivo = list(dados_gist["files"].keys())[0]
+            arquivo_info = dados_gist["files"][nome_arquivo]
+            
+            # 2. Se o JSON for gigante (> 1MB), o GitHub "corta" o texto. Nós pegamos a URL bruta:
+            if arquivo_info.get("truncated", False):
+                raw_url = arquivo_info["raw_url"]
+                raw_resp = requests.get(raw_url, headers=headers)
+                conteudo_str = raw_resp.text
+            else:
+                conteudo_str = arquivo_info["content"]
+                
             return json.loads(conteudo_str)
         else:
-            print(f"Erro Github: {resposta.status_code}")
+            st.error(f"Erro ao conectar no GitHub: {resposta.status_code}")
             return {}
     except Exception as e:
-        print(f"Falha ao conectar: {e}")
+        # 3. Agora o erro não é mais silencioso. Se der falha, você verá na tela!
+        st.error(f"🚨 Falha interna ao processar o banco de dados: {e}")
         return {}
 
 def normalizar_texto(texto):
