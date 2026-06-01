@@ -370,7 +370,7 @@ def renderizar_tabela_html(df, modo_cores='diario', classe_altura='height-diaria
         styles = []
         nome_linha = str(row['NOME']).upper().strip() if 'NOME' in row else ''
         eh_cabecalho = nome_linha in [
-            'FINANCEIRO', 'E-MAIL', 'FINANCEIRO ASSÍNCRONO', 
+            'FINANCEIRO', 'E-MAIL', 'ASSÍNCRONO', 
             'PLENO', 'STAFF', 'N2'
         ]
         
