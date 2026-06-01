@@ -52,8 +52,8 @@ st.markdown("""
             overflow-y: auto; overflow-x: auto; display: block;
             border: 1px solid #444; border-radius: 4px; background-color: #0e1117;
         }
-        .height-mensal { height: calc(100vh - 320px); }
-        .height-diaria { height: calc(100vh - 265px); }
+        .height-mensal { height: calc(100vh - 310px); }
+        .height-diaria { height: calc(100vh - 325px); }
         .height-diaria-plantao { height: calc(100vh - 315px); }
         table { width: 100%; border-collapse: separate; border-spacing: 0; font-family: sans-serif; font-size: 11px; }
         
