@@ -53,7 +53,7 @@ st.markdown("""
             border: 1px solid #444; border-radius: 4px; background-color: #0e1117;
         }
         .height-mensal { height: calc(100vh - 310px); }
-        .height-diaria { height: calc(100vh - 325px); }
+        .height-diaria { height: calc(100vh - 315px); }
         .height-diaria-plantao { height: calc(100vh - 315px); }
         table { width: 100%; border-collapse: separate; border-spacing: 0; font-family: sans-serif; font-size: 11px; }
         
