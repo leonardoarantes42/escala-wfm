@@ -236,7 +236,16 @@ def carregar_dados_aba(nome_aba):
              df = df[df['NOME'].astype(str).str.strip() != '']
 
         if 'ILHA' in df.columns: 
-            df = df[df['ILHA'].astype(str).str.strip() != '']
+            # --- CORREÇÃO: Lista de palavras que não podem ser deletadas ---
+            lista_separadores = ['FINANCEIRO', 'E-MAIL', 'ASSÍNCRONO', 'ASSINCRONO', 'FINANCEIRO ASSÍNCRONO', 'PLENO', 'STAFF', 'N2']
+            
+            # Condição 1: A ilha não é vazia
+            mask_ilha_preenchida = df['ILHA'].astype(str).str.strip() != ''
+            # Condição 2: O nome é um dos nossos separadores VIP
+            mask_eh_separador = df['NOME'].astype(str).str.upper().str.strip().isin(lista_separadores)
+            
+            # Mantém a linha se ela passar na Condição 1 OU na Condição 2
+            df = df[mask_ilha_preenchida | mask_eh_separador]
 
         # 4. LIMPEZA DE DADOS
         for col in df.columns:
