@@ -134,8 +134,8 @@ GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 # 🚀 O NOVO MOTOR DE DADOS (PULL DO GITHUB)
 # ==========================================
 @st.cache_data(ttl=600, show_spinner=False)
-def fetch_master_json():
-    """Baixa o Data Lake inteiro em uma única requisição ultrarrápida."""
+def fetch_gist_file(nome_do_arquivo):
+    """Baixa um arquivo específico do nosso Data Lake no GitHub."""
     url = f"https://api.github.com/gists/{GIST_ID}"
     headers = {
         "Authorization": f"Bearer {GITHUB_TOKEN}",
@@ -146,11 +146,14 @@ def fetch_master_json():
         if resposta.status_code == 200:
             dados_gist = resposta.json()
             
-            # 1. Pega dinamicamente o primeiro arquivo (ignora o nome que você digitou no Gist)
-            nome_arquivo = list(dados_gist["files"].keys())[0]
-            arquivo_info = dados_gist["files"][nome_arquivo]
+            # Verifica se o arquivo que pedimos realmente existe lá
+            if nome_do_arquivo not in dados_gist["files"]:
+                st.error(f"Arquivo {nome_do_arquivo} não encontrado no Gist.")
+                return {}
+                
+            arquivo_info = dados_gist["files"][nome_do_arquivo]
             
-            # 2. Se o JSON for gigante (> 1MB), o GitHub "corta" o texto. Nós pegamos a URL bruta:
+            # Se o JSON for gigante (> 1MB), pegamos a URL bruta
             if arquivo_info.get("truncated", False):
                 raw_url = arquivo_info["raw_url"]
                 raw_resp = requests.get(raw_url, headers=headers)
@@ -163,7 +166,7 @@ def fetch_master_json():
             st.error(f"Erro ao conectar no GitHub: {resposta.status_code}")
             return {}
     except Exception as e:
-        st.error(f"🚨 Falha interna ao processar o banco de dados: {e}")
+        st.error(f"🚨 Falha interna ao processar {nome_do_arquivo}: {e}")
         return {}
 
 def normalizar_texto(texto):
@@ -549,6 +552,15 @@ opcoes_lider, opcoes_ilha = carregar_lista_pessoas()
 with st.sidebar:
     st.write(f"👤 **{st.session_state.get('nome', 'Visitante')}**")
     
+    # 🌟 NOVO: Menu de Navegação do App
+    st.markdown("---")
+    menu_navegacao = st.radio(
+        "Navegação",
+        ["📅 Escala WFM", "📊 Meus Resultados"],
+        label_visibility="collapsed"
+    )
+    st.markdown("---")
+    
     if st.button("Sair / Logout", type="secondary"):
         try:
             cookie_manager.delete("turbi_token")
@@ -579,13 +591,19 @@ with st.sidebar:
     st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
     st.markdown('<div class="footer-simple">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
 
-# --- HEADER ---
-c_title, _, c_search = st.columns([2, 0.5, 1.2])
-with c_title: st.markdown("### 🚙 Sistema de Escalas Turbi")
-with c_search:
-    data_sel = st.date_input("Busca", value=datetime.now(), format="DD/MM/YYYY", label_visibility="collapsed")
-    texto_busca = data_sel.strftime("%d/%m")
-    st.caption(f"Filtrando: {texto_busca}")
+# ==========================================
+# 🖥️ ROTEADOR DE TELAS
+# ==========================================
+
+if menu_navegacao == "📅 Escala WFM":
+    
+    # --- HEADER DA ESCALA ---
+    c_title, _, c_search = st.columns([2, 0.5, 1.2])
+    with c_title: st.markdown("### 🚙 Sistema de Escalas Turbi")
+    with c_search:
+        data_sel = st.date_input("Busca", value=datetime.now(), format="DD/MM/YYYY", label_visibility="collapsed")
+        texto_busca = data_sel.strftime("%d/%m")
+        st.caption(f"Filtrando: {texto_busca}")
 
 # --- ABAS INTELIGENTES ---
 abas = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária"])
@@ -704,3 +722,22 @@ with aba_diaria:
                 </a>
             </div>
         """, unsafe_allow_html=True)
+
+elif menu_navegacao == "📊 Meus Resultados":
+    
+    # --- HEADER DOS RESULTADOS ---
+    st.markdown(f"### 📊 Painel de Performance: {st.session_state.get('nome', 'Visitante')}")
+    st.caption("Acompanhe seus indicadores e feedbacks de qualidade em tempo real.")
+    st.divider()
+    
+    # Apenas para testar se a conexão com o novo arquivo deu certo!
+    st.info("Baixando dados de qualidade do GitHub...")
+    dados_metricas = fetch_gist_file("metricas_cx.json")
+    
+    if dados_metricas:
+        st.success("✅ Conexão com o banco de métricas estabelecida com sucesso!")
+        # Mostra quais "gavetas" o nosso robô do Sheets guardou lá dentro
+        st.write("Módulos disponíveis no arquivo:")
+        st.write(list(dados_metricas.keys()))
+    else:
+        st.error("Não foi possível carregar os resultados ainda.")
