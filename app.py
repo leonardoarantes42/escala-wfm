@@ -744,9 +744,35 @@ if menu_navegacao == "📅 Escala SC":
     
 elif menu_navegacao == "📊 Meus Resultados":
     
-    # --- HEADER DOS RESULTADOS ---
+    # --- HEADER DOS RESULTADOS E REGRAS ---
     st.markdown(f"### 📊 Painel de Performance: {st.session_state.get('nome', 'Visitante')}")
-    st.caption("Acompanhe seus indicadores e sua evolução no Turbi Guide.")
+    
+    # Colunas para alinhar a descrição com o botão Pop-up de Regras
+    c_desc, c_btn = st.columns([3, 1])
+    with c_desc:
+        st.caption("Acompanhe seus indicadores, sua trilha de bonificação e feedbacks de qualidade.")
+    with c_btn:
+        # 💡 Botão Pop-up com as Regras da Turbi
+        with st.popover("💡 Ver Regras de Bonificação"):
+            st.markdown("#### 🏆 Status e Multiplicadores")
+            st.markdown("""
+            | PONTUAÇÃO FINAL | STATUS | BÔNUS BASE |
+            | :--- | :--- | :--- |
+            | **Até 69,9%** | ⚠️ Neutro | Sem bônus |
+            | **70% a 109,9%** | ✅ Acelerando | Bônus Categoria 1 |
+            | **110% a 129,9%** | 🚀 Turbo | Bônus Categoria 2 |
+            | **130% ou mais** | 👑 Super Turbo | Bônus Máximo |
+            """)
+            st.divider()
+            st.markdown("#### 🚨 Impacto da Qualidade")
+            st.markdown("""
+            | NCGs (Não Conformidade) | IMPACTO NO BÔNUS |
+            | :--- | :--- |
+            | **0 NCGs** | Mantém 100% do Status alcançado |
+            | **1 NCG** | Cai 1 nível de Status (Ex: Turbo vira Acelerando) |
+            | **2 ou mais NCGs** | Perda total do bônus do ciclo |
+            """)
+            
     st.divider()
     
     # 1. Baixa o nosso pacote isolado de Métricas
@@ -755,7 +781,6 @@ elif menu_navegacao == "📊 Meus Resultados":
     if dados_metricas and "Resultados_Atuais" in dados_metricas:
         matriz_resultados = dados_metricas["Resultados_Atuais"]
         
-        # 2. Rastreia dinamicamente onde está a linha de Cabeçalho (a que tem "E-MAIL")
         indice_cabecalho = -1
         for i, linha in enumerate(matriz_resultados[:10]):
             linha_upper = [str(x).upper().strip() for x in linha]
@@ -768,65 +793,57 @@ elif menu_navegacao == "📊 Meus Resultados":
             email_logado = st.session_state.get("usuario", "").strip().lower()
             linha_usuario = None
             
-            # 3. Faz o PROCX no Python: Busca o analista exato na base
             for linha in matriz_resultados[indice_cabecalho+1:]:
-                # Na Turbi Guide 2.0, E-MAIL é a coluna B (índice 1)
                 if len(linha) > 1 and str(linha[1]).strip().lower() == email_logado:
                     linha_usuario = linha
                     break
             
             if linha_usuario:
-                # ==========================================
-                # 🎯 EXTRAÇÃO DINÂMICA (A MÁGICA DOS CABEÇALHOS)
-                # ==========================================
                 def buscar_valor_por_nome(nome_coluna):
                     try:
                         idx = cabecalho.index(nome_coluna)
                         return str(linha_usuario[idx]).strip()
-                    except (ValueError, IndexError): # 🛡️ Blindagem contra colunas vazias
+                    except (ValueError, IndexError):
                         return "-"
 
-                # 1. Busca os Nomes e Resultados Reais
+                # Nomes e Resultados Reais
                 metrica_1_nome = cabecalho[4] if len(cabecalho) > 4 else "Métrica 1"
                 metrica_1_val = linha_usuario[4] if len(linha_usuario) > 4 else "-"
-                
                 metrica_2_nome = cabecalho[5] if len(cabecalho) > 5 else "Métrica 2"
                 metrica_2_val = linha_usuario[5] if len(linha_usuario) > 5 else "-"
-                
                 metrica_3_nome = cabecalho[6] if len(cabecalho) > 6 else "Métrica 3"
                 metrica_3_val = linha_usuario[6] if len(linha_usuario) > 6 else "-"
                 
-                # 2. Busca as Novas Metas e Porcentagens que você criou no Sheets
+                # Metas e Atingimentos
                 meta_1_val = buscar_valor_por_nome("META 1")
                 meta_2_val = buscar_valor_por_nome("META 2")
                 meta_3_val = buscar_valor_por_nome("META 3")
-                
                 ating_1_val = buscar_valor_por_nome("% ATINGIMENTO 1")
                 ating_2_val = buscar_valor_por_nome("% ATINGIMENTO 2")
                 ating_3_val = buscar_valor_por_nome("% ATINGIMENTO 3")
 
-                # 3. Busca o consolidado final
+                # Consolidado
                 status_final = buscar_valor_por_nome("STATUSFINAL")
                 bonus_final = buscar_valor_por_nome("BONIFICAÇÃO FINAL")
+                pontuacao_final_str = buscar_valor_por_nome("PONTUAÇÃO FINAL")
                 qualidade = buscar_valor_por_nome("QUALIDADE")
                 ncg = buscar_valor_por_nome("NCG")
                 
                 # ==========================================
-                # 🎨 UI: RENDERIZAÇÃO DO DASHBOARD (O SHOW DE UX)
+                # 🎨 UI: BANNER E TRILHA DE GAMIFICAÇÃO
                 # ==========================================
                 
-                # --- A) BANNER DE STATUS E BÔNUS ---
-                cor_status = "#262730" # Cor padrão
+                cor_status = "#262730"
                 txt_status_upper = status_final.upper()
                 
-                if "SUPER TURBO" in txt_status_upper: cor_status = "#d100d1"   # Magenta
-                elif "TURBO" in txt_status_upper: cor_status = "#1e3a8a"       # Azul Turbi
-                elif "ACELERANDO" in txt_status_upper: cor_status = "#11734b"  # Verde Turbi
-                elif "NEUTRO" in txt_status_upper: cor_status = "#b8860b"      # Dourado
-                elif "ALERTA" in txt_status_upper: cor_status = "#8a1e1e"      # Vermelho
+                if "SUPER TURBO" in txt_status_upper: cor_status = "#d100d1"
+                elif "TURBO" in txt_status_upper: cor_status = "#1e3a8a"
+                elif "ACELERANDO" in txt_status_upper: cor_status = "#11734b"
+                elif "NEUTRO" in txt_status_upper: cor_status = "#b8860b"
+                elif "ALERTA" in txt_status_upper: cor_status = "#8a1e1e"
                 
                 st.markdown(f"""
-                    <div style="background-color: {cor_status}; padding: 25px; border-radius: 8px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 10px rgba(0,0,0,0.4);">
+                    <div style="background-color: {cor_status}; padding: 25px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 10px rgba(0,0,0,0.4);">
                         <div>
                             <div style="color: rgba(255,255,255,0.7); font-size: 13px; font-weight: bold; letter-spacing: 1px;">STATUS DO MÊS</div>
                             <div style="color: #fff; font-size: 36px; font-weight: 900; letter-spacing: 1px; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">{txt_status_upper}</div>
@@ -838,9 +855,45 @@ elif menu_navegacao == "📊 Meus Resultados":
                     </div>
                 """, unsafe_allow_html=True)
                 
+                # --- CÁLCULO MATEMÁTICO DA TRILHA ---
+                try:
+                    pontuacao_val = float(pontuacao_final_str.replace("%", "").replace(",", ".").strip())
+                except:
+                    pontuacao_val = 0.0
+
+                escala_max = 135.0 # Fim da régua para dar respiro após os 130%
+                pos_user = min(100.0, (pontuacao_val / escala_max) * 100.0)
+                pos_acel = (70.0 / escala_max) * 100.0
+                pos_turbo = (110.0 / escala_max) * 100.0
+                pos_sturbo = (130.0 / escala_max) * 100.0
+                
+                # Gradiente inteligente dependendo de onde o analista está
+                if pontuacao_val < 70: cor_trilha = "linear-gradient(90deg, #8a1e1e, #b8860b)"
+                elif pontuacao_val < 110: cor_trilha = "linear-gradient(90deg, #11734b, #11734b)"
+                elif pontuacao_val < 130: cor_trilha = "linear-gradient(90deg, #11734b, #1e3a8a)"
+                else: cor_trilha = "linear-gradient(90deg, #1e3a8a, #d100d1)"
+
+                # --- HTML DA TRILHA (SEM RECUO PARA EVITAR MARKDOWN TRAP) ---
+                trilha_gamificacao = f"""<div style="background-color: #1c1e24; padding: 20px 30px 40px 30px; border-radius: 8px; border: 1px solid #333; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.15);">
+<div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
+<span style="color: #ccc; font-size: 14px; font-weight: bold;">PONTUAÇÃO FINAL: <span style="color: #fff; font-size: 22px;">{pontuacao_final_str}</span></span>
+<span style="color: #999; font-size: 12px; margin-top: 8px;">JORNADA DE BONIFICAÇÃO</span>
+</div>
+<div style="position: relative; width: 100%; height: 14px; background-color: #2b2d35; border-radius: 8px;">
+<div style="width: {pos_user}%; background: {cor_trilha}; height: 14px; border-radius: 8px; box-shadow: 0 0 10px rgba(255,255,255,0.1);"></div>
+<div style="position: absolute; top: -6px; left: {pos_acel}%; height: 26px; width: 2px; background-color: #11734b;"></div>
+<div style="position: absolute; top: 22px; left: {pos_acel}%; transform: translateX(-50%); font-size: 11px; color: #11734b; font-weight: bold;">70% Acel.</div>
+<div style="position: absolute; top: -6px; left: {pos_turbo}%; height: 26px; width: 2px; background-color: #1e3a8a;"></div>
+<div style="position: absolute; top: 22px; left: {pos_turbo}%; transform: translateX(-50%); font-size: 11px; color: #1e3a8a; font-weight: bold;">110% Turbo</div>
+<div style="position: absolute; top: -6px; left: {pos_sturbo}%; height: 26px; width: 2px; background-color: #d100d1;"></div>
+<div style="position: absolute; top: 22px; left: {pos_sturbo}%; transform: translateX(-50%); font-size: 11px; color: #d100d1; font-weight: bold;">130% S.Turbo</div>
+<div style="position: absolute; top: -32px; left: {pos_user}%; transform: translateX(-50%); font-size: 24px; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.5));">📍</div>
+</div>
+</div>"""
+                st.markdown(trilha_gamificacao, unsafe_allow_html=True)
+                
                 # --- B) MOTOR INTELIGENTE DOS SMART CARDS ---
                 def draw_smart_card(titulo, real_str, meta_str, ating_str):
-                    # Transforma os textos em números para o Python fazer as contas
                     def limpar_num(texto):
                         try: return float(str(texto).replace("%", "").replace(",", ".").strip())
                         except: return 0.0
@@ -849,43 +902,27 @@ elif menu_navegacao == "📊 Meus Resultados":
                     meta_val = limpar_num(meta_str)
                     ating_val = limpar_num(ating_str)
 
-                    # 1. Define Cores e Selos com base na Regra do Jogo
-                    if ating_val >= 130:
-                        cor_barra, tag_nivel = "#d100d1", "👑 SUPER TURBO"
-                    elif ating_val >= 110:
-                        cor_barra, tag_nivel = "#1e3a8a", "🚀 TURBO"
-                    elif ating_val >= 70:
-                        cor_barra, tag_nivel = "#11734b", "✅ ACELERANDO"
-                    elif ating_val >= 30:
-                        cor_barra, tag_nivel = "#b8860b", "⚠️ NEUTRO"
-                    else:
-                        cor_barra, tag_nivel = "#8a1e1e", "🚨 PISCA ALERTA"
+                    if ating_val >= 130: cor_barra, tag_nivel = "#d100d1", "👑 SUPER TURBO"
+                    elif ating_val >= 110: cor_barra, tag_nivel = "#1e3a8a", "🚀 TURBO"
+                    elif ating_val >= 70: cor_barra, tag_nivel = "#11734b", "✅ ACELERANDO"
+                    elif ating_val >= 30: cor_barra, tag_nivel = "#b8860b", "⚠️ NEUTRO"
+                    else: cor_barra, tag_nivel = "#8a1e1e", "🚨 PISCA ALERTA"
 
-                    # Limita a barra visualmente a 100% da caixa, mesmo se o cara fizer 130%
                     largura_visual = min(100, ating_val)
-                    if largura_visual == 0: largura_visual = 2 # Mostra pelo menos uma pontinha
+                    if largura_visual == 0: largura_visual = 2 
 
-                    # 2. O Cérebro do Insight (Diferença para a Meta)
                     insight = ""
-                    if ating_val >= 130:
-                        insight = "🏆 Meta máxima atingida! Você é Super Turbo."
-                    elif ating_val >= 100:
-                        insight = f"🔥 Sensacional! Meta Acelerando ({meta_str}) já garantida."
+                    if ating_val >= 130: insight = "🏆 Meta máxima atingida! Você é Super Turbo."
+                    elif ating_val >= 100: insight = f"🔥 Sensacional! Meta Acelerando ({meta_str}) já garantida."
                     else:
                         diff = abs(meta_val - real_val)
-                        diff_str = f"{diff:g}".replace(".", ",") # Ex: 1.5 vira 1,5
+                        diff_str = f"{diff:g}".replace(".", ",") 
                         t_upper = titulo.upper()
-                        
-                        if "TMO" in t_upper or "TMA" in t_upper:
-                            insight = f"Falta reduzir {diff_str} min para bater a meta Acelerando."
-                        elif "PRODUTIVIDADE" in t_upper:
-                            insight = f"Faltam {diff_str} tickets para chegar na meta."
-                        elif "DISPONIBILIDADE" in t_upper or "SLA" in t_upper:
-                            insight = f"Faltam {diff_str}% para alcançar a meta Acelerando."
-                        else:
-                            insight = f"Faltam {diff_str} para a meta principal."
+                        if "TMO" in t_upper or "TMA" in t_upper: insight = f"Falta reduzir {diff_str} min para bater a meta Acelerando."
+                        elif "PRODUTIVIDADE" in t_upper: insight = f"Faltam {diff_str} tickets para chegar na meta."
+                        elif "DISPONIBILIDADE" in t_upper or "SLA" in t_upper: insight = f"Faltam {diff_str}% para alcançar a meta Acelerando."
+                        else: insight = f"Faltam {diff_str} para a meta principal."
 
-                    # 3. Desenho do Card HTML (🚨 SEM RECUO PARA NÃO VIRAR CÓDIGO)
                     return f"""<div style="background-color: #1c1e24; padding: 20px; border-radius: 8px; border: 1px solid #333; height: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.15); position: relative;">
 <div style="position: absolute; top: 18px; right: 18px; font-size: 10px; font-weight: 800; color: {cor_barra}; background-color: {cor_barra}15; padding: 4px 8px; border-radius: 4px; border: 1px solid {cor_barra}40;">{tag_nivel}</div>
 <div style="font-size: 11px; color: #999; margin-bottom: 5px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">{titulo}</div>
@@ -910,7 +947,6 @@ elif menu_navegacao == "📊 Meus Resultados":
                 with c2: st.markdown(draw_smart_card(metrica_2_nome, metrica_2_val, meta_2_val, ating_2_val), unsafe_allow_html=True)
                 with c3: st.markdown(draw_smart_card(metrica_3_nome, metrica_3_val, meta_3_val, ating_3_val), unsafe_allow_html=True)
                 
-                # Card de Qualidade Modernizado (🚨 SEM RECUO PARA NÃO VIRAR CÓDIGO)
                 card_qualidade = f"""<div style="background-color: #1c1e24; padding: 20px; border-radius: 8px; border: 1px solid #333; height: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.15); display: flex; flex-direction: column; justify-content: center;">
 <div style="font-size: 11px; color: #999; margin-bottom: 5px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">QUALIDADE MENSAL</div>
 <div style="font-size: 32px; color: #fff; font-weight: 900; margin-bottom: 15px;">{qualidade}</div>
