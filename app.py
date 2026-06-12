@@ -743,20 +743,125 @@ if menu_navegacao == "📅 Escala SC":
             """, unsafe_allow_html=True)
     
 elif menu_navegacao == "📊 Meus Resultados":
+    
+    # --- HEADER DOS RESULTADOS ---
+    st.markdown(f"### 📊 Painel de Performance: {st.session_state.get('nome', 'Visitante')}")
+    st.caption("Acompanhe seus indicadores e sua evolução no Turbi Guide.")
+    st.divider()
+    
+    # 1. Baixa o nosso pacote isolado de Métricas
+    dados_metricas = fetch_gist_file("metricas_cx.json")
+    
+    if dados_metricas and "Resultados_Atuais" in dados_metricas:
+        matriz_resultados = dados_metricas["Resultados_Atuais"]
         
-        # --- HEADER DOS RESULTADOS ---
-        st.markdown(f"### 📊 Painel de Performance: {st.session_state.get('nome', 'Visitante')}")
-        st.caption("Acompanhe seus indicadores e feedbacks de qualidade em tempo real.")
-        st.divider()
-        
-        # Apenas para testar se a conexão com o novo arquivo deu certo!
-        st.info("Baixando dados de qualidade do GitHub...")
-        dados_metricas = fetch_gist_file("metricas_cx.json")
-        
-        if dados_metricas:
-            st.success("✅ Conexão com o banco de métricas estabelecida com sucesso!")
-            # Mostra quais "gavetas" o nosso robô do Sheets guardou lá dentro
-            st.write("Módulos disponíveis no arquivo:")
-            st.write(list(dados_metricas.keys()))
+        # 2. Rastreia dinamicamente onde está a linha de Cabeçalho (a que tem "E-MAIL")
+        indice_cabecalho = -1
+        for i, linha in enumerate(matriz_resultados[:10]):
+            linha_upper = [str(x).upper().strip() for x in linha]
+            if "E-MAIL" in linha_upper or "EMAIL" in linha_upper:
+                indice_cabecalho = i
+                cabecalho = linha_upper
+                break
+                
+        if indice_cabecalho != -1:
+            email_logado = st.session_state.get("usuario", "").strip().lower()
+            linha_usuario = None
+            
+            # 3. Faz o PROCX no Python: Busca o analista exato na base
+            for linha in matriz_resultados[indice_cabecalho+1:]:
+                # Na Turbi Guide 2.0, E-MAIL é a coluna B (índice 1)
+                if len(linha) > 1 and str(linha[1]).strip().lower() == email_logado:
+                    linha_usuario = linha
+                    break
+            
+            if linha_usuario:
+                # ==========================================
+                # 🎯 EXTRAÇÃO DINÂMICA (A MÁGICA DOS CABEÇALHOS)
+                # ==========================================
+                # O Python lê as colunas E(4), F(5) e G(6), não importa qual seja o nome delas
+                metrica_1_nome = cabecalho[4] if len(cabecalho) > 4 else "Métrica 1"
+                metrica_1_val = linha_usuario[4] if len(linha_usuario) > 4 else "-"
+                
+                metrica_2_nome = cabecalho[5] if len(cabecalho) > 5 else "Métrica 2"
+                metrica_2_val = linha_usuario[5] if len(linha_usuario) > 5 else "-"
+                
+                metrica_3_nome = cabecalho[6] if len(cabecalho) > 6 else "Métrica 3"
+                metrica_3_val = linha_usuario[6] if len(linha_usuario) > 6 else "-"
+                
+                # Procura as colunas de resultado final onde quer que elas estejam
+                def buscar_valor_por_nome(nome_coluna):
+                    try:
+                        idx = cabecalho.index(nome_coluna)
+                        return str(linha_usuario[idx]).strip()
+                    except ValueError:
+                        return "-"
+
+                status_final = buscar_valor_por_nome("STATUS FINAL")
+                bonus_final = buscar_valor_por_nome("BONIFICAÇÃO FINAL")
+                qualidade = buscar_valor_por_nome("QUALIDADE")
+                ncg = buscar_valor_por_nome("NCG")
+                
+                # ==========================================
+                # 🎨 UI: RENDERIZAÇÃO DO DASHBOARD
+                # ==========================================
+                
+                # --- A) BANNER DE STATUS E BÔNUS ---
+                # Define a cor de fundo com base no nível atingido
+                cor_status = "#262730" # Cor padrão (Cinza Escuro)
+                if "ACELERANDO" in status_final.upper(): cor_status = "#11734b" # Verde Turbi
+                elif "TURBO" in status_final.upper(): cor_status = "#1e3a8a"    # Azul Turbi
+                elif "ALERTA" in status_final.upper(): cor_status = "#8a1e1e"   # Vermelho Alerta
+                elif "NEUTRO" in status_final.upper(): cor_status = "#b8860b"   # Dourado Neutro
+                
+                st.markdown(f"""
+                    <div style="background-color: {cor_status}; padding: 25px; border-radius: 8px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #444; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                        <div>
+                            <div style="color: #ccc; font-size: 13px; font-weight: bold; letter-spacing: 1px;">STATUS DO MÊS</div>
+                            <div style="color: #fff; font-size: 34px; font-weight: 900;">{status_final.upper()}</div>
+                        </div>
+                        <div style="text-align: right; border-left: 1px solid rgba(255,255,255,0.2); padding-left: 25px;">
+                            <div style="color: #ccc; font-size: 13px; font-weight: bold; letter-spacing: 1px;">PROJEÇÃO DE BÔNUS</div>
+                            <div style="color: #fff; font-size: 34px; font-weight: 900;">{bonus_final}</div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                # --- B) SMART CARDS DAS MÉTRICAS ---
+                c1, c2, c3, c4 = st.columns(4)
+                
+                # Componente HTML para um "Smart Card" com barra de progresso fake (por enquanto)
+                def draw_smart_card(titulo, valor, cor_barra, insight):
+                    # Usamos um valor visual padrão de 75% para a barra (depois podemos plugar a matemática real)
+                    return f"""
+                    <div style="background-color: #1c1e24; padding: 18px; border-radius: 8px; border: 1px solid #333; height: 100%; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                        <div style="font-size: 11px; color: #999; margin-bottom: 8px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">{titulo}</div>
+                        <div style="font-size: 26px; color: #fff; font-weight: 800; margin-bottom: 12px;">{valor}</div>
+                        <div style="width: 100%; background-color: #2b2d35; border-radius: 4px; height: 5px; margin-bottom: 10px;">
+                            <div style="width: 75%; background-color: {cor_barra}; height: 5px; border-radius: 4px;"></div>
+                        </div>
+                        <div style="font-size: 11px; color: #bbb;">💡 <i>{insight}</i></div>
+                    </div>
+                    """
+                
+                with c1: st.markdown(draw_smart_card(metrica_1_nome, metrica_1_val, "#1f77b4", "Consolidação da métrica principal."), unsafe_allow_html=True)
+                with c2: st.markdown(draw_smart_card(metrica_2_nome, metrica_2_val, "#ff7f0e", "Acompanhamento de volume/tempo."), unsafe_allow_html=True)
+                with c3: st.markdown(draw_smart_card(metrica_3_nome, metrica_3_val, "#2ca02c", "Indicador de performance atrelado."), unsafe_allow_html=True)
+                
+                # O card de qualidade não precisa de barra de progresso, vamos focar no NCG
+                card_qualidade = f"""
+                    <div style="background-color: #1c1e24; padding: 18px; border-radius: 8px; border: 1px solid #333; height: 100%; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                        <div style="font-size: 11px; color: #999; margin-bottom: 8px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">QUALIDADE</div>
+                        <div style="font-size: 26px; color: #fff; font-weight: 800; margin-bottom: 12px;">{qualidade}</div>
+                        <hr style="border: 0; height: 1px; background: #333; margin: 10px 0;">
+                        <div style="font-size: 12px; color: #e74c3c; font-weight: bold;">🚨 NCG Registrado: {ncg}</div>
+                    </div>
+                """
+                with c4: st.markdown(card_qualidade, unsafe_allow_html=True)
+                
+            else:
+                st.warning(f"Ops! Não encontramos os resultados mensais para o e-mail: **{email_logado}**. Verifique se ele está presente na aba 'Turbi Guide 2.0'.")
         else:
-            st.error("Não foi possível carregar os resultados ainda.")
+            st.error("Erro Estrutural: Não foi possível localizar a linha de cabeçalhos na base de dados.")
+    else:
+        st.error("Não foi possível processar o banco de dados de métricas.")
