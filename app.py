@@ -554,12 +554,12 @@ with st.sidebar:
     st.divider() # Linha sutil nativa do Streamlit
     
     # 🌟 FEATURE FLAG: ÁREA VIP DE DESENVOLVIMENTO
-    # Apenas os e-mails nesta lista verão o menu "Meus Resultados"
     usuario_logado = st.session_state.get("usuario", "")
     desenvolvedores = ["leonardo.arantes@turbi.com.br"] 
     
     if usuario_logado in desenvolvedores:
-        st.markdown("#### 🧭 Navegação")
+        # Colocamos um "calço" invisível (margin-bottom: 30px) para anular o CSS que puxava o menu pra cima
+        st.markdown("<h4 style='margin-bottom: 30px;'>🧭 Navegação</h4>", unsafe_allow_html=True)
         menu_navegacao = st.radio(
             "Selecione a tela:",
             ["📅 Escala SC", "📊 Meus Resultados"],
@@ -567,7 +567,7 @@ with st.sidebar:
         )
         st.divider()
     else:
-        # Para a operação normal, o menu nem aparece e o sistema força a tela da Escala
+        # Para a operação normal, o menu nem aparece
         menu_navegacao = "📅 Escala SC"
     
     # Logo e Filtros
