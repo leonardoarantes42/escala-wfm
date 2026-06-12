@@ -605,139 +605,139 @@ if menu_navegacao == "📅 Escala WFM":
         texto_busca = data_sel.strftime("%d/%m")
         st.caption(f"Filtrando: {texto_busca}")
 
-# --- ABAS INTELIGENTES ---
-abas = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária"])
-aba_mensal, aba_diaria = abas[0], abas[1]
-
-MAPA_MESES = {
-    1: "JANEIRO", 2: "FEVEREIRO", 3: "MARÇO", 4: "ABRIL",
-    5: "MAIO", 6: "JUNHO", 7: "JULHO", 8: "AGOSTO",
-    9: "SETEMBRO", 10: "OUTUBRO", 11: "NOVEMBRO", 12: "DEZEMBRO"
-}
-
-with aba_mensal:
-    mes_num = data_sel.month
-    nome_aba_oficial = MAPA_MESES.get(mes_num)
+    # --- ABAS INTELIGENTES ---
+    abas = st.tabs(["📅 Visão Mensal", "⏱️ Visão Diária"])
+    aba_mensal, aba_diaria = abas[0], abas[1]
     
-    df_global, _ = carregar_dados_aba(nome_aba_oficial)
-
-    if df_global is None:
-        st.warning(f"⚠️ A aba **{nome_aba_oficial}** não foi encontrada.")
-        st.markdown(f"""
-            <div style="background-color: #1e1e1e; padding: 15px; border-radius: 5px; border-left: 5px solid #ffbd45;">
-                <p>Para poupar recursos, mantemos apenas os meses ativos nesta planilha.</p>
-                <p>O histórico completo pode ser acessado no Drive:</p>
-                <a href="https://drive.google.com/drive/folders/1WeIKaV6OvFOsNHdWhCirOx-zZogwdyPd?usp=drive_link" target="_blank" class="custom-link-btn" style="width: 200px;">
-                    📂 Acessar Histórico (Drive)
-                </a>
-            </div>
-        """, unsafe_allow_html=True)
-    else:
-        colunas_datas = [c for c in df_global.columns if '/' in c]
-        dia_show = texto_busca if texto_busca in colunas_datas else (colunas_datas[0] if colunas_datas else None)
+    MAPA_MESES = {
+        1: "JANEIRO", 2: "FEVEREIRO", 3: "MARÇO", 4: "ABRIL",
+        5: "MAIO", 6: "JUNHO", 7: "JULHO", 8: "AGOSTO",
+        9: "SETEMBRO", 10: "OUTUBRO", 11: "NOVEMBRO", 12: "DEZEMBRO"
+    }
+    
+    with aba_mensal:
+        mes_num = data_sel.month
+        nome_aba_oficial = MAPA_MESES.get(mes_num)
         
-        if dia_show:
-            kpis = calcular_kpis_mensal_detalhado(df_global, dia_show)
-            picos = calcular_picos_vales_mensal(df_global)
-            
-            k1, k2, k3, k4, k5, k6 = st.columns(6)
-            
-            with k1: st.metric("✅ Escalados(Sup & Emerg)", kpis["NoChat"])
-            with k2: st.metric("🛋️ Folgas(Sup & Emerg)", kpis["Folga"])
-            with k3: st.metric("🎧 Escalados Suporte", kpis["Suporte"])
-            with k4: st.metric("🚨 Escalados Emergência", kpis["Emergencia"])
-            
-            if picos:
-                with k5: st.metric("📈 Pico(Sup & Emerg)", f"{picos['max_dia']}", f"{picos['max_val']}")
-                with k6: st.metric("📉 Vale(Sup & Emerg)", f"{picos['min_dia']}", f"{picos['min_val']}", delta_color="inverse")
-
-            df_f = df_global.copy()
-            if sel_lider: df_f = df_f[df_f['LIDER'].isin(sel_lider)]
-            if sel_ilha and 'ILHA' in df_f.columns: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
-            if busca_nome: df_f = df_f[df_f['NOME'].str.contains(busca_nome, case=False)]
-            
-            cols_clean = [c for c in df_f.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ADMISSAO', 'ILHA', 'Z']]
-            st.markdown(renderizar_tabela_html(df_f[cols_clean], 'mensal', 'height-mensal'), unsafe_allow_html=True)
+        df_global, _ = carregar_dados_aba(nome_aba_oficial)
+    
+        if df_global is None:
+            st.warning(f"⚠️ A aba **{nome_aba_oficial}** não foi encontrada.")
+            st.markdown(f"""
+                <div style="background-color: #1e1e1e; padding: 15px; border-radius: 5px; border-left: 5px solid #ffbd45;">
+                    <p>Para poupar recursos, mantemos apenas os meses ativos nesta planilha.</p>
+                    <p>O histórico completo pode ser acessado no Drive:</p>
+                    <a href="https://drive.google.com/drive/folders/1WeIKaV6OvFOsNHdWhCirOx-zZogwdyPd?usp=drive_link" target="_blank" class="custom-link-btn" style="width: 200px;">
+                        📂 Acessar Histórico (Drive)
+                    </a>
+                </div>
+            """, unsafe_allow_html=True)
         else:
-            st.warning("Não encontrei colunas de data nesta aba.")
-
-with aba_diaria:
-    # 1. Verifica se tem plantão hoje
-    data_plantao_str = data_sel.strftime("%d/%m/%Y")
-    plantao_hoje = carregar_plantao_dia(data_plantao_str)
+            colunas_datas = [c for c in df_global.columns if '/' in c]
+            dia_show = texto_busca if texto_busca in colunas_datas else (colunas_datas[0] if colunas_datas else None)
+            
+            if dia_show:
+                kpis = calcular_kpis_mensal_detalhado(df_global, dia_show)
+                picos = calcular_picos_vales_mensal(df_global)
+                
+                k1, k2, k3, k4, k5, k6 = st.columns(6)
+                
+                with k1: st.metric("✅ Escalados(Sup & Emerg)", kpis["NoChat"])
+                with k2: st.metric("🛋️ Folgas(Sup & Emerg)", kpis["Folga"])
+                with k3: st.metric("🎧 Escalados Suporte", kpis["Suporte"])
+                with k4: st.metric("🚨 Escalados Emergência", kpis["Emergencia"])
+                
+                if picos:
+                    with k5: st.metric("📈 Pico(Sup & Emerg)", f"{picos['max_dia']}", f"{picos['max_val']}")
+                    with k6: st.metric("📉 Vale(Sup & Emerg)", f"{picos['min_dia']}", f"{picos['min_val']}", delta_color="inverse")
     
-    # 2. DECIDE A ALTURA DA TABELA: Se tem plantão, usa a classe menor
-    classe_altura_dinamica = 'height-diaria-plantao' if plantao_hoje else 'height-diaria'
+                df_f = df_global.copy()
+                if sel_lider: df_f = df_f[df_f['LIDER'].isin(sel_lider)]
+                if sel_ilha and 'ILHA' in df_f.columns: df_f = df_f[df_f['ILHA'].isin(sel_ilha)]
+                if busca_nome: df_f = df_f[df_f['NOME'].str.contains(busca_nome, case=False)]
+                
+                cols_clean = [c for c in df_f.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ADMISSAO', 'ILHA', 'Z']]
+                st.markdown(renderizar_tabela_html(df_f[cols_clean], 'mensal', 'height-mensal'), unsafe_allow_html=True)
+            else:
+                st.warning("Não encontrei colunas de data nesta aba.")
     
-    if plantao_hoje:
-        st.markdown(f"""
-        <div style="background-color: #1c1e24; border: 1px solid #333; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; text-align: center;">
-            <span style="font-size: 14px;">🚨 <b>PLANTÃO DE HOJE</b> &nbsp;|&nbsp; 
-            <b>Supervisão:</b> {plantao_hoje['staff']} &nbsp;|&nbsp; 
-            <b>Urgência:</b> {plantao_hoje['urgencia']} &nbsp;|&nbsp; 
-            <b>📞 Telefone:</b> {plantao_hoje['telefone']}</span>
-        </div>
-        """, unsafe_allow_html=True)
-
-    abas_dim = listar_abas_dim()
-    aba_encontrada = next((a for a in abas_dim if texto_busca in a), None)
-    
-    if aba_encontrada:
-        df_dim, _ = carregar_dados_aba(aba_encontrada)
+    with aba_diaria:
+        # 1. Verifica se tem plantão hoje
+        data_plantao_str = data_sel.strftime("%d/%m/%Y")
+        plantao_hoje = carregar_plantao_dia(data_plantao_str)
         
-        if df_dim is not None:
-            analise = analisar_gargalos_dim(df_dim)
-            resumo = calcular_resumo_dia_dim(df_dim)
-            
-            kc1, kc2, kc3, kc4 = st.columns(4)
-            with kc1: st.metric("👥 No Chat", resumo["Trabalhando"])
-            with kc2: st.metric("🛋️ Folgas(Sup & Emerg)", resumo["Folga"])
-            if analise:
-                with kc3: st.metric("⚠️ Menos Chats", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
-                with kc4: st.metric("☕ Mais Pausas", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
-            
-            df_dim_f = df_dim.copy()
-            
-            if sel_lider and 'LIDER' in df_dim_f.columns:
-                df_dim_f = df_dim_f[df_dim_f['LIDER'].isin(sel_lider)]
-            if sel_ilha and 'ILHA' in df_dim_f.columns:
-                df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
-            if busca_nome and 'NOME' in df_dim_f.columns:
-                df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
-            
-            tipo = st.radio("Modo:", ["▦ Grade", "💬 Apenas Chat", "🚫 Apenas Folgas"], horizontal=True, label_visibility="collapsed")
-            df_exibicao = df_dim_f if tipo == "▦ Grade" else filtrar_e_ordenar_dim(df_dim_f, tipo)
-            
-            cols_v = [c for c in df_exibicao.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ILHA', 'Z']]
-            st.markdown(renderizar_tabela_html(df_exibicao[cols_v], 'diario', classe_altura_dinamica), unsafe_allow_html=True)
-            
-    else:
-        st.warning(f"⚠️ A aba diária para **{texto_busca}** não foi encontrada.")
-        st.markdown(f"""
-            <div style="background-color: #1e1e1e; padding: 15px; border-radius: 5px; border-left: 5px solid #ffbd45;">
-                <p>Para poupar recursos, mantemos apenas as abas ativas nesta planilha.</p>
-                <p>O histórico completo pode ser acessado no Drive:</p>
-                <a href="https://drive.google.com/drive/folders/1WeIKaV6OvFOsNHdWhCirOx-zZogwdyPd?usp=drive_link" target="_blank" class="custom-link-btn" style="width: 200px;">
-                    📂 Acessar Histórico (Drive)
-                </a>
+        # 2. DECIDE A ALTURA DA TABELA: Se tem plantão, usa a classe menor
+        classe_altura_dinamica = 'height-diaria-plantao' if plantao_hoje else 'height-diaria'
+        
+        if plantao_hoje:
+            st.markdown(f"""
+            <div style="background-color: #1c1e24; border: 1px solid #333; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; text-align: center;">
+                <span style="font-size: 14px;">🚨 <b>PLANTÃO DE HOJE</b> &nbsp;|&nbsp; 
+                <b>Supervisão:</b> {plantao_hoje['staff']} &nbsp;|&nbsp; 
+                <b>Urgência:</b> {plantao_hoje['urgencia']} &nbsp;|&nbsp; 
+                <b>📞 Telefone:</b> {plantao_hoje['telefone']}</span>
             </div>
-        """, unsafe_allow_html=True)
-
+            """, unsafe_allow_html=True)
+    
+        abas_dim = listar_abas_dim()
+        aba_encontrada = next((a for a in abas_dim if texto_busca in a), None)
+        
+        if aba_encontrada:
+            df_dim, _ = carregar_dados_aba(aba_encontrada)
+            
+            if df_dim is not None:
+                analise = analisar_gargalos_dim(df_dim)
+                resumo = calcular_resumo_dia_dim(df_dim)
+                
+                kc1, kc2, kc3, kc4 = st.columns(4)
+                with kc1: st.metric("👥 No Chat", resumo["Trabalhando"])
+                with kc2: st.metric("🛋️ Folgas(Sup & Emerg)", resumo["Folga"])
+                if analise:
+                    with kc3: st.metric("⚠️ Menos Chats", f"{analise['min_chat_hora']}", f"{analise['min_chat_valor']}", delta_color="inverse")
+                    with kc4: st.metric("☕ Mais Pausas", f"{analise['max_pausa_hora']}", f"{analise['max_pausa_valor']}", delta_color="off")
+                
+                df_dim_f = df_dim.copy()
+                
+                if sel_lider and 'LIDER' in df_dim_f.columns:
+                    df_dim_f = df_dim_f[df_dim_f['LIDER'].isin(sel_lider)]
+                if sel_ilha and 'ILHA' in df_dim_f.columns:
+                    df_dim_f = df_dim_f[df_dim_f['ILHA'].isin(sel_ilha)]
+                if busca_nome and 'NOME' in df_dim_f.columns:
+                    df_dim_f = df_dim_f[df_dim_f['NOME'].str.contains(busca_nome, case=False)]
+                
+                tipo = st.radio("Modo:", ["▦ Grade", "💬 Apenas Chat", "🚫 Apenas Folgas"], horizontal=True, label_visibility="collapsed")
+                df_exibicao = df_dim_f if tipo == "▦ Grade" else filtrar_e_ordenar_dim(df_dim_f, tipo)
+                
+                cols_v = [c for c in df_exibicao.columns if c.upper().strip() not in ['EMAIL', 'E-MAIL', 'ILHA', 'Z']]
+                st.markdown(renderizar_tabela_html(df_exibicao[cols_v], 'diario', classe_altura_dinamica), unsafe_allow_html=True)
+                
+        else:
+            st.warning(f"⚠️ A aba diária para **{texto_busca}** não foi encontrada.")
+            st.markdown(f"""
+                <div style="background-color: #1e1e1e; padding: 15px; border-radius: 5px; border-left: 5px solid #ffbd45;">
+                    <p>Para poupar recursos, mantemos apenas as abas ativas nesta planilha.</p>
+                    <p>O histórico completo pode ser acessado no Drive:</p>
+                    <a href="https://drive.google.com/drive/folders/1WeIKaV6OvFOsNHdWhCirOx-zZogwdyPd?usp=drive_link" target="_blank" class="custom-link-btn" style="width: 200px;">
+                        📂 Acessar Histórico (Drive)
+                    </a>
+                </div>
+            """, unsafe_allow_html=True)
+    
 elif menu_navegacao == "📊 Meus Resultados":
-    
-    # --- HEADER DOS RESULTADOS ---
-    st.markdown(f"### 📊 Painel de Performance: {st.session_state.get('nome', 'Visitante')}")
-    st.caption("Acompanhe seus indicadores e feedbacks de qualidade em tempo real.")
-    st.divider()
-    
-    # Apenas para testar se a conexão com o novo arquivo deu certo!
-    st.info("Baixando dados de qualidade do GitHub...")
-    dados_metricas = fetch_gist_file("metricas_cx.json")
-    
-    if dados_metricas:
-        st.success("✅ Conexão com o banco de métricas estabelecida com sucesso!")
-        # Mostra quais "gavetas" o nosso robô do Sheets guardou lá dentro
-        st.write("Módulos disponíveis no arquivo:")
-        st.write(list(dados_metricas.keys()))
-    else:
-        st.error("Não foi possível carregar os resultados ainda.")
+        
+        # --- HEADER DOS RESULTADOS ---
+        st.markdown(f"### 📊 Painel de Performance: {st.session_state.get('nome', 'Visitante')}")
+        st.caption("Acompanhe seus indicadores e feedbacks de qualidade em tempo real.")
+        st.divider()
+        
+        # Apenas para testar se a conexão com o novo arquivo deu certo!
+        st.info("Baixando dados de qualidade do GitHub...")
+        dados_metricas = fetch_gist_file("metricas_cx.json")
+        
+        if dados_metricas:
+            st.success("✅ Conexão com o banco de métricas estabelecida com sucesso!")
+            # Mostra quais "gavetas" o nosso robô do Sheets guardou lá dentro
+            st.write("Módulos disponíveis no arquivo:")
+            st.write(list(dados_metricas.keys()))
+        else:
+            st.error("Não foi possível carregar os resultados ainda.")
