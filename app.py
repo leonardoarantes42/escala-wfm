@@ -550,16 +550,16 @@ opcoes_lider, opcoes_ilha = carregar_lista_pessoas()
 
 # --- SIDEBAR ---
 with st.sidebar:
-    # 🌟 NOVO: Topo da Sidebar com Nome e Logo lado a lado
-    c_nome, c_logo = st.columns([3.5, 1.5])
-    
-    with c_nome:
-        # Uma margem superior para alinhar o texto verticalmente com o meio da imagem
-        st.markdown(f"<div style='margin-top: 10px; font-size: 15px;'>👤 <b>{st.session_state.get('nome', 'Visitante')}</b></div>", unsafe_allow_html=True)
+    # 🌟 NOVO: Logo funcionando como "Avatar" no lugar do emoji
+    c_logo, c_nome = st.columns([1, 4])
     
     with c_logo:
-        # A imagem menorzinha puxada para a direita
-        st.image("logo_turbi.png", width=55)
+        # Tamanho ajustado (ex: 40px) para ficar um pouco maior que um emoji, mas ainda como ícone
+        st.image("logo_turbi.png", width=40)
+        
+    with c_nome:
+        # Alinhamento vertical (margin-top) para o nome não ficar "voando" em relação à imagem
+        st.markdown(f"<div style='margin-top: 8px; font-size: 16px;'><b>{st.session_state.get('nome', 'Visitante')}</b></div>", unsafe_allow_html=True)
         
     st.divider() # Linha sutil nativa do Streamlit
     
@@ -579,12 +579,9 @@ with st.sidebar:
         # Para a operação normal, o menu nem aparece
         menu_navegacao = "📅 Escala SC"
     
-    # 👇 A antiga imagem de 180px que ficava aqui foi removida!
-    
     st.markdown("#### 🔍 Filtros")
     
     sel_lider = st.multiselect("Líder", options=opcoes_lider)
-    # ... o resto do seu código de filtros continua normalmente a partir daqui ...
     sel_ilha = st.multiselect("Ilha", options=opcoes_ilha)
     
     busca_nome = st.text_input("Buscar Nome")
