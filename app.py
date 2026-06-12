@@ -559,7 +559,7 @@ with st.sidebar:
         
     with c_nome:
         # Alinhamento vertical (margin-top) para o nome não ficar "voando" em relação à imagem
-        (f"<div style='margin-top: 8px; font-size: 16px;'><b>{st.session_state.get('nome', 'Visitante')}</b></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='margin-top: 8px; font-size: 16px;'><b>{st.session_state.get('nome', 'Visitante')}</b></div>", unsafe_allow_html=True)
         
     st.divider() # Linha sutil nativa do Streamlit
     
@@ -568,7 +568,7 @@ with st.sidebar:
     desenvolvedores = ["leonardo.arantes@turbi.com.br"] 
     
     if usuario_logado in desenvolvedores:
-        ("<h4 style='margin-bottom: 30px;'>🧭 Navegação</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='margin-bottom: 30px;'>🧭 Navegação</h4>", unsafe_allow_html=True)
         menu_navegacao = st.radio(
             "Selecione a tela:",
             ["📅 Escala SC", "📊 Meus Resultados"],
@@ -579,16 +579,16 @@ with st.sidebar:
         # Para a operação normal, o menu nem aparece
         menu_navegacao = "📅 Escala SC"
     
-    ("#### 🔍 Filtros")
+    st.markdown("#### 🔍 Filtros")
     
     sel_lider = st.multiselect("Líder", options=opcoes_lider)
     sel_ilha = st.multiselect("Ilha", options=opcoes_ilha)
     
     busca_nome = st.text_input("Buscar Nome")
-    ("<hr style='margin: 10px 0px;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 10px 0px;'>", unsafe_allow_html=True)
     
     # Links Úteis
-    (f'<a href="{LINK_FORM_FERIAS}" target="_blank" class="custom-link-btn">🏖️ Solicitação de Férias</a>', unsafe_allow_html=True)
+    st.markdown(f'<a href="{LINK_FORM_FERIAS}" target="_blank" class="custom-link-btn">🏖️ Solicitação de Férias</a>', unsafe_allow_html=True)
     st.markdown(f'<a href="{LINK_FORM_DAYOFF}" target="_blank" class="custom-link-btn">🎂 Solicitação de Day Off (Aniversário)</a>', unsafe_allow_html=True)
     st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
     
