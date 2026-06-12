@@ -551,17 +551,44 @@ opcoes_lider, opcoes_ilha = carregar_lista_pessoas()
 # --- SIDEBAR ---
 with st.sidebar:
     st.write(f"👤 **{st.session_state.get('nome', 'Visitante')}**")
+    st.divider() # Linha sutil nativa do Streamlit
     
-    # 🌟 NOVO: Menu de Navegação do App
-    st.markdown("---")
-    menu_navegacao = st.radio(
-        "Navegação",
-        ["📅 Escala WFM", "📊 Meus Resultados"],
-        label_visibility="collapsed"
-    )
-    st.markdown("---")
+    # 🌟 FEATURE FLAG: ÁREA VIP DE DESENVOLVIMENTO
+    # Apenas os e-mails nesta lista verão o menu "Meus Resultados"
+    usuario_logado = st.session_state.get("usuario", "")
+    desenvolvedores = ["leonardo.arantes@turbi.com.br"] 
     
-    if st.button("Sair / Logout", type="secondary"):
+    if usuario_logado in desenvolvedores:
+        st.markdown("#### 🧭 Navegação")
+        menu_navegacao = st.radio(
+            "Selecione a tela:",
+            ["📅 Escala SC", "📊 Meus Resultados"],
+            label_visibility="collapsed"
+        )
+        st.divider()
+    else:
+        # Para a operação normal, o menu nem aparece e o sistema força a tela da Escala
+        menu_navegacao = "📅 Escala SC"
+    
+    # Logo e Filtros
+    st.image("logo_turbi.png", width=180) 
+    
+    st.markdown("#### 🔍 Filtros")
+    
+    sel_lider = st.multiselect("Líder", options=opcoes_lider)
+    sel_ilha = st.multiselect("Ilha", options=opcoes_ilha)
+    
+    busca_nome = st.text_input("Buscar Nome")
+    st.markdown("<hr style='margin: 10px 0px;'>", unsafe_allow_html=True)
+    
+    # Links Úteis
+    st.markdown(f'<a href="{LINK_FORM_FERIAS}" target="_blank" class="custom-link-btn">🏖️ Solicitação de Férias</a>', unsafe_allow_html=True)
+    st.markdown(f'<a href="{LINK_FORM_DAYOFF}" target="_blank" class="custom-link-btn">🎂 Solicitação de Day Off (Aniversário)</a>', unsafe_allow_html=True)
+    st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
+    
+    # Empurra o botão de Sair para o final
+    st.markdown("<br>", unsafe_allow_html=True) 
+    if st.button("🚪 Sair / Logout", type="secondary", use_container_width=True):
         try:
             cookie_manager.delete("turbi_token")
         except:
@@ -574,28 +601,14 @@ with st.sidebar:
         time.sleep(0.5)
         st.rerun()
 
-    st.divider()
-    
-    st.image("logo_turbi.png", width=180) 
-    
-    st.markdown("#### 🔍 Filtros")
-    
-    sel_lider = st.multiselect("Líder", options=opcoes_lider)
-    sel_ilha = st.multiselect("Ilha", options=opcoes_ilha)
-    
-    busca_nome = st.text_input("Buscar Nome")
-    st.markdown("<hr style='margin: 10px 0px;'>", unsafe_allow_html=True)
-    
-    st.markdown(f'<a href="{LINK_FORM_FERIAS}" target="_blank" class="custom-link-btn">🏖️ Solicitação de Férias</a>', unsafe_allow_html=True)
-    st.markdown(f'<a href="{LINK_FORM_DAYOFF}" target="_blank" class="custom-link-btn">🎂 Solicitação de Day Off (Aniversário)</a>', unsafe_allow_html=True)
-    st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
     st.markdown('<div class="footer-simple">Made by <b>Leonardo Arantes</b></div>', unsafe_allow_html=True)
 
 # ==========================================
 # 🖥️ ROTEADOR DE TELAS
 # ==========================================
 
-if menu_navegacao == "📅 Escala WFM":
+# 🚨 IMPORTANTE: Lembre-se de mudar aqui também para Escala SC!
+if menu_navegacao == "📅 Escala SC":
     
     # --- HEADER DA ESCALA ---
     c_title, _, c_search = st.columns([2, 0.5, 1.2])
