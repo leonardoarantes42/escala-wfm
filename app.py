@@ -860,8 +860,8 @@ elif menu_navegacao == "📊 Meus Resultados":
                 with c4: st.markdown(card_qualidade, unsafe_allow_html=True)
                 
             else:
-                st.warning(f"Ops! Não encontramos os resultados mensais para o e-mail: **{email_logado}**. Verifique se ele está presente na aba 'Turbi Guide 2.0'.")
+                st.info("Ops! Não encontramos resultados de performance consolidados para este usuário no ciclo atual.")
         else:
-            st.error("Erro Estrutural: Não foi possível localizar a linha de cabeçalhos na base de dados.")
+            st.error("Não foi possível carregar a estrutura de indicadores neste momento.")
     else:
-        st.error("Não foi possível processar o banco de dados de métricas.")
+        st.error("Serviço de métricas temporariamente indisponível.")
