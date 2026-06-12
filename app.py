@@ -512,7 +512,7 @@ if not st.session_state.get("logado", False):
         with login_container.container():
             c1, c2, c3 = st.columns([1, 2, 1])
             with c2:
-                st.markdown("### 🔒 Acesso Sistema de Escalas Turbi")
+                ("### 🔒 Acesso Sistema de Escalas Turbi")
                 i_user = st.text_input("E-mail", placeholder="ex: nome@turbi.com.br")
                 i_pass = st.text_input("Senha", type="password")
                 if st.button("Entrar", type="primary", use_container_width=True):
@@ -559,7 +559,7 @@ with st.sidebar:
         
     with c_nome:
         # Alinhamento vertical (margin-top) para o nome não ficar "voando" em relação à imagem
-        st.markdown(f"<div style='margin-top: 8px; font-size: 16px;'><b>{st.session_state.get('nome', 'Visitante')}</b></div>", unsafe_allow_html=True)
+        (f"<div style='margin-top: 8px; font-size: 16px;'><b>{st.session_state.get('nome', 'Visitante')}</b></div>", unsafe_allow_html=True)
         
     st.divider() # Linha sutil nativa do Streamlit
     
@@ -568,7 +568,7 @@ with st.sidebar:
     desenvolvedores = ["leonardo.arantes@turbi.com.br"] 
     
     if usuario_logado in desenvolvedores:
-        st.markdown("<h4 style='margin-bottom: 30px;'>🧭 Navegação</h4>", unsafe_allow_html=True)
+        ("<h4 style='margin-bottom: 30px;'>🧭 Navegação</h4>", unsafe_allow_html=True)
         menu_navegacao = st.radio(
             "Selecione a tela:",
             ["📅 Escala SC", "📊 Meus Resultados"],
@@ -579,16 +579,16 @@ with st.sidebar:
         # Para a operação normal, o menu nem aparece
         menu_navegacao = "📅 Escala SC"
     
-    st.markdown("#### 🔍 Filtros")
+    ("#### 🔍 Filtros")
     
     sel_lider = st.multiselect("Líder", options=opcoes_lider)
     sel_ilha = st.multiselect("Ilha", options=opcoes_ilha)
     
     busca_nome = st.text_input("Buscar Nome")
-    st.markdown("<hr style='margin: 10px 0px;'>", unsafe_allow_html=True)
+    ("<hr style='margin: 10px 0px;'>", unsafe_allow_html=True)
     
     # Links Úteis
-    st.markdown(f'<a href="{LINK_FORM_FERIAS}" target="_blank" class="custom-link-btn">🏖️ Solicitação de Férias</a>', unsafe_allow_html=True)
+    (f'<a href="{LINK_FORM_FERIAS}" target="_blank" class="custom-link-btn">🏖️ Solicitação de Férias</a>', unsafe_allow_html=True)
     st.markdown(f'<a href="{LINK_FORM_DAYOFF}" target="_blank" class="custom-link-btn">🎂 Solicitação de Day Off (Aniversário)</a>', unsafe_allow_html=True)
     st.markdown(f'<a href="{LINK_FORMULARIO}" target="_blank" class="custom-link-btn">📝 Alteração de folga/horário</a>', unsafe_allow_html=True)
     
@@ -783,7 +783,7 @@ elif menu_navegacao == "📊 Meus Resultados":
                     try:
                         idx = cabecalho.index(nome_coluna)
                         return str(linha_usuario[idx]).strip()
-                    except ValueError:
+                    except (ValueError, IndexError): # 🛡️ Blindagem contra colunas vazias
                         return "-"
 
                 # 1. Busca os Nomes e Resultados Reais
@@ -885,52 +885,41 @@ elif menu_navegacao == "📊 Meus Resultados":
                         else:
                             insight = f"Faltam {diff_str} para a meta principal."
 
-                    # 3. Desenho do Card HTML (Com Injeção Dinâmica)
-                    return f"""
-                    <div style="background-color: #1c1e24; padding: 20px; border-radius: 8px; border: 1px solid #333; height: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.15); position: relative;">
-                        <div style="position: absolute; top: 18px; right: 18px; font-size: 10px; font-weight: 800; color: {cor_barra}; background-color: {cor_barra}15; padding: 4px 8px; border-radius: 4px; border: 1px solid {cor_barra}40;">
-                            {tag_nivel}
-                        </div>
-                        
-                        <div style="font-size: 11px; color: #999; margin-bottom: 5px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">{titulo}</div>
-                        
-                        <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 15px;">
-                            <div style="font-size: 28px; color: #fff; font-weight: 900;">{real_str}</div>
-                            <div style="font-size: 13px; color: #777; font-weight: bold;">/ {meta_str}</div>
-                        </div>
-                        
-                        <div style="width: 100%; background-color: #2b2d35; border-radius: 6px; height: 8px; margin-bottom: 8px;">
-                            <div style="width: {largura_visual}%; background-color: {cor_barra}; height: 8px; border-radius: 6px; box-shadow: 0 0 8px {cor_barra}60;"></div>
-                        </div>
-                        
-                        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #aaa; margin-bottom: 15px; font-weight: bold;">
-                            <span>0%</span>
-                            <span style="color: {cor_barra};">{ating_str} Atingido</span>
-                        </div>
-                        
-                        <div style="font-size: 11.5px; color: #ccc; border-top: 1px dashed #444; padding-top: 12px; line-height: 1.4;">
-                            💡 <i>{insight}</i>
-                        </div>
-                    </div>
-                    """
+                    # 3. Desenho do Card HTML (🚨 SEM RECUO PARA NÃO VIRAR CÓDIGO)
+                    return f"""<div style="background-color: #1c1e24; padding: 20px; border-radius: 8px; border: 1px solid #333; height: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.15); position: relative;">
+<div style="position: absolute; top: 18px; right: 18px; font-size: 10px; font-weight: 800; color: {cor_barra}; background-color: {cor_barra}15; padding: 4px 8px; border-radius: 4px; border: 1px solid {cor_barra}40;">{tag_nivel}</div>
+<div style="font-size: 11px; color: #999; margin-bottom: 5px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">{titulo}</div>
+<div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 15px;">
+<div style="font-size: 28px; color: #fff; font-weight: 900;">{real_str}</div>
+<div style="font-size: 13px; color: #777; font-weight: bold;">/ {meta_str}</div>
+</div>
+<div style="width: 100%; background-color: #2b2d35; border-radius: 6px; height: 8px; margin-bottom: 8px;">
+<div style="width: {largura_visual}%; background-color: {cor_barra}; height: 8px; border-radius: 6px; box-shadow: 0 0 8px {cor_barra}60;"></div>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 11px; color: #aaa; margin-bottom: 15px; font-weight: bold;">
+<span>0%</span>
+<span style="color: {cor_barra};">{ating_str} Atingido</span>
+</div>
+<div style="font-size: 11.5px; color: #ccc; border-top: 1px dashed #444; padding-top: 12px; line-height: 1.4;">
+💡 <i>{insight}</i>
+</div>
+</div>"""
                 
                 c1, c2, c3, c4 = st.columns(4)
                 with c1: st.markdown(draw_smart_card(metrica_1_nome, metrica_1_val, meta_1_val, ating_1_val), unsafe_allow_html=True)
                 with c2: st.markdown(draw_smart_card(metrica_2_nome, metrica_2_val, meta_2_val, ating_2_val), unsafe_allow_html=True)
                 with c3: st.markdown(draw_smart_card(metrica_3_nome, metrica_3_val, meta_3_val, ating_3_val), unsafe_allow_html=True)
                 
-                # Card de Qualidade Modernizado
-                card_qualidade = f"""
-                    <div style="background-color: #1c1e24; padding: 20px; border-radius: 8px; border: 1px solid #333; height: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.15); display: flex; flex-direction: column; justify-content: center;">
-                        <div style="font-size: 11px; color: #999; margin-bottom: 5px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">QUALIDADE MENSAL</div>
-                        <div style="font-size: 32px; color: #fff; font-weight: 900; margin-bottom: 15px;">{qualidade}</div>
-                        <hr style="border: 0; height: 1px; background: #444; margin: 0 0 15px 0;">
-                        <div style="background-color: #8a1e1e15; padding: 10px; border-radius: 6px; border-left: 4px solid #e74c3c;">
-                            <div style="font-size: 12px; color: #e74c3c; font-weight: bold;">🚨 NCG (Não Conformidade):</div>
-                            <div style="font-size: 16px; color: #fff; font-weight: bold;">{ncg} Registros</div>
-                        </div>
-                    </div>
-                """
+                # Card de Qualidade Modernizado (🚨 SEM RECUO PARA NÃO VIRAR CÓDIGO)
+                card_qualidade = f"""<div style="background-color: #1c1e24; padding: 20px; border-radius: 8px; border: 1px solid #333; height: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.15); display: flex; flex-direction: column; justify-content: center;">
+<div style="font-size: 11px; color: #999; margin-bottom: 5px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">QUALIDADE MENSAL</div>
+<div style="font-size: 32px; color: #fff; font-weight: 900; margin-bottom: 15px;">{qualidade}</div>
+<hr style="border: 0; height: 1px; background: #444; margin: 0 0 15px 0;">
+<div style="background-color: #8a1e1e15; padding: 10px; border-radius: 6px; border-left: 4px solid #e74c3c;">
+<div style="font-size: 12px; color: #e74c3c; font-weight: bold;">🚨 NCG (Não Conformidade):</div>
+<div style="font-size: 16px; color: #fff; font-weight: bold;">{ncg} Registros</div>
+</div>
+</div>"""
                 with c4: st.markdown(card_qualidade, unsafe_allow_html=True)
                 
             else:
