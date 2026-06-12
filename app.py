@@ -752,26 +752,29 @@ elif menu_navegacao == "📊 Meus Resultados":
     with c_desc:
         st.caption("Acompanhe seus indicadores, sua trilha de bonificação e feedbacks de qualidade.")
     with c_btn:
-        # 💡 Botão Pop-up com as Regras da Turbi
+        # 💡 Botão Pop-up com as Regras da Turbi Atualizadas
         with st.popover("💡 Ver Regras de Bonificação"):
             st.markdown("#### 🏆 Status e Multiplicadores")
             st.markdown("""
             | PONTUAÇÃO FINAL | STATUS | BÔNUS BASE |
             | :--- | :--- | :--- |
-            | **Até 69,9%** | ⚠️ Neutro | Sem bônus |
-            | **70% a 109,9%** | ✅ Acelerando | Bônus Categoria 1 |
-            | **110% a 129,9%** | 🚀 Turbo | Bônus Categoria 2 |
-            | **130% ou mais** | 👑 Super Turbo | Bônus Máximo |
+            | **Até 69,9%** | ⚠️ Pisca Alerta / Neutro | **0%** (Sem bônus) |
+            | **70% a 109,9%** | ✅ Acelerando | **3% a 10%** |
+            | **110% a 129,9%** | 🚀 Turbo | **12% a 18%** |
+            | **130% ou mais** | 👑 Super Turbo | **20%** |
             """)
             st.divider()
-            st.markdown("#### 🚨 Impacto da Qualidade")
+            st.markdown("#### 🚨 Impacto da Qualidade Mensal")
             st.markdown("""
-            | NCGs (Não Conformidade) | IMPACTO NO BÔNUS |
+            | RESULTADO DA QUALIDADE | IMPACTO NO BÔNUS FINAL |
             | :--- | :--- |
-            | **0 NCGs** | Mantém 100% do Status alcançado |
-            | **1 NCG** | Cai 1 nível de Status (Ex: Turbo vira Acelerando) |
-            | **2 ou mais NCGs** | Perda total do bônus do ciclo |
+            | **1 ou mais NCGs** | ❌ Perde toda a bonificação |
+            | **Nota de 0% a 69,9%** | ❌ Perde toda a bonificação |
+            | **Nota de 70% a 79,9%** | 📉 Penalidade de **-5%** no bônus |
+            | **Nota de 80% a 94,9%** | ➖ Sem alteração (**0%**) |
+            | **Nota de 95% ou mais** | 📈 Acréscimo de **+5%** no bônus |
             """)
+            st.caption("*Nota: O bônus nunca ficará negativo. O mínimo é 0%.*")
             
     st.divider()
     
@@ -830,68 +833,57 @@ elif menu_navegacao == "📊 Meus Resultados":
                 ncg = buscar_valor_por_nome("NCG")
                 
                 # ==========================================
-                # 🎨 UI: BANNER E TRILHA DE GAMIFICAÇÃO
+                # 🎨 UI: O HERO BANNER COMBINADO (MÁGICA DO CSS)
                 # ==========================================
                 
-                cor_status = "#262730"
                 txt_status_upper = status_final.upper()
-                
-                if "SUPER TURBO" in txt_status_upper: cor_status = "#d100d1"
-                elif "TURBO" in txt_status_upper: cor_status = "#1e3a8a"
-                elif "ACELERANDO" in txt_status_upper: cor_status = "#11734b"
-                elif "NEUTRO" in txt_status_upper: cor_status = "#b8860b"
-                elif "ALERTA" in txt_status_upper: cor_status = "#8a1e1e"
-                
-                st.markdown(f"""
-                    <div style="background-color: {cor_status}; padding: 25px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 10px rgba(0,0,0,0.4);">
-                        <div>
-                            <div style="color: rgba(255,255,255,0.7); font-size: 13px; font-weight: bold; letter-spacing: 1px;">STATUS DO MÊS</div>
-                            <div style="color: #fff; font-size: 36px; font-weight: 900; letter-spacing: 1px; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">{txt_status_upper}</div>
-                        </div>
-                        <div style="text-align: right; border-left: 1px solid rgba(255,255,255,0.2); padding-left: 25px;">
-                            <div style="color: rgba(255,255,255,0.7); font-size: 13px; font-weight: bold; letter-spacing: 1px;">PROJEÇÃO DE BÔNUS</div>
-                            <div style="color: #fff; font-size: 36px; font-weight: 900; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">{bonus_final}</div>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-                
+                # Cores baseadas no nível
+                if "SUPER TURBO" in txt_status_upper: cor_status = "#d100d1"   # Magenta
+                elif "TURBO" in txt_status_upper: cor_status = "#1e3a8a"       # Azul Turbi
+                elif "ACELERANDO" in txt_status_upper: cor_status = "#11734b"  # Verde Turbi
+                elif "NEUTRO" in txt_status_upper: cor_status = "#b8860b"      # Dourado
+                elif "ALERTA" in txt_status_upper: cor_status = "#8a1e1e"      # Vermelho
+                else: cor_status = "#262730"
+
                 # --- CÁLCULO MATEMÁTICO DA TRILHA ---
                 try:
                     pontuacao_val = float(pontuacao_final_str.replace("%", "").replace(",", ".").strip())
                 except:
                     pontuacao_val = 0.0
 
-                escala_max = 135.0 # Fim da régua para dar respiro após os 130%
+                escala_max = 135.0 # Respiro no final
                 pos_user = min(100.0, (pontuacao_val / escala_max) * 100.0)
                 pos_acel = (70.0 / escala_max) * 100.0
                 pos_turbo = (110.0 / escala_max) * 100.0
                 pos_sturbo = (130.0 / escala_max) * 100.0
-                
-                # Gradiente inteligente dependendo de onde o analista está
-                if pontuacao_val < 70: cor_trilha = "linear-gradient(90deg, #8a1e1e, #b8860b)"
-                elif pontuacao_val < 110: cor_trilha = "linear-gradient(90deg, #11734b, #11734b)"
-                elif pontuacao_val < 130: cor_trilha = "linear-gradient(90deg, #11734b, #1e3a8a)"
-                else: cor_trilha = "linear-gradient(90deg, #1e3a8a, #d100d1)"
 
-                # --- HTML DA TRILHA (SEM RECUO PARA EVITAR MARKDOWN TRAP) ---
-                trilha_gamificacao = f"""<div style="background-color: #1c1e24; padding: 20px 30px 40px 30px; border-radius: 8px; border: 1px solid #333; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.15);">
-<div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
-<span style="color: #ccc; font-size: 14px; font-weight: bold;">PONTUAÇÃO FINAL: <span style="color: #fff; font-size: 22px;">{pontuacao_final_str}</span></span>
-<span style="color: #999; font-size: 12px; margin-top: 8px;">JORNADA DE BONIFICAÇÃO</span>
+                # HTML Combinado: Banner + Trilha (🚨 SEM RECUO)
+                hero_banner = f"""<div style="background-color: {cor_status}; padding: 25px 30px 40px 30px; border-radius: 12px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 8px 16px rgba(0,0,0,0.4);">
+<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 35px;">
+<div>
+<div style="color: rgba(255,255,255,0.8); font-size: 12px; font-weight: bold; letter-spacing: 1px; margin-bottom: 5px;">PONTUAÇÃO FINAL (MÊS VIGENTE)</div>
+<div style="color: #fff; font-size: 34px; font-weight: 900; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 10px;">
+{pontuacao_final_str} <span style="font-size: 16px; font-weight: 800; background-color: rgba(0,0,0,0.2); padding: 4px 10px; border-radius: 6px;">{txt_status_upper}</span>
 </div>
-<div style="position: relative; width: 100%; height: 14px; background-color: #2b2d35; border-radius: 8px;">
-<div style="width: {pos_user}%; background: {cor_trilha}; height: 14px; border-radius: 8px; box-shadow: 0 0 10px rgba(255,255,255,0.1);"></div>
-<div style="position: absolute; top: -6px; left: {pos_acel}%; height: 26px; width: 2px; background-color: #11734b;"></div>
-<div style="position: absolute; top: 22px; left: {pos_acel}%; transform: translateX(-50%); font-size: 11px; color: #11734b; font-weight: bold;">70% Acel.</div>
-<div style="position: absolute; top: -6px; left: {pos_turbo}%; height: 26px; width: 2px; background-color: #1e3a8a;"></div>
-<div style="position: absolute; top: 22px; left: {pos_turbo}%; transform: translateX(-50%); font-size: 11px; color: #1e3a8a; font-weight: bold;">110% Turbo</div>
-<div style="position: absolute; top: -6px; left: {pos_sturbo}%; height: 26px; width: 2px; background-color: #d100d1;"></div>
-<div style="position: absolute; top: 22px; left: {pos_sturbo}%; transform: translateX(-50%); font-size: 11px; color: #d100d1; font-weight: bold;">130% S.Turbo</div>
-<div style="position: absolute; top: -32px; left: {pos_user}%; transform: translateX(-50%); font-size: 24px; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.5));">📍</div>
+</div>
+<div style="text-align: right; border-left: 2px solid rgba(255,255,255,0.3); padding-left: 25px;">
+<div style="color: rgba(255,255,255,0.8); font-size: 12px; font-weight: bold; letter-spacing: 1px; margin-bottom: 5px;">PROJEÇÃO DE BÔNUS</div>
+<div style="color: #fff; font-size: 36px; font-weight: 900; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">{bonus_final}</div>
+</div>
+</div>
+<div style="position: relative; width: 100%; height: 16px; background-color: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+<div style="width: {pos_user}%; background: rgba(255,255,255,0.9); height: 16px; border-radius: 8px; box-shadow: 0 0 12px rgba(255,255,255,0.6);"></div>
+<div style="position: absolute; top: -5px; left: {pos_acel}%; height: 26px; width: 2px; background-color: rgba(255,255,255,0.7);"></div>
+<div style="position: absolute; top: 24px; left: {pos_acel}%; transform: translateX(-50%); font-size: 11px; color: rgba(255,255,255,0.9); font-weight: bold;">70% Acel.</div>
+<div style="position: absolute; top: -5px; left: {pos_turbo}%; height: 26px; width: 2px; background-color: rgba(255,255,255,0.7);"></div>
+<div style="position: absolute; top: 24px; left: {pos_turbo}%; transform: translateX(-50%); font-size: 11px; color: rgba(255,255,255,0.9); font-weight: bold;">110% Turbo</div>
+<div style="position: absolute; top: -5px; left: {pos_sturbo}%; height: 26px; width: 2px; background-color: rgba(255,255,255,0.7);"></div>
+<div style="position: absolute; top: 24px; left: {pos_sturbo}%; transform: translateX(-50%); font-size: 11px; color: rgba(255,255,255,0.9); font-weight: bold;">130% S.Turbo</div>
+<div style="position: absolute; top: -34px; left: {pos_user}%; transform: translateX(-50%); font-size: 26px; filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.6));">📍</div>
 </div>
 </div>"""
-                st.markdown(trilha_gamificacao, unsafe_allow_html=True)
-                
+                st.markdown(hero_banner, unsafe_allow_html=True)
+                                
                 # --- B) MOTOR INTELIGENTE DOS SMART CARDS ---
                 def draw_smart_card(titulo, real_str, meta_str, ating_str):
                     def limpar_num(texto):
