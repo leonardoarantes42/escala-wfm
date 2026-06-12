@@ -176,14 +176,14 @@ def normalizar_texto(texto):
 
 @st.cache_data(ttl=600, show_spinner=False)
 def listar_abas_dim():
-    data = fetch_master_json()
+    data = fetch_gist_file("escala_cx.json")
     dims = data.get("DIMs", {})
     return sorted(list(dims.keys()))
 
 # 1. FUNÇÃO PESADA (Refatorada para ler da memória)
 @st.cache_data(ttl=600, show_spinner=False)
 def carregar_dados_aba(nome_aba):
-    data = fetch_master_json()
+    data = fetch_gist_file("escala_cx.json")
     
     # Identifica se a requisição é de um Mês ou de um DIM
     dados = []
@@ -267,7 +267,7 @@ def carregar_dados_aba(nome_aba):
 # 2. FUNÇÃO LEVE (Lê Pessoas)
 @st.cache_data(ttl=600, show_spinner=False)
 def carregar_lista_pessoas():
-    data = fetch_master_json()
+    data = fetch_gist_file("escala_cx.json")
     dados = data.get("Pessoas", [])
     if not dados: return [], []
     
@@ -296,7 +296,7 @@ def carregar_lista_pessoas():
 # ==========================================
 @st.cache_data(ttl=600, show_spinner=False)
 def carregar_plantao_dia(data_str):
-    data = fetch_master_json()
+    data = fetch_gist_file("escala_cx.json")
     dados = data.get("ESCALA 26 STAFF", [])
     if not dados or len(dados) < 3: return None
     
