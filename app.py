@@ -779,7 +779,14 @@ elif menu_navegacao == "📊 Meus Resultados":
                 # ==========================================
                 # 🎯 EXTRAÇÃO DINÂMICA (A MÁGICA DOS CABEÇALHOS)
                 # ==========================================
-                # O Python lê as colunas E(4), F(5) e G(6), não importa qual seja o nome delas
+                def buscar_valor_por_nome(nome_coluna):
+                    try:
+                        idx = cabecalho.index(nome_coluna)
+                        return str(linha_usuario[idx]).strip()
+                    except ValueError:
+                        return "-"
+
+                # 1. Busca os Nomes e Resultados Reais
                 metrica_1_nome = cabecalho[4] if len(cabecalho) > 4 else "Métrica 1"
                 metrica_1_val = linha_usuario[4] if len(linha_usuario) > 4 else "-"
                 
@@ -789,72 +796,139 @@ elif menu_navegacao == "📊 Meus Resultados":
                 metrica_3_nome = cabecalho[6] if len(cabecalho) > 6 else "Métrica 3"
                 metrica_3_val = linha_usuario[6] if len(linha_usuario) > 6 else "-"
                 
-                # Procura as colunas de resultado final onde quer que elas estejam
-                def buscar_valor_por_nome(nome_coluna):
-                    try:
-                        idx = cabecalho.index(nome_coluna)
-                        return str(linha_usuario[idx]).strip()
-                    except ValueError:
-                        return "-"
+                # 2. Busca as Novas Metas e Porcentagens que você criou no Sheets
+                meta_1_val = buscar_valor_por_nome("META 1")
+                meta_2_val = buscar_valor_por_nome("META 2")
+                meta_3_val = buscar_valor_por_nome("META 3")
+                
+                ating_1_val = buscar_valor_por_nome("% ATINGIMENTO 1")
+                ating_2_val = buscar_valor_por_nome("% ATINGIMENTO 2")
+                ating_3_val = buscar_valor_por_nome("% ATINGIMENTO 3")
 
+                # 3. Busca o consolidado final
                 status_final = buscar_valor_por_nome("STATUSFINAL")
                 bonus_final = buscar_valor_por_nome("BONIFICAÇÃO FINAL")
                 qualidade = buscar_valor_por_nome("QUALIDADE")
                 ncg = buscar_valor_por_nome("NCG")
                 
                 # ==========================================
-                # 🎨 UI: RENDERIZAÇÃO DO DASHBOARD
+                # 🎨 UI: RENDERIZAÇÃO DO DASHBOARD (O SHOW DE UX)
                 # ==========================================
                 
                 # --- A) BANNER DE STATUS E BÔNUS ---
-                # Define a cor de fundo com base no nível atingido
-                cor_status = "#262730" # Cor padrão (Cinza Escuro)
-                if "ACELERANDO" in status_final.upper(): cor_status = "#11734b" # Verde Turbi
-                elif "TURBO" in status_final.upper(): cor_status = "#1e3a8a"    # Azul Turbi
-                elif "ALERTA" in status_final.upper(): cor_status = "#8a1e1e"   # Vermelho Alerta
-                elif "NEUTRO" in status_final.upper(): cor_status = "#b8860b"   # Dourado Neutro
+                cor_status = "#262730" # Cor padrão
+                txt_status_upper = status_final.upper()
+                
+                if "SUPER TURBO" in txt_status_upper: cor_status = "#d100d1"   # Magenta
+                elif "TURBO" in txt_status_upper: cor_status = "#1e3a8a"       # Azul Turbi
+                elif "ACELERANDO" in txt_status_upper: cor_status = "#11734b"  # Verde Turbi
+                elif "NEUTRO" in txt_status_upper: cor_status = "#b8860b"      # Dourado
+                elif "ALERTA" in txt_status_upper: cor_status = "#8a1e1e"      # Vermelho
                 
                 st.markdown(f"""
-                    <div style="background-color: {cor_status}; padding: 25px; border-radius: 8px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #444; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                    <div style="background-color: {cor_status}; padding: 25px; border-radius: 8px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 10px rgba(0,0,0,0.4);">
                         <div>
-                            <div style="color: #ccc; font-size: 13px; font-weight: bold; letter-spacing: 1px;">STATUS DO MÊS</div>
-                            <div style="color: #fff; font-size: 34px; font-weight: 900;">{status_final.upper()}</div>
+                            <div style="color: rgba(255,255,255,0.7); font-size: 13px; font-weight: bold; letter-spacing: 1px;">STATUS DO MÊS</div>
+                            <div style="color: #fff; font-size: 36px; font-weight: 900; letter-spacing: 1px; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">{txt_status_upper}</div>
                         </div>
                         <div style="text-align: right; border-left: 1px solid rgba(255,255,255,0.2); padding-left: 25px;">
-                            <div style="color: #ccc; font-size: 13px; font-weight: bold; letter-spacing: 1px;">PROJEÇÃO DE BÔNUS</div>
-                            <div style="color: #fff; font-size: 34px; font-weight: 900;">{bonus_final}</div>
+                            <div style="color: rgba(255,255,255,0.7); font-size: 13px; font-weight: bold; letter-spacing: 1px;">PROJEÇÃO DE BÔNUS</div>
+                            <div style="color: #fff; font-size: 36px; font-weight: 900; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">{bonus_final}</div>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
                 
-                # --- B) SMART CARDS DAS MÉTRICAS ---
-                c1, c2, c3, c4 = st.columns(4)
-                
-                # Componente HTML para um "Smart Card" com barra de progresso fake (por enquanto)
-                def draw_smart_card(titulo, valor, cor_barra, insight):
-                    # Usamos um valor visual padrão de 75% para a barra (depois podemos plugar a matemática real)
+                # --- B) MOTOR INTELIGENTE DOS SMART CARDS ---
+                def draw_smart_card(titulo, real_str, meta_str, ating_str):
+                    # Transforma os textos em números para o Python fazer as contas
+                    def limpar_num(texto):
+                        try: return float(str(texto).replace("%", "").replace(",", ".").strip())
+                        except: return 0.0
+                    
+                    real_val = limpar_num(real_str)
+                    meta_val = limpar_num(meta_str)
+                    ating_val = limpar_num(ating_str)
+
+                    # 1. Define Cores e Selos com base na Regra do Jogo
+                    if ating_val >= 130:
+                        cor_barra, tag_nivel = "#d100d1", "👑 SUPER TURBO"
+                    elif ating_val >= 110:
+                        cor_barra, tag_nivel = "#1e3a8a", "🚀 TURBO"
+                    elif ating_val >= 70:
+                        cor_barra, tag_nivel = "#11734b", "✅ ACELERANDO"
+                    elif ating_val >= 30:
+                        cor_barra, tag_nivel = "#b8860b", "⚠️ NEUTRO"
+                    else:
+                        cor_barra, tag_nivel = "#8a1e1e", "🚨 PISCA ALERTA"
+
+                    # Limita a barra visualmente a 100% da caixa, mesmo se o cara fizer 130%
+                    largura_visual = min(100, ating_val)
+                    if largura_visual == 0: largura_visual = 2 # Mostra pelo menos uma pontinha
+
+                    # 2. O Cérebro do Insight (Diferença para a Meta)
+                    insight = ""
+                    if ating_val >= 130:
+                        insight = "🏆 Meta máxima atingida! Você é Super Turbo."
+                    elif ating_val >= 100:
+                        insight = f"🔥 Sensacional! Meta Acelerando ({meta_str}) já garantida."
+                    else:
+                        diff = abs(meta_val - real_val)
+                        diff_str = f"{diff:g}".replace(".", ",") # Ex: 1.5 vira 1,5
+                        t_upper = titulo.upper()
+                        
+                        if "TMO" in t_upper or "TMA" in t_upper:
+                            insight = f"Falta reduzir {diff_str} min para bater a meta Acelerando."
+                        elif "PRODUTIVIDADE" in t_upper:
+                            insight = f"Faltam {diff_str} tickets para chegar na meta."
+                        elif "DISPONIBILIDADE" in t_upper or "SLA" in t_upper:
+                            insight = f"Faltam {diff_str}% para alcançar a meta Acelerando."
+                        else:
+                            insight = f"Faltam {diff_str} para a meta principal."
+
+                    # 3. Desenho do Card HTML (Com Injeção Dinâmica)
                     return f"""
-                    <div style="background-color: #1c1e24; padding: 18px; border-radius: 8px; border: 1px solid #333; height: 100%; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-                        <div style="font-size: 11px; color: #999; margin-bottom: 8px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">{titulo}</div>
-                        <div style="font-size: 26px; color: #fff; font-weight: 800; margin-bottom: 12px;">{valor}</div>
-                        <div style="width: 100%; background-color: #2b2d35; border-radius: 4px; height: 5px; margin-bottom: 10px;">
-                            <div style="width: 75%; background-color: {cor_barra}; height: 5px; border-radius: 4px;"></div>
+                    <div style="background-color: #1c1e24; padding: 20px; border-radius: 8px; border: 1px solid #333; height: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.15); position: relative;">
+                        <div style="position: absolute; top: 18px; right: 18px; font-size: 10px; font-weight: 800; color: {cor_barra}; background-color: {cor_barra}15; padding: 4px 8px; border-radius: 4px; border: 1px solid {cor_barra}40;">
+                            {tag_nivel}
                         </div>
-                        <div style="font-size: 11px; color: #bbb;">💡 <i>{insight}</i></div>
+                        
+                        <div style="font-size: 11px; color: #999; margin-bottom: 5px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">{titulo}</div>
+                        
+                        <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 15px;">
+                            <div style="font-size: 28px; color: #fff; font-weight: 900;">{real_str}</div>
+                            <div style="font-size: 13px; color: #777; font-weight: bold;">/ {meta_str}</div>
+                        </div>
+                        
+                        <div style="width: 100%; background-color: #2b2d35; border-radius: 6px; height: 8px; margin-bottom: 8px;">
+                            <div style="width: {largura_visual}%; background-color: {cor_barra}; height: 8px; border-radius: 6px; box-shadow: 0 0 8px {cor_barra}60;"></div>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #aaa; margin-bottom: 15px; font-weight: bold;">
+                            <span>0%</span>
+                            <span style="color: {cor_barra};">{ating_str} Atingido</span>
+                        </div>
+                        
+                        <div style="font-size: 11.5px; color: #ccc; border-top: 1px dashed #444; padding-top: 12px; line-height: 1.4;">
+                            💡 <i>{insight}</i>
+                        </div>
                     </div>
                     """
                 
-                with c1: st.markdown(draw_smart_card(metrica_1_nome, metrica_1_val, "#1f77b4", "Consolidação da métrica principal."), unsafe_allow_html=True)
-                with c2: st.markdown(draw_smart_card(metrica_2_nome, metrica_2_val, "#ff7f0e", "Acompanhamento de volume/tempo."), unsafe_allow_html=True)
-                with c3: st.markdown(draw_smart_card(metrica_3_nome, metrica_3_val, "#2ca02c", "Indicador de performance atrelado."), unsafe_allow_html=True)
+                c1, c2, c3, c4 = st.columns(4)
+                with c1: st.markdown(draw_smart_card(metrica_1_nome, metrica_1_val, meta_1_val, ating_1_val), unsafe_allow_html=True)
+                with c2: st.markdown(draw_smart_card(metrica_2_nome, metrica_2_val, meta_2_val, ating_2_val), unsafe_allow_html=True)
+                with c3: st.markdown(draw_smart_card(metrica_3_nome, metrica_3_val, meta_3_val, ating_3_val), unsafe_allow_html=True)
                 
-                # O card de qualidade não precisa de barra de progresso, vamos focar no NCG
+                # Card de Qualidade Modernizado
                 card_qualidade = f"""
-                    <div style="background-color: #1c1e24; padding: 18px; border-radius: 8px; border: 1px solid #333; height: 100%; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-                        <div style="font-size: 11px; color: #999; margin-bottom: 8px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">QUALIDADE</div>
-                        <div style="font-size: 26px; color: #fff; font-weight: 800; margin-bottom: 12px;">{qualidade}</div>
-                        <hr style="border: 0; height: 1px; background: #333; margin: 10px 0;">
-                        <div style="font-size: 12px; color: #e74c3c; font-weight: bold;">🚨 NCG Registrado: {ncg}</div>
+                    <div style="background-color: #1c1e24; padding: 20px; border-radius: 8px; border: 1px solid #333; height: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.15); display: flex; flex-direction: column; justify-content: center;">
+                        <div style="font-size: 11px; color: #999; margin-bottom: 5px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">QUALIDADE MENSAL</div>
+                        <div style="font-size: 32px; color: #fff; font-weight: 900; margin-bottom: 15px;">{qualidade}</div>
+                        <hr style="border: 0; height: 1px; background: #444; margin: 0 0 15px 0;">
+                        <div style="background-color: #8a1e1e15; padding: 10px; border-radius: 6px; border-left: 4px solid #e74c3c;">
+                            <div style="font-size: 12px; color: #e74c3c; font-weight: bold;">🚨 NCG (Não Conformidade):</div>
+                            <div style="font-size: 16px; color: #fff; font-weight: bold;">{ncg} Registros</div>
+                        </div>
                     </div>
                 """
                 with c4: st.markdown(card_qualidade, unsafe_allow_html=True)
