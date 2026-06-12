@@ -797,7 +797,7 @@ elif menu_navegacao == "📊 Meus Resultados":
                     except ValueError:
                         return "-"
 
-                status_final = buscar_valor_por_nome("STATUS FINAL")
+                status_final = buscar_valor_por_nome("STATUSFINAL")
                 bonus_final = buscar_valor_por_nome("BONIFICAÇÃO FINAL")
                 qualidade = buscar_valor_por_nome("QUALIDADE")
                 ncg = buscar_valor_por_nome("NCG")
