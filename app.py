@@ -550,7 +550,17 @@ opcoes_lider, opcoes_ilha = carregar_lista_pessoas()
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.write(f"👤 **{st.session_state.get('nome', 'Visitante')}**")
+    # 🌟 NOVO: Topo da Sidebar com Nome e Logo lado a lado
+    c_nome, c_logo = st.columns([3.5, 1.5])
+    
+    with c_nome:
+        # Uma margem superior para alinhar o texto verticalmente com o meio da imagem
+        st.markdown(f"<div style='margin-top: 10px; font-size: 15px;'>👤 <b>{st.session_state.get('nome', 'Visitante')}</b></div>", unsafe_allow_html=True)
+    
+    with c_logo:
+        # A imagem menorzinha puxada para a direita
+        st.image("logo_turbi.png", width=55)
+        
     st.divider() # Linha sutil nativa do Streamlit
     
     # 🌟 FEATURE FLAG: ÁREA VIP DE DESENVOLVIMENTO
@@ -558,7 +568,6 @@ with st.sidebar:
     desenvolvedores = ["leonardo.arantes@turbi.com.br"] 
     
     if usuario_logado in desenvolvedores:
-        # Colocamos um "calço" invisível (margin-bottom: 30px) para anular o CSS que puxava o menu pra cima
         st.markdown("<h4 style='margin-bottom: 30px;'>🧭 Navegação</h4>", unsafe_allow_html=True)
         menu_navegacao = st.radio(
             "Selecione a tela:",
@@ -570,12 +579,12 @@ with st.sidebar:
         # Para a operação normal, o menu nem aparece
         menu_navegacao = "📅 Escala SC"
     
-    # Logo e Filtros
-    st.image("logo_turbi.png", width=180) 
+    # 👇 A antiga imagem de 180px que ficava aqui foi removida!
     
     st.markdown("#### 🔍 Filtros")
     
     sel_lider = st.multiselect("Líder", options=opcoes_lider)
+    # ... o resto do seu código de filtros continua normalmente a partir daqui ...
     sel_ilha = st.multiselect("Ilha", options=opcoes_ilha)
     
     busca_nome = st.text_input("Buscar Nome")
